@@ -10,9 +10,27 @@ import sys
 import atexit
 from ppe_tracker import PPEViolationTracker
 
+def _load_dotenv_local():
+    """Đọc .env.local (KEY=VALUE) ở gốc repo nếu có, không ghi đè biến đã
+    set qua shell. Tự parse thay vì thêm dependency python-dotenv chỉ để
+    đọc vài dòng KEY=VALUE."""
+    if not os.path.exists(".env.local"):
+        return
+    with open(".env.local", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            key, _, value = line.partition("=")
+            os.environ.setdefault(key.strip(), value.strip())
+
+
+_load_dotenv_local()
+
 # Configuration
 BRIDGE_URL = "http://localhost:4001/detections"
 NEXT_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/violations"
+AI_ENGINE_SECRET = os.environ.get("AI_ENGINE_SECRET", "")
 SNAPSHOT_DIR = "public/snapshots"
 
 # PPE thiếu -> (type, severity) khớp src/types/enums.ts (ViolationType/Severity)
@@ -57,7 +75,7 @@ def report_violation(cam_id, detection):
                 "confidence": detection["confidence"],
             }],
             "snapshotUrl": snapshot_url,
-        }, timeout=1.0)
+        }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
     except requests.exceptions.RequestException:
         pass
 

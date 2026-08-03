@@ -47,7 +47,10 @@ python3 -m venv .venv
 .venv/bin/pip install ultralytics opencv-python requests
 
 # 3. Biến môi trường — tạo .env.local (KHÔNG commit, đã gitignore)
-cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_YOLO_SERVER_URL
+cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_YOLO_SERVER_URL,
+                      # và AI_ENGINE_SECRET (bắt buộc — POST /api/violations từ chối request
+                      # thiếu header X-AI-Engine-Secret khớp giá trị này, sinh bằng
+                      # `openssl rand -base64 24`)
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không
 #    Violation write sẽ lỗi 404 vì cameraId chưa tồn tại)
