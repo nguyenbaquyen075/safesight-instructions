@@ -1,0 +1,182 @@
+// SafeSight — SQLite schema (dev)
+// For production with PostgreSQL, revert provider to "postgresql"
+// and restore enum types + array fields
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// --- Models (SQLite-compatible: no enums, no native arrays) ---
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("starter")
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+  sites Site[]
+}
+
+model Site {
+  id                String   @id @default(cuid())
+  orgId             String
+  name              String
+  address           String
+  lat               Float
+  lng               Float
+  status            String   @default("SETUP")
+  cameraCount       Int      @default(0)
+  onlineCameraCount Int      @default(0)
+  workerCount       Int      @default(0)
+  complianceRate    Float    @default(0)
+  activeAlerts      Int      @default(0)
+  todayViolations   Int      @default(0)
+  imageUrl          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  cameras      Camera[]
+  zones        Zone[]
+  violations   Violation[]
+  alertRules   AlertRule[]
+}
+
+model Camera {
+  id               String   @id @default(cuid())
+  siteId           String
+  name             String
+  rtspUrl          String
+  status           String   @default("OFFLINE")
+  type             String   @default("fixed")
+  location         String
+  fps              Int      @default(15)
+  resolution       String   @default("1920x1080")
+  lastHealthCheck  DateTime @default(now())
+  lastDetectionAt  DateTime?
+  thumbnailUrl     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  zones      Zone[]
+  violations Violation[]
+}
+
+model Zone {
+  id               String   @id @default(cuid())
+  siteId           String
+  cameraId         String
+  name             String
+  type             String   @default("MONITORING")
+  polygonData      String   // JSON string
+  schedule         String?  // JSON string
+  isActive         Boolean  @default(true)
+  maxOccupancy     Int?
+  currentOccupancy Int?
+  violationCount   Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  camera     Camera      @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  violations Violation[]
+}
+
+model Violation {
+  id          String   @id @default(cuid())
+  cameraId    String
+  siteId      String
+  zoneId      String?
+  type        String
+  severity    String
+  confidence  Float
+  bboxData   String   // JSON string
+  snapshotUrl String
+  clipUrl     String?
+  status      String   @default("OPEN")
+  detectedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  camera Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  alerts Alert[]
+}
+
+model Alert {
+  id               String   @id @default(cuid())
+  violationId      String
+  ruleId          String?
+  channel         String
+  recipient       String
+  status          String   @default("NEW")
+  sentAt          DateTime @default(now())
+  acknowledgedById String?
+  acknowledgedAt  DateTime?
+  escalatedAt     DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  violation      Violation  @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  alertRule     AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  acknowledgedBy User?     @relation(fields: [acknowledgedById], references: [id], onDelete: SetNull)
+}
+
+model AlertRule {
+  id              String @id @default(cuid())
+  siteId          String
+  name            String
+  violationTypes  String // JSON array
+  channels        String // JSON array
+  recipients      String // JSON array
+  threshold       Int    @default(1)
+  cooldownSec     Int    @default(300)
+  schedule        String? // JSON string
+  isActive        Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+}
+
+model User {
+  id               String   @id @default(cuid())
+  orgId            String
+  email            String   @unique
+  passwordHash     String?
+  name             String
+  role             String   @default("SAFETY_OFFICER")
+  avatarUrl        String?
+  assignedSites    String   // JSON array
+  isActive         Boolean  @default(true)
+  twoFactorEnabled Boolean  @default(false)
+  lastLogin        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  acknowledgedAlerts Alert[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  userName   String
+  action     String
+  resource   String
+  resourceId String?
+  details    String?
+  ipAddress  String
+  createdAt  DateTime @default(now())
+}

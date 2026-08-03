@@ -1,0 +1,24 @@
+# SafeSight PPE — khai báo lớp cho model MỚI (nhận diện theo từng bộ phận)
+# Dùng với Ultralytics YOLOv8. Dataset export từ Roboflow theo định dạng "YOLOv8".
+#
+# Sau khi export dataset, đặt vào thư mục ./dataset rồi chỉnh path bên dưới cho khớp.
+
+path: ./dataset          # thư mục gốc dataset
+train: images/train      # ảnh train
+val: images/val          # ảnh validation
+
+# Danh sách lớp — bắt theo bộ phận (đầu / thân / tay / chân)
+# Lớp "no_*" = vi phạm (thiếu trang bị)
+names:
+  0: person        # người (để định vị công nhân)
+  1: helmet        # ĐẦU có mũ bảo hộ        ✅
+  2: no_helmet     # ĐẦU không mũ            ❌ vi phạm
+  3: vest          # THÂN có áo phản quang    ✅
+  4: no_vest       # THÂN không áo           ❌ vi phạm
+  5: gloves        # TAY có găng             ✅
+  6: no_gloves     # TAY không găng          ❌ vi phạm
+  7: boots         # CHÂN có giày bảo hộ      ✅
+  8: no_boots      # CHÂN không giày         ❌ vi phạm
+
+# Ghi chú: có thể bớt/thêm lớp tùy dataset thực tế anh chọn.
+# Số thứ tự (index) phải khớp với thứ tự lớp trong dataset export.
