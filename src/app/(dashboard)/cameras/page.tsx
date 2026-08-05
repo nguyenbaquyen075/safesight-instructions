@@ -500,7 +500,12 @@ export default function CamerasPage() {
                   <p className="text-[10px] font-bold text-white/60 uppercase tracking-tighter">{cam.siteName}</p>
                 </div>
                 <div className="flex items-center gap-2">
-                  {hasViolation && <MicButton cameraId={cam.id} mode={voiceMode} />}
+                  <MicButton
+                    cameraId={cam.id}
+                    mode={voiceMode}
+                    hasViolation={hasViolation}
+                    onError={(msg) => showNotification('Cảnh báo giọng nói lỗi', msg, 'danger')}
+                  />
                   <button
                     onClick={() => setSelectedCamera({ cam, videoUrl })}
                     className="w-8 h-8 rounded-lg bg-white/10 hover:bg-[var(--primary)] backdrop-blur-md flex items-center justify-center text-white transition-all"

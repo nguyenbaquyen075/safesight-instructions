@@ -9,12 +9,16 @@ import { mockCameras } from '@/data/mock-cameras';
 import { CameraStatus } from '@/types/enums';
 
 const YOLO_SERVER_URL = process.env.NEXT_PUBLIC_YOLO_SERVER_URL || '';
+// WAV câm 1 mẫu — phát 1 lần trong thao tác bấm của người dùng để "mở khoá"
+// quyền tự động phát audio của trình duyệt (cần cho tablet/Safari).
+const SILENT_AUDIO_SRC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
 
 export default function SiteSpeakerPage() {
   const [cameraId, setCameraId] = React.useState('');
   const [isConnected, setIsConnected] = React.useState(false);
   const [lastPlayedAt, setLastPlayedAt] = React.useState<number | null>(null);
   const [playError, setPlayError] = React.useState<string | null>(null);
+  const [activated, setActivated] = React.useState(false);
 
   const onlineCameras = mockCameras.filter((c) => c.status === CameraStatus.ONLINE);
 
@@ -56,6 +60,11 @@ export default function SiteSpeakerPage() {
     };
   }, [cameraId]);
 
+  const activate = () => {
+    new Audio(SILENT_AUDIO_SRC).play().catch(() => {});
+    setActivated(true);
+  };
+
   return (
     <div className="max-w-xl mx-auto space-y-8 py-12">
       <div>
@@ -78,28 +87,44 @@ export default function SiteSpeakerPage() {
         ))}
       </select>
 
-      {cameraId && (
-        <div className="flex items-center gap-4 p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
-          <div
-            className={cn(
-              "p-3 rounded-xl",
-              isConnected ? "bg-[var(--success-muted)] text-[var(--success)]" : "bg-[var(--danger-muted)] text-[var(--danger)]"
-            )}
-          >
-            {isConnected ? <Wifi className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
-          </div>
-          <div>
-            <p className="text-sm font-bold text-[var(--text-primary)]">
-              {isConnected ? 'Đã kết nối — sẵn sàng nhận cảnh báo' : 'Đang kết nối...'}
-            </p>
-            {lastPlayedAt && (
-              <p className="text-xs text-[var(--text-muted)] mt-1 flex items-center gap-1">
-                <Volume2 className="w-3 h-3" /> Vừa phát lúc {new Date(lastPlayedAt).toLocaleTimeString()}
+      {!cameraId ? (
+        <p className="text-sm text-[var(--text-muted)]">Chưa chọn camera — chọn 1 camera ở trên để bắt đầu nhận cảnh báo.</p>
+      ) : !YOLO_SERVER_URL ? (
+        <div className="p-6 rounded-2xl bg-[var(--danger-muted)] border border-[var(--danger)]/30 text-sm text-[var(--danger)]">
+          Chưa cấu hình máy chủ YOLO (NEXT_PUBLIC_YOLO_SERVER_URL) — không thể nhận cảnh báo.
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {!activated && (
+            <button
+              onClick={activate}
+              className="w-full p-3 rounded-xl bg-[var(--primary)] text-white text-sm font-bold"
+            >
+              Kích hoạt loa (bấm 1 lần trước khi dùng trên máy tính bảng)
+            </button>
+          )}
+          <div className="flex items-center gap-4 p-6 rounded-2xl bg-[var(--surface)] border border-[var(--border)]">
+            <div
+              className={cn(
+                "p-3 rounded-xl",
+                isConnected ? "bg-[var(--success-muted)] text-[var(--success)]" : "bg-[var(--danger-muted)] text-[var(--danger)]"
+              )}
+            >
+              {isConnected ? <Wifi className="w-6 h-6" /> : <WifiOff className="w-6 h-6" />}
+            </div>
+            <div>
+              <p className="text-sm font-bold text-[var(--text-primary)]">
+                {isConnected ? 'Đã kết nối — sẵn sàng nhận cảnh báo' : 'Đang kết nối...'}
               </p>
-            )}
-            {playError && (
-              <p className="text-xs text-[var(--danger)] mt-1">{playError}</p>
-            )}
+              {lastPlayedAt && (
+                <p className="text-xs text-[var(--text-muted)] mt-1 flex items-center gap-1">
+                  <Volume2 className="w-3 h-3" /> Vừa phát lúc {new Date(lastPlayedAt).toLocaleTimeString()}
+                </p>
+              )}
+              {playError && (
+                <p className="text-xs text-[var(--danger)] mt-1">{playError}</p>
+              )}
+            </div>
           </div>
         </div>
       )}

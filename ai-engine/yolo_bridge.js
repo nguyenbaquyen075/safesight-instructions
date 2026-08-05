@@ -39,8 +39,12 @@ io.on('connection', (socket) => {
     socket.join('all-cameras');
   });
 
-  socket.on('voice-broadcast', ({ cameraId, audio, mimeType }) => {
+  // ponytail: không có auth/kiểm tra cameraId ở đây (cả app cũng chưa có auth
+  // gate cấp route) — thêm shared-secret hoặc xác thực trước khi mở bridge
+  // này ra ngoài localhost/máy demo.
+  socket.on('voice-broadcast', ({ cameraId, audio, mimeType }, ack) => {
     io.to(`camera-${cameraId}`).emit('voice-broadcast', { cameraId, audio, mimeType });
+    if (typeof ack === 'function') ack();
   });
 });
 
