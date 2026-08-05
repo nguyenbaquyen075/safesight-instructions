@@ -328,6 +328,7 @@ export default function CamerasPage() {
           id: `ai-${cam.id}-${v.trackId}-${now}`,
           type: v.label,
           severity: 'CRITICAL',
+          cameraId: cam.id,
           siteName: cam.siteName,
           cameraName: cam.name,
           date: new Date().toLocaleDateString(),

@@ -25,6 +25,7 @@ import {
 import { cn } from '@/lib/utils';
 import { mockViolations } from '@/data/mock-violations';
 import { Severity } from '@/types/enums';
+import { MicButton } from '@/components/cameras/MicButton';
 
 // --- Sub-component: Violation Detail Modal ---
 function ViolationDetailModal({ violation, onClose }: { violation: any, onClose: () => void }) {
@@ -75,6 +76,16 @@ function ViolationDetailModal({ violation, onClose }: { violation: any, onClose:
              <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
              <span className="text-[10px] font-black uppercase tracking-widest">Bằng chứng đã ghi</span>
           </div>
+          {violation.cameraId && (
+            <div className="absolute top-6 right-6">
+              <MicButton
+                cameraId={violation.cameraId}
+                mode="broadcast"
+                hasViolation
+                onError={(msg) => toast(msg, 'error')}
+              />
+            </div>
+          )}
         </div>
 
         {/* Content Side */}
