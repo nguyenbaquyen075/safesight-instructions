@@ -83,11 +83,10 @@ export function useVoiceRecorder(onStop: (blob: Blob) => void): UseVoiceRecorder
   // (vd: camera hết vi phạm hoặc bị lọc khỏi lưới trong lúc đang ghi âm).
   useEffect(() => {
     return () => {
-      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
-      mediaRecorderRef.current?.stop();
+      stop();
       cleanupStream();
     };
-  }, [cleanupStream]);
+  }, [stop, cleanupStream]);
 
   return { isRecording, error, start, stop };
 }
