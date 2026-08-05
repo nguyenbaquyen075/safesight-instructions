@@ -14,6 +14,7 @@ export default function SiteSpeakerPage() {
   const [cameraId, setCameraId] = React.useState('');
   const [isConnected, setIsConnected] = React.useState(false);
   const [lastPlayedAt, setLastPlayedAt] = React.useState<number | null>(null);
+  const [playError, setPlayError] = React.useState<string | null>(null);
 
   const onlineCameras = mockCameras.filter((c) => c.status === CameraStatus.ONLINE);
 
@@ -35,8 +36,19 @@ export default function SiteSpeakerPage() {
     socket.on('voice-broadcast', (data: { cameraId: string; audio: ArrayBuffer; mimeType: string }) => {
       if (data.cameraId !== cameraId) return;
       const blob = new Blob([data.audio], { type: data.mimeType });
-      new Audio(URL.createObjectURL(blob)).play();
-      setLastPlayedAt(Date.now());
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audio.addEventListener('ended', () => URL.revokeObjectURL(url));
+      audio
+        .play()
+        .then(() => {
+          setPlayError(null);
+          setLastPlayedAt(Date.now());
+        })
+        .catch(() => {
+          URL.revokeObjectURL(url);
+          setPlayError('Không phát được cảnh báo vừa nhận — kiểm tra âm thanh thiết bị này.');
+        });
     });
 
     return () => {
@@ -84,6 +96,9 @@ export default function SiteSpeakerPage() {
               <p className="text-xs text-[var(--text-muted)] mt-1 flex items-center gap-1">
                 <Volume2 className="w-3 h-3" /> Vừa phát lúc {new Date(lastPlayedAt).toLocaleTimeString()}
               </p>
+            )}
+            {playError && (
+              <p className="text-xs text-[var(--danger)] mt-1">{playError}</p>
             )}
           </div>
         </div>
