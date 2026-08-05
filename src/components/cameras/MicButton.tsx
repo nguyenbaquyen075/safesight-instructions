@@ -15,7 +15,6 @@ interface MicButtonProps {
 }
 
 export function MicButton({ cameraId, mode }: MicButtonProps) {
-  const { isRecording, error, start, stop } = useVoiceRecorder();
   const [sending, setSending] = React.useState(false);
 
   const sendBroadcast = async (blob: Blob) => {
@@ -35,16 +34,20 @@ export function MicButton({ cameraId, mode }: MicButtonProps) {
     });
   };
 
-  const handleClick = async (e: React.MouseEvent) => {
+  const { isRecording, error, start, stop } = useVoiceRecorder((blob) => {
+    if (mode === 'demo') {
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.addEventListener('ended', () => URL.revokeObjectURL(audio.src));
+      audio.play();
+    } else {
+      sendBroadcast(blob);
+    }
+  });
+
+  const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isRecording) {
-      const blob = await stop();
-      if (!blob) return;
-      if (mode === 'demo') {
-        new Audio(URL.createObjectURL(blob)).play();
-      } else {
-        sendBroadcast(blob);
-      }
+      stop();
     } else {
       start();
     }

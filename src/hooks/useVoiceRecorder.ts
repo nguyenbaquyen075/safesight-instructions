@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const MAX_RECORDING_MS = 30_000; // tự dừng sau 30s phòng quên bấm dừng
 
@@ -8,37 +8,33 @@ export interface UseVoiceRecorderResult {
   isRecording: boolean;
   error: string | null;
   start: () => Promise<void>;
-  stop: () => Promise<Blob | null>;
+  stop: () => void;
 }
 
-export function useVoiceRecorder(): UseVoiceRecorderResult {
+export function useVoiceRecorder(onStop: (blob: Blob) => void): UseVoiceRecorderResult {
   const [isRecording, setIsRecording] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const stopResolveRef = useRef<((blob: Blob | null) => void) | null>(null);
+  const onStopRef = useRef(onStop);
+  onStopRef.current = onStop;
 
   const cleanupStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
   }, []);
 
-  const stop = useCallback((): Promise<Blob | null> => {
-    return new Promise((resolve) => {
-      const recorder = mediaRecorderRef.current;
-      if (!recorder || recorder.state === 'inactive') {
-        resolve(null);
-        return;
-      }
-      if (stopTimeoutRef.current) {
-        clearTimeout(stopTimeoutRef.current);
-        stopTimeoutRef.current = null;
-      }
-      stopResolveRef.current = resolve;
+  const stop = useCallback(() => {
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== 'inactive') {
       recorder.stop();
-    });
+    }
   }, []);
 
   const start = useCallback(async () => {
@@ -67,8 +63,7 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
         cleanupStream();
         setIsRecording(false);
-        stopResolveRef.current?.(blob);
-        stopResolveRef.current = null;
+        onStopRef.current(blob);
       };
 
       mediaRecorderRef.current = recorder;
@@ -83,6 +78,16 @@ export function useVoiceRecorder(): UseVoiceRecorderResult {
       setIsRecording(false);
     }
   }, [cleanupStream, stop]);
+
+  // Dừng mic + nhả stream khi component unmount giữa chừng lúc đang ghi
+  // (vd: camera hết vi phạm hoặc bị lọc khỏi lưới trong lúc đang ghi âm).
+  useEffect(() => {
+    return () => {
+      if (stopTimeoutRef.current) clearTimeout(stopTimeoutRef.current);
+      mediaRecorderRef.current?.stop();
+      cleanupStream();
+    };
+  }, [cleanupStream]);
 
   return { isRecording, error, start, stop };
 }
