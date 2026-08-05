@@ -34,6 +34,7 @@ import { mockCameras } from '@/data/mock-cameras';
 import { mockViolations } from '@/data/mock-violations';
 import { CameraStatus, Severity } from '@/types/enums';
 import cameraVideos from '@/data/camera-videos.json';
+import { MicButton } from '@/components/cameras/MicButton';
 
 // --- Video của từng camera ---
 // Đọc từ NGUỒN DUY NHẤT src/data/camera-videos.json (YOLO cũng đọc chính file này).
@@ -271,6 +272,7 @@ export default function CamerasPage() {
   const [mounted, setMounted] = React.useState(false);
   const [notification, setNotification] = React.useState<any>(null);
   const [showViolationsOnly, setShowViolationsOnly] = React.useState(false);
+  const [voiceMode, setVoiceMode] = React.useState<'demo' | 'broadcast'>('demo');
 
   const { isConnected, lastEvent, getDetectionsForCamera } = useYolo();
 
@@ -439,6 +441,26 @@ export default function CamerasPage() {
                   Hiển thị {visibleCameras.length} / {onlineCameras.length} luồng
                 </span>
               )}
+              <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
+                <button
+                  onClick={() => setVoiceMode('demo')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    voiceMode === 'demo' ? "bg-[var(--primary)] text-white" : "text-[var(--text-muted)]"
+                  )}
+                >
+                  Mic: Demo
+                </button>
+                <button
+                  onClick={() => setVoiceMode('broadcast')}
+                  className={cn(
+                    "px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                    voiceMode === 'broadcast' ? "bg-[var(--primary)] text-white" : "text-[var(--text-muted)]"
+                  )}
+                >
+                  Mic: Thật
+                </button>
+              </div>
             </div>
 
             {visibleCameras.length === 0 ? (
@@ -477,12 +499,15 @@ export default function CamerasPage() {
                 <div>
                   <p className="text-[10px] font-bold text-white/60 uppercase tracking-tighter">{cam.siteName}</p>
                 </div>
-                <button
-                  onClick={() => setSelectedCamera({ cam, videoUrl })}
-                  className="w-8 h-8 rounded-lg bg-white/10 hover:bg-[var(--primary)] backdrop-blur-md flex items-center justify-center text-white transition-all"
-                >
-                  <Maximize2 className="w-4 h-4" />
-                </button>
+                <div className="flex items-center gap-2">
+                  {hasViolation && <MicButton cameraId={cam.id} mode={voiceMode} />}
+                  <button
+                    onClick={() => setSelectedCamera({ cam, videoUrl })}
+                    className="w-8 h-8 rounded-lg bg-white/10 hover:bg-[var(--primary)] backdrop-blur-md flex items-center justify-center text-white transition-all"
+                  >
+                    <Maximize2 className="w-4 h-4" />
+                  </button>
+                </div>
               </div>
             </div>
               ))}
