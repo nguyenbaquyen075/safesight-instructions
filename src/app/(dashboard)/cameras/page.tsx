@@ -270,6 +270,7 @@ export default function CamerasPage() {
   const [selectedCamera, setSelectedCamera] = React.useState<any>(null);
   const [mounted, setMounted] = React.useState(false);
   const [notification, setNotification] = React.useState<any>(null);
+  const [showViolationsOnly, setShowViolationsOnly] = React.useState(false);
 
   const { isConnected, lastEvent, getDetectionsForCamera } = useYolo();
 
@@ -410,13 +411,44 @@ export default function CamerasPage() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {mockCameras.filter(c => c.status === CameraStatus.ONLINE).slice(0, 6).map((cam, idx) => {
+      {(() => {
+        const onlineCameras = mockCameras.filter(c => c.status === CameraStatus.ONLINE).slice(0, 6).map(cam => {
           const detections = getDetectionsForCamera(cam.id);
-          const hasViolation = detections.some(d => d.isViolation);
-          const videoUrl = videoForCamera(cam.id);
+          return { cam, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id) };
+        });
+        const violationCount = onlineCameras.filter(c => c.hasViolation).length;
+        const visibleCameras = showViolationsOnly ? onlineCameras.filter(c => c.hasViolation) : onlineCameras;
 
-          return (
+        return (
+          <>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setShowViolationsOnly(v => !v)}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all",
+                  showViolationsOnly
+                    ? "bg-red-500 border-red-500 text-white shadow-[0_0_20px_rgba(220,38,38,0.4)]"
+                    : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                <Filter className="w-3.5 h-3.5" />
+                {showViolationsOnly ? `Đang vi phạm (${violationCount})` : `Lọc: chỉ vi phạm (${violationCount})`}
+              </button>
+              {showViolationsOnly && (
+                <span className="text-xs text-[var(--text-muted)]">
+                  Hiển thị {visibleCameras.length} / {onlineCameras.length} luồng
+                </span>
+              )}
+            </div>
+
+            {visibleCameras.length === 0 ? (
+              <div className="flex flex-col items-center justify-center gap-2 py-16 rounded-[2rem] border border-dashed border-[var(--border)] text-[var(--text-muted)]">
+                <ShieldCheck className="w-8 h-8 text-[var(--success)]" />
+                <p className="text-sm font-bold">Không có camera nào đang vi phạm</p>
+              </div>
+            ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {visibleCameras.map(({ cam, detections, hasViolation, videoUrl }, idx) => (
             <div
               key={cam.id}
               className={cn(
@@ -453,9 +485,12 @@ export default function CamerasPage() {
                 </button>
               </div>
             </div>
-          );
-        })}
-      </div>
+              ))}
+            </div>
+            )}
+          </>
+        );
+      })()}
 
       <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3rem] p-10 mt-12 animate-fade-up border-white/5 shadow-2xl">
         <div className="flex flex-col lg:flex-row gap-12 items-center">
