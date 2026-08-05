@@ -38,6 +38,10 @@ io.on('connection', (socket) => {
   socket.on('subscribe-all', () => {
     socket.join('all-cameras');
   });
+
+  socket.on('voice-broadcast', ({ cameraId, audio, mimeType }) => {
+    io.to(`camera-${cameraId}`).emit('voice-broadcast', { cameraId, audio, mimeType });
+  });
 });
 
 // Nếu cổng đang bận (zombie chưa nhả), thử lại thay vì crash âm thầm
