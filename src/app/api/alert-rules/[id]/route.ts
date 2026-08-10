@@ -2,12 +2,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { AlertRule as AlertRuleRow } from '@prisma/client';
-import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { alertRuleObjectSchema, alertRuleSchema } from '@/lib/validation/alert-rule';
-import { UserRole } from '@/types/enums';
-
-const ORG_WIDE_ROLES: string[] = [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN];
+import { assertSiteAccess } from '@/lib/auth/site-access';
 
 function serializeRule(rule: AlertRuleRow) {
   return {
@@ -16,21 +13,6 @@ function serializeRule(rule: AlertRuleRow) {
     channels: JSON.parse(rule.channels),
     recipients: JSON.parse(rule.recipients),
   };
-}
-
-async function assertSiteAccess(siteId: string): Promise<NextResponse | null> {
-  const session = await auth();
-  if (!session?.user) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  }
-  if (ORG_WIDE_ROLES.includes(session.user.role)) return null;
-
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-  const assignedSites: string[] = user ? JSON.parse(user.assignedSites) : [];
-  if (!assignedSites.includes(siteId)) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-  return null;
 }
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -48,7 +30,6 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const merged = {
-    siteId: existing.siteId,
     name: existing.name,
     violationTypes: JSON.parse(existing.violationTypes),
     channels: JSON.parse(existing.channels),
@@ -57,6 +38,11 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     cooldownSec: existing.cooldownSec,
     isActive: existing.isActive,
     ...parsedPatch.data,
+    // siteId is locked to the existing row and always wins, regardless of
+    // what the request body contains: this endpoint does not support moving
+    // a rule between sites (that would need a fresh assertSiteAccess check
+    // against the new site, which we deliberately don't do here).
+    siteId: existing.siteId,
   };
   const parsedMerged = alertRuleSchema.safeParse(merged);
   if (!parsedMerged.success) {
