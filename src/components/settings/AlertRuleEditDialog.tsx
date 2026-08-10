@@ -9,6 +9,7 @@ import { toast } from '@/lib/toast';
 import { ViolationType, AlertChannel } from '@/types/enums';
 import { chatIdSchema } from '@/lib/validation/alert-rule';
 import { useCreateAlertRule, useUpdateAlertRule, type AlertRuleView } from '@/hooks/use-alert-rules';
+import { Switch } from './ui';
 
 interface AlertRuleEditDialogProps {
   rule: AlertRuleView | null;
@@ -191,6 +192,13 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
                 </div>
               </div>
             )}
+
+            <Switch
+              enabled={form.isActive}
+              onChange={(val) => setForm({ ...form, isActive: val })}
+              label="Kích hoạt quy tắc"
+              description="Tắt để tạm dừng gửi cảnh báo theo quy tắc này mà không cần xoá"
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
