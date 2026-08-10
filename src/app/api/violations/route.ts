@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { mockViolations } from '@/data/mock-violations';
 import { prisma } from '@/lib/prisma';
+import { notifyViolation } from '@/lib/alert-notifier';
 import type { Violation } from '@/types/models';
 
 // Vi phạm thật (do AI engine ghi qua POST bên dưới) hiện lên TRƯỚC, gộp với
@@ -115,6 +116,11 @@ export async function POST(request: NextRequest) {
       snapshotUrl,
     },
   });
+
+  // ponytail: fire-and-forget vì server chạy long-lived process (dev-all.sh),
+  // KHÔNG await — yolo_inference.py đang chặn frame loop chờ response này.
+  // Nếu chuyển sang serverless (Vercel functions) phải đổi sang waitUntil/queue.
+  notifyViolation(violation, camera).catch((err) => console.error('[telegram] notify failed', err));
 
   return NextResponse.json(violation, { status: 201 });
 }
