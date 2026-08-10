@@ -119,6 +119,7 @@ model Alert {
   channel         String
   recipient       String
   status          String   @default("NEW")
+  errorMessage    String?
   sentAt          DateTime @default(now())
   acknowledgedById String?
   acknowledgedAt  DateTime?
@@ -179,4 +180,12 @@ model AuditLog {
   details    String?
   ipAddress  String
   createdAt  DateTime @default(now())
+}
+
+model TelegramSettings {
+  id                String   @id @default(cuid())
+  botTokenEncrypted String?
+  isEnabled         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

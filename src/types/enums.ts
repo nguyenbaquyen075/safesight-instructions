@@ -50,6 +50,7 @@ export enum AlertChannel {
   SIREN = 'siren',
   PA_SYSTEM = 'pa_system',
   WEBHOOK = 'webhook',
+  TELEGRAM = 'telegram',
 }
 
 export enum AlertStatus {
