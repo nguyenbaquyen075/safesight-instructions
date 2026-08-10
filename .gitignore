@@ -56,3 +56,6 @@ dev.db
 # Python cache
 __pycache__/
 *.pyc
+
+# git worktrees (local scratch, not committed)
+.worktrees/
