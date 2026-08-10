@@ -2,13 +2,19 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { decrypt } from '@/lib/crypto';
 import { TelegramClient } from '@/lib/telegram';
+import { ORG_WIDE_ROLES } from '@/lib/auth/site-access';
 
 const testSchema = z.object({ botToken: z.string().min(1).optional() });
 
 export async function POST(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!ORG_WIDE_ROLES.includes(session.user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
   const body = await request.json().catch(() => ({}));
   const parsed = testSchema.safeParse(body);
   if (!parsed.success) {

@@ -51,6 +51,11 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # và AI_ENGINE_SECRET (bắt buộc — POST /api/violations từ chối request
                       # thiếu header X-AI-Engine-Secret khớp giá trị này, sinh bằng
                       # `openssl rand -base64 24`)
+                      #
+                      # TELEGRAM_ENCRYPT_KEY (bắt buộc — dùng mã hoá bot token Telegram lưu
+                      # trong DB, app throw lỗi "TELEGRAM_ENCRYPT_KEY is not set" ngay lần
+                      # đầu lưu token nếu thiếu, sinh bằng
+                      # `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không
 #    Violation write sẽ lỗi 404 vì cameraId chưa tồn tại)

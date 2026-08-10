@@ -23,7 +23,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const authError = await assertSiteAccess(existing.siteId);
   if (authError) return authError;
 
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const parsedPatch = alertRuleObjectSchema.partial().safeParse(body);
   if (!parsedPatch.success) {
     return NextResponse.json({ error: parsedPatch.error.flatten() }, { status: 400 });

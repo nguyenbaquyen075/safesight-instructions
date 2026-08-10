@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 
 import { NextRequest, NextResponse } from 'next/server';
+import { Prisma } from '@prisma/client';
 import type { AlertRule as AlertRuleRow } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const body = await request.json();
+  const body = await request.json().catch(() => ({}));
   const parsed = alertRuleSchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
@@ -62,13 +63,20 @@ export async function POST(request: NextRequest) {
   if (authError) return authError;
 
   const { violationTypes, channels, recipients, ...rest } = parsed.data;
-  const rule = await prisma.alertRule.create({
-    data: {
-      ...rest,
-      violationTypes: JSON.stringify(violationTypes),
-      channels: JSON.stringify(channels),
-      recipients: JSON.stringify(recipients),
-    },
-  });
-  return NextResponse.json(serializeRule(rule), { status: 201 });
+  try {
+    const rule = await prisma.alertRule.create({
+      data: {
+        ...rest,
+        violationTypes: JSON.stringify(violationTypes),
+        channels: JSON.stringify(channels),
+        recipients: JSON.stringify(recipients),
+      },
+    });
+    return NextResponse.json(serializeRule(rule), { status: 201 });
+  } catch (err) {
+    if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {
+      return NextResponse.json({ error: 'Site không tồn tại' }, { status: 400 });
+    }
+    throw err;
+  }
 }

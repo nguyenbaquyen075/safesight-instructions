@@ -55,8 +55,11 @@ async function isBelowThreshold(rule: MatchedRule, violation: Violation, camera:
 }
 
 async function isInCooldown(rule: MatchedRule): Promise<boolean> {
+  // Only a successful send (errorMessage: null, per sendToRecipients' Alert.create
+  // below) starts the cooldown clock — a failed send must not block retrying on
+  // the next violation.
   const lastAlert = await prisma.alert.findFirst({
-    where: { ruleId: rule.id },
+    where: { ruleId: rule.id, errorMessage: null },
     orderBy: { sentAt: 'desc' },
   });
   if (!lastAlert) return false;
