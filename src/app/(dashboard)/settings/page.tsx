@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
+import { TelegramBotCard } from '@/components/settings/TelegramBotCard';
+import { AlertRulesCard } from '@/components/settings/AlertRulesCard';
 
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'monitoring' | 'notifications' | 'security'>('profile');
@@ -264,6 +266,8 @@ export default function SettingsPage() {
                   ))}
                 </div>
               </SettingCard>
+              <TelegramBotCard />
+              <AlertRulesCard />
             </div>
           )}
 
