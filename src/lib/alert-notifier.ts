@@ -70,8 +70,13 @@ async function isInCooldown(rule: MatchedRule): Promise<boolean> {
 
 async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, botToken: string): Promise<void> {
   const client = new TelegramClient(botToken);
+  // Lần đầu chỉ là nhắc nhở; còn tái phạm (occurrenceCount >= 2) mới tính là vi phạm chính thức.
+  const title =
+    violation.occurrenceCount <= 1
+      ? '⚠️ Nhắc nhở vi phạm ATLĐ'
+      : `🚨 Vi phạm ATLĐ (lần ${violation.occurrenceCount})`;
   const caption =
-    `⚠️ <b>Cảnh báo vi phạm ATLĐ (lần ${violation.occurrenceCount})</b>\n` +
+    `<b>${title}</b>\n` +
     `Loại vi phạm: ${getViolationTypeLabel(violation.type)}\n` +
     `Camera: ${camera.name}\n` +
     `Thời gian: ${violation.detectedAt.toISOString()}`;
