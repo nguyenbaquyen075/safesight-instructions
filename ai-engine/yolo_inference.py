@@ -179,7 +179,7 @@ def run_inference():
 
     print(f"✅ Starting real-time tracking trên {len(streams)} luồng...")
 
-    REPORT_INTERVAL = 30  # còn vi phạm liên tục -> chụp+báo lại mỗi 30s/người, không chỉ 1 lần
+    REPORT_INTERVAL = 60  # còn vi phạm liên tục -> chụp+báo lại mỗi 60s/người, không chỉ 1 lần
 
     # ponytail: dict không tự dọn -> phình dần nếu chạy 24/7 nhiều ngày; nếu cần chạy dài hạn,
     # dọn định kỳ theo track đã biến mất khỏi tracker (không còn trong results.boxes.id).
