@@ -88,6 +88,7 @@ def report_violation(cam_id, detection):
                 "confidence": detection["confidence"],
             }],
             "snapshotUrl": snapshot_url,
+            "occurrenceCount": detection.get("occurrenceCount", 1),
         }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
     except requests.exceptions.RequestException:
         pass
@@ -183,6 +184,7 @@ def run_inference():
     # ponytail: dict không tự dọn -> phình dần nếu chạy 24/7 nhiều ngày; nếu cần chạy dài hạn,
     # dọn định kỳ theo track đã biến mất khỏi tracker (không còn trong results.boxes.id).
     last_reported = {}    # (cameraId, trackId) -> lúc ghi DB gần nhất, để biết khi nào báo lại
+    violation_count = {}  # (cameraId, trackId) -> số lần đã báo liên tục (hiện "vi phạm lần N")
 
     while True:
         for st in streams:
@@ -225,6 +227,8 @@ def run_inference():
                     annotated = _draw_violation_box(frame.copy(), d["bbox"], d["label"])
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
                     d['snapshotUrl'] = f"/snapshots/{filename}"
+                    violation_count[key] = violation_count.get(key, 0) + 1
+                    d['occurrenceCount'] = violation_count[key]
                     report_violation(cam_id, d)
                     last_reported[key] = now
 

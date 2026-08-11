@@ -71,7 +71,7 @@ async function isInCooldown(rule: MatchedRule): Promise<boolean> {
 async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, botToken: string): Promise<void> {
   const client = new TelegramClient(botToken);
   const caption =
-    `⚠️ <b>Cảnh báo vi phạm ATLĐ</b>\n` +
+    `⚠️ <b>Cảnh báo vi phạm ATLĐ (lần ${violation.occurrenceCount})</b>\n` +
     `Loại vi phạm: ${getViolationTypeLabel(violation.type)}\n` +
     `Camera: ${camera.name}\n` +
     `Thời gian: ${violation.detectedAt.toISOString()}`;

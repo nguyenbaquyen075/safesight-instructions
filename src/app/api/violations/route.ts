@@ -77,6 +77,7 @@ const violationInputSchema = z.object({
   ),
   snapshotUrl: z.string(),
   zoneId: z.string().optional(),
+  occurrenceCount: z.number().int().min(1).optional(),
 });
 
 // Ghi vi phạm thật từ AI inference (yolo_inference.py) vào DB.
@@ -97,7 +98,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { cameraId, type, severity, confidence, bboxData, snapshotUrl, zoneId } = parsed.data;
+  const { cameraId, type, severity, confidence, bboxData, snapshotUrl, zoneId, occurrenceCount } = parsed.data;
 
   const camera = await prisma.camera.findUnique({ where: { id: cameraId } });
   if (!camera) {
@@ -114,6 +115,7 @@ export async function POST(request: NextRequest) {
       confidence,
       bboxData: JSON.stringify(bboxData),
       snapshotUrl,
+      ...(occurrenceCount !== undefined && { occurrenceCount }),
     },
   });
 

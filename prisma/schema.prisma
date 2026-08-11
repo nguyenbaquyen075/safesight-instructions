@@ -102,6 +102,7 @@ model Violation {
   snapshotUrl String
   clipUrl     String?
   status      String   @default("OPEN")
+  occurrenceCount Int  @default(1) // lần vi phạm liên tục thứ mấy của người này (reset khi rời khung hình)
   detectedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
