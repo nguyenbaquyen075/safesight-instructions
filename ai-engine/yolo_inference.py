@@ -44,6 +44,19 @@ def _pct_to_ratio(pct_str: str) -> float:
     return float(pct_str.rstrip("%")) / 100
 
 
+def _draw_violation_box(frame, bbox_pct, label):
+    """Khoanh khung đỏ + nhãn quanh ĐÚNG người/đối tượng đang vi phạm trong ảnh chụp."""
+    h, w = frame.shape[:2]
+    x1 = int(_pct_to_ratio(bbox_pct["left"]) * w)
+    y1 = int(_pct_to_ratio(bbox_pct["top"]) * h)
+    bw = int(_pct_to_ratio(bbox_pct["width"]) * w)
+    bh = int(_pct_to_ratio(bbox_pct["height"]) * h)
+    cv2.rectangle(frame, (x1, y1), (x1 + bw, y1 + bh), (0, 0, 255), 3)
+    cv2.putText(frame, label, (x1, max(y1 - 10, 20)),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2, cv2.LINE_AA)
+    return frame
+
+
 def report_violation(cam_id, detection):
     """Ghi 1 Violation vào DB qua API Next.js (POST /api/violations).
 
@@ -149,8 +162,7 @@ def run_inference():
             imgsz=640              # Nét cao -> bắt mũ/vật nhỏ chắc tay hơn (ưu tiên CHÍNH XÁC).
                                    # Video đã cắt còn cảnh đứng nên bù lại phần chậm.
         )
-        streams.append({"path": video_path, "cap": cap, "tracker": tracker, "cams": cams,
-                        "last_snapshot_ts": 0.0, "last_snapshot_url": None})
+        streams.append({"path": video_path, "cap": cap, "tracker": tracker, "cams": cams})
         print(f"🎥 {video_path} -> {cams}")
 
     if not streams:
@@ -162,12 +174,10 @@ def run_inference():
         streams.append({"path": "camera-0", "cap": cap,
                         "tracker": PPEViolationTracker(model_path=MODEL_PATH, confidence=0.25,
                                                        min_height_ratio=0.0, imgsz=640),
-                        "cams": ["cam-001"],
-                        "last_snapshot_ts": 0.0, "last_snapshot_url": None})
+                        "cams": ["cam-001"]})
 
     print(f"✅ Starting real-time tracking trên {len(streams)} luồng...")
 
-    SNAPSHOT_EVERY = 30           # chỉ lưu tối đa 1 ảnh / 30 giây / luồng (tránh đầy ổ đĩa)
     # ponytail: set không tự dọn -> phình dần nếu chạy 24/7 nhiều ngày; nếu cần chạy dài hạn,
     # dọn định kỳ theo track đã biến mất khỏi tracker (không còn trong results.boxes.id).
     written_violations = set()    # (cameraId, trackId) đã ghi DB -> khỏi ghi lặp mỗi frame
@@ -183,24 +193,7 @@ def run_inference():
             # Phân tích ĐÚNG video của luồng này -> khung khớp người trong ô đó
             detections = st["tracker"].process_frame(frame)
 
-            # Chụp bằng chứng khi có vi phạm — nhưng CÓ GIỚI HẠN để không ghi liên tục.
-            # Trạng thái snapshot lưu RIÊNG từng luồng (st[...]) — trước đây dùng biến
-            # chung cho mọi luồng nên 2 camera khác video có thể bị gắn NHẦM ảnh của nhau.
             violations = [d for d in detections if d.get('isViolation')]
-            if violations:
-                now = time.time()
-                if now - st["last_snapshot_ts"] >= SNAPSHOT_EVERY:
-                    if not os.path.exists(SNAPSHOT_DIR):
-                        os.makedirs(SNAPSHOT_DIR)
-                    timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    cv2.imwrite(f"{SNAPSHOT_DIR}/violation_{timestamp}.jpg", frame)
-                    st["last_snapshot_ts"] = now
-                    st["last_snapshot_url"] = f"/snapshots/violation_{timestamp}.jpg"
-
-                if st["last_snapshot_url"]:
-                    for d in detections:
-                        if d.get('isViolation'):
-                            d['snapshotUrl'] = st["last_snapshot_url"]
 
             # Gửi toạ độ detections sang bridge cho CÁC camera dùng video này
             for cam_id in st["cams"]:
@@ -213,13 +206,22 @@ def run_inference():
                     pass
 
                 # Ghi Violation vào DB — chỉ khi đã CHỐT (đủ conf + đủ 3s liên tục,
-                # xem PPEViolationTracker.CONFIRM_CONF/CONFIRM_DELAY), mỗi (camera, trackId) 1 lần
+                # xem PPEViolationTracker.CONFIRM_CONF/CONFIRM_DELAY), mỗi (camera, trackId) 1 lần.
+                # Ảnh chụp riêng cho ĐÚNG lúc/ĐÚNG người này, khoanh khung đỏ quanh người vi phạm
+                # — không dùng ảnh throttle cũ nữa để tránh gắn nhầm ảnh người khác.
                 for d in violations:
                     if d.get('type') != 'person' or not d.get('confirmed'):
                         continue
                     key = (cam_id, d.get('trackId'))
                     if key[1] is None or key in written_violations:
                         continue
+                    if not os.path.exists(SNAPSHOT_DIR):
+                        os.makedirs(SNAPSHOT_DIR)
+                    timestamp = time.strftime("%Y%m%d-%H%M%S")
+                    filename = f"violation_{cam_id}_{timestamp}.jpg"
+                    annotated = _draw_violation_box(frame.copy(), d["bbox"], d["label"])
+                    cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
+                    d['snapshotUrl'] = f"/snapshots/{filename}"
                     report_violation(cam_id, d)
                     written_violations.add(key)
 
