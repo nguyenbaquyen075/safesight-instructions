@@ -44,6 +44,29 @@ export function getSeverityColor(severity: string): string {
   return map[severity.toLowerCase()] || 'var(--text-muted)';
 }
 
+const VIOLATION_TYPE_LABELS: Record<string, string> = {
+  hard_hat: 'Thiếu mũ bảo hộ',
+  safety_vest: 'Thiếu áo phản quang',
+  safety_harness: 'Thiếu dây an toàn',
+  protective_eyewear: 'Thiếu kính bảo hộ',
+  safety_gloves: 'Thiếu găng tay bảo hộ',
+  safety_footwear: 'Thiếu giày bảo hộ',
+  respiratory: 'Thiếu khẩu trang/mặt nạ chống độc',
+  zone_intrusion: 'Xâm nhập khu vực cấm',
+  vehicle_proximity: 'Đến gần phương tiện nguy hiểm',
+  suspended_load: 'Đứng dưới vật treo/cẩu',
+  fall_detected: 'Phát hiện té ngã',
+  fire_smoke: 'Phát hiện cháy/khói',
+  phone_use: 'Sử dụng điện thoại khi làm việc',
+  running: 'Chạy trong khu vực nguy hiểm',
+  unauthorized_climbing: 'Trèo/leo trái phép',
+  crowd_density: 'Tụ tập đông người',
+};
+
+export function getViolationTypeLabel(type: string): string {
+  return VIOLATION_TYPE_LABELS[type.toLowerCase()] || type.replace(/_/g, ' ');
+}
+
 export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }

@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma';
 import { decrypt } from '@/lib/crypto';
 import { TelegramClient, type TelegramResult } from '@/lib/telegram';
 import { AlertChannel } from '@/types/enums';
+import { getViolationTypeLabel } from '@/lib/utils';
 
 interface MatchedRule {
   id: string;
@@ -71,7 +72,7 @@ async function sendToRecipients(rule: MatchedRule, violation: Violation, camera:
   const client = new TelegramClient(botToken);
   const caption =
     `⚠️ <b>Cảnh báo vi phạm ATLĐ</b>\n` +
-    `Loại vi phạm: ${violation.type}\n` +
+    `Loại vi phạm: ${getViolationTypeLabel(violation.type)}\n` +
     `Camera: ${camera.name}\n` +
     `Thời gian: ${violation.detectedAt.toISOString()}`;
 

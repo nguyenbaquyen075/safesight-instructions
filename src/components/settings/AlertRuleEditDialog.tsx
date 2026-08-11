@@ -4,7 +4,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { useEffect, useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { ViolationType, AlertChannel } from '@/types/enums';
 import { chatIdSchema } from '@/lib/validation/alert-rule';
@@ -125,7 +125,7 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
                         : "bg-[var(--background)] border-[var(--border)] text-[var(--text-secondary)]"
                     )}
                   >
-                    {type.replace(/_/g, ' ')}
+                    {getViolationTypeLabel(type)}
                   </button>
                 ))}
               </div>

@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
 import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
-import { cn, getSeverityColor } from '@/lib/utils';
+import { cn, getSeverityColor, getViolationTypeLabel } from '@/lib/utils';
 import type { Alert } from '@/types/models';
 import { AlertStatus, Severity } from '@/types/enums';
 
@@ -85,7 +85,7 @@ export function AlertTimeline({ alerts }: AlertTimelineProps) {
                   {/* Details */}
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
                     <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                      {violation.type.split('_').map((w) => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
+                      {getViolationTypeLabel(violation.type)}
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] truncate">
                       {violation.siteName}

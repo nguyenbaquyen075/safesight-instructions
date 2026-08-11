@@ -22,7 +22,7 @@ import {
   X,
   PlayCircle
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { mockViolations } from '@/data/mock-violations';
 import { Severity } from '@/types/enums';
 import { MicButton } from '@/components/cameras/MicButton';
@@ -38,7 +38,7 @@ function ViolationDetailModal({ violation, onClose }: { violation: any, onClose:
 
   const reason = String(violation.type || '').toLowerCase().match(/mũ|helmet|hard/)
     ? 'Không đội mũ bảo hộ lao động'
-    : `Vi phạm: ${violation.type}`;
+    : `Vi phạm: ${getViolationTypeLabel(violation.type)}`;
 
   // Nhận diện khuôn mặt: hiện MÔ PHỎNG (chưa có model face thật)
   const autoScan = () => {
@@ -99,7 +99,7 @@ function ViolationDetailModal({ violation, onClose }: { violation: any, onClose:
                     )}>
                       {violation.severity === Severity.CRITICAL ? 'NGHIÊM TRỌNG' : 'CAO'}
                     </div>
-                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{violation.type}</h2>
+                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{getViolationTypeLabel(violation.type)}</h2>
                  </div>
                  <button onClick={onClose} className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 text-white transition-all">
                     <X className="w-6 h-6" />
@@ -129,7 +129,7 @@ function ViolationDetailModal({ violation, onClose }: { violation: any, onClose:
                  <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Mô tả AI</h4>
                     <p className="text-sm text-white/70 leading-relaxed italic">
-                       "{violation.description || `Hệ thống phát hiện tự động đã ghi nhận vi phạm ${violation.type.toLowerCase()}. Bằng chứng đã được lưu trữ để xem xét tuân thủ.`}"
+                       "{violation.description || `Hệ thống phát hiện tự động đã ghi nhận vi phạm: ${getViolationTypeLabel(violation.type)}. Bằng chứng đã được lưu trữ để xem xét tuân thủ.`}"
                     </p>
                  </div>
               </div>
@@ -185,7 +185,7 @@ function ViolationDetailModal({ violation, onClose }: { violation: any, onClose:
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20"><ShieldAlert className="w-10 h-10" /></div>
                   )}
-                  <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-red-500 text-white text-[9px] font-black uppercase tracking-widest">{violation.type}</span>
+                  <span className="absolute top-2 left-2 px-2 py-1 rounded-md bg-red-500 text-white text-[9px] font-black uppercase tracking-widest">{getViolationTypeLabel(violation.type)}</span>
                 </div>
               </div>
 
@@ -378,7 +378,7 @@ export default function ViolationsPage() {
             <div className="p-8 space-y-6">
                <div className="flex justify-between items-start">
                   <div>
-                     <h3 className="text-xl font-black text-[var(--text-primary)] group-hover:text-[var(--primary-light)] transition-colors uppercase tracking-tight">{violation.type}</h3>
+                     <h3 className="text-xl font-black text-[var(--text-primary)] group-hover:text-[var(--primary-light)] transition-colors uppercase tracking-tight">{getViolationTypeLabel(violation.type)}</h3>
                      <div className="flex items-center gap-3 mt-2 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                         <div className="flex items-center gap-1.5">
                            <Calendar className="w-3 h-3" />
