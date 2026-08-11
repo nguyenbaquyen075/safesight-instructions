@@ -178,9 +178,11 @@ def run_inference():
 
     print(f"✅ Starting real-time tracking trên {len(streams)} luồng...")
 
-    # ponytail: set không tự dọn -> phình dần nếu chạy 24/7 nhiều ngày; nếu cần chạy dài hạn,
+    REPORT_INTERVAL = 30  # còn vi phạm liên tục -> chụp+báo lại mỗi 30s/người, không chỉ 1 lần
+
+    # ponytail: dict không tự dọn -> phình dần nếu chạy 24/7 nhiều ngày; nếu cần chạy dài hạn,
     # dọn định kỳ theo track đã biến mất khỏi tracker (không còn trong results.boxes.id).
-    written_violations = set()    # (cameraId, trackId) đã ghi DB -> khỏi ghi lặp mỗi frame
+    last_reported = {}    # (cameraId, trackId) -> lúc ghi DB gần nhất, để biết khi nào báo lại
 
     while True:
         for st in streams:
@@ -206,14 +208,15 @@ def run_inference():
                     pass
 
                 # Ghi Violation vào DB — chỉ khi đã CHỐT (đủ conf + đủ 3s liên tục,
-                # xem PPEViolationTracker.CONFIRM_CONF/CONFIRM_DELAY), mỗi (camera, trackId) 1 lần.
-                # Ảnh chụp riêng cho ĐÚNG lúc/ĐÚNG người này, khoanh khung đỏ quanh người vi phạm
-                # — không dùng ảnh throttle cũ nữa để tránh gắn nhầm ảnh người khác.
+                # xem PPEViolationTracker.CONFIRM_CONF/CONFIRM_DELAY). Còn vi phạm liên tục thì
+                # báo lại mỗi REPORT_INTERVAL giây/người, không chỉ 1 lần cho tới khi rời khung hình.
+                # Ảnh chụp riêng cho ĐÚNG lúc/ĐÚNG người này, khoanh khung đỏ quanh người vi phạm.
+                now = time.time()
                 for d in violations:
                     if d.get('type') != 'person' or not d.get('confirmed'):
                         continue
                     key = (cam_id, d.get('trackId'))
-                    if key[1] is None or key in written_violations:
+                    if key[1] is None or now - last_reported.get(key, 0) < REPORT_INTERVAL:
                         continue
                     if not os.path.exists(SNAPSHOT_DIR):
                         os.makedirs(SNAPSHOT_DIR)
@@ -223,7 +226,7 @@ def run_inference():
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
                     d['snapshotUrl'] = f"/snapshots/{filename}"
                     report_violation(cam_id, d)
-                    written_violations.add(key)
+                    last_reported[key] = now
 
         # Small delay to throttle CPU
         time.sleep(0.01)
