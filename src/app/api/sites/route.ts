@@ -1,18 +1,16 @@
 // SPDX-License-Identifier: MIT
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mockSites } from '@/data/mock-sites';
+import { prisma } from '@/lib/prisma';
+import { toSiteDTO } from '@/lib/site-shape';
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const status = searchParams.get('status');
-  
-  let sites = [...mockSites];
-  
-  if (status) {
-    sites = sites.filter(s => s.status === status);
-  }
-  
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return NextResponse.json(sites);
+  const status = request.nextUrl.searchParams.get('status');
+
+  const rows = await prisma.site.findMany({
+    where: status ? { status } : undefined,
+    orderBy: { createdAt: 'asc' },
+  });
+
+  return NextResponse.json(rows.map(toSiteDTO));
 }

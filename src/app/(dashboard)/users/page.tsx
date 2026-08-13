@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { Users, UserPlus, Search, Filter, ShieldCheck, UserCog, Key } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { UserRole } from '@/types/enums';
-import { useUsers } from '@/hooks/use-users';
+import { useUsers, useUpdateUser, useDeleteUser } from '@/hooks/use-users';
 import { UserTable } from '@/components/users/UserTable';
 import { UserEditDialog } from '@/components/users/UserEditDialog';
 import { toast } from '@/lib/toast';
@@ -24,8 +24,10 @@ export default function UsersPage() {
   const { data: users, isLoading } = useUsers(
     role !== 'all' ? { role } : undefined
   );
+  const updateUser = useUpdateUser();
+  const deleteUser = useDeleteUser();
 
-  const filteredUsers = users?.filter(user => 
+  const filteredUsers = users?.filter(user =>
     user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     user.email.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -35,11 +37,35 @@ export default function UsersPage() {
     setIsDialogOpen(true);
   };
 
-  const handleSave = (data: any) => {
-    console.log('Saving user data:', data);
-    // In a real app, this would be a mutation
-    setIsDialogOpen(false);
-    toast('Đã lưu thông tin người dùng', 'success');
+  const handleSave = (data: Partial<User>) => {
+    if (!selectedUser) return;
+    updateUser.mutate(
+      { id: selectedUser.id, data: { role: data.role, isActive: data.isActive, twoFactorEnabled: data.twoFactorEnabled, assignedSites: data.assignedSites } },
+      {
+        onSuccess: () => {
+          setIsDialogOpen(false);
+          toast('Đã lưu thông tin người dùng', 'success');
+        },
+        onError: () => toast('Lưu thất bại, thử lại sau', 'error'),
+      }
+    );
+  };
+
+  const handleDelete = (user: User) => {
+    deleteUser.mutate(user.id, {
+      onSuccess: () => toast(`Đã xoá người dùng ${user.name}`, 'success'),
+      onError: () => toast('Xoá thất bại, thử lại sau', 'error'),
+    });
+  };
+
+  const handleToggleActive = (user: User) => {
+    updateUser.mutate(
+      { id: user.id, data: { isActive: !user.isActive } },
+      {
+        onSuccess: () => toast(user.isActive ? `Đã vô hiệu hoá ${user.name}` : `Đã kích hoạt ${user.name}`, 'success'),
+        onError: () => toast('Cập nhật thất bại, thử lại sau', 'error'),
+      }
+    );
   };
 
   return (
@@ -71,7 +97,9 @@ export default function UsersPage() {
                <div className="p-2 rounded-lg bg-[var(--primary-muted)] text-[var(--primary)]">
                   <ShieldCheck className="w-5 h-5" />
                </div>
-               <span className="text-[10px] font-bold text-[var(--success)] uppercase tracking-widest">+2 tháng này</span>
+               <span className="text-[10px] font-bold text-[var(--success)] uppercase tracking-widest">
+                 +{users?.filter(u => { const d = new Date(u.createdAt), n = new Date(); return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear(); }).length ?? 0} tháng này
+               </span>
             </div>
             <p className="text-sm text-[var(--text-muted)] font-medium">Tổng số Nhân sự</p>
             <p className="text-2xl font-bold text-[var(--text-primary)]">{users?.length ?? 0}</p>
@@ -82,7 +110,7 @@ export default function UsersPage() {
                <div className="p-2 rounded-lg bg-[var(--warning-muted)] text-[var(--warning)]">
                   <Key className="w-5 h-5" />
                </div>
-               <span className="text-[10px] font-bold text-[var(--warning)] uppercase tracking-widest">3 đang chờ</span>
+               <span className="text-[10px] font-bold text-[var(--warning)] uppercase tracking-widest">{users?.filter(u => !u.twoFactorEnabled).length ?? 0} đang chờ</span>
             </div>
             <p className="text-sm text-[var(--text-muted)] font-medium">Tuân thủ 2FA</p>
             <p className="text-2xl font-bold text-[var(--text-primary)]">
@@ -97,8 +125,8 @@ export default function UsersPage() {
                </div>
                <span className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-widest">Đang hoạt động</span>
             </div>
-            <p className="text-sm text-[var(--text-muted)] font-medium">Phiên hoạt động</p>
-            <p className="text-2xl font-bold text-[var(--text-primary)]">14</p>
+            <p className="text-sm text-[var(--text-muted)] font-medium">Tài khoản đang hoạt động</p>
+            <p className="text-2xl font-bold text-[var(--text-primary)]">{users?.filter(u => u.isActive).length ?? 0}</p>
          </div>
       </div>
 
@@ -135,10 +163,12 @@ export default function UsersPage() {
       </div>
 
       {/* Table Content */}
-      <UserTable 
-        users={filteredUsers ?? []} 
+      <UserTable
+        users={filteredUsers ?? []}
         onEdit={handleEdit}
-        isLoading={isLoading} 
+        onDelete={handleDelete}
+        onToggleActive={handleToggleActive}
+        isLoading={isLoading}
         isAdmin={isAdmin}
       />
 

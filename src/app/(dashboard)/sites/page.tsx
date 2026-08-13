@@ -2,17 +2,22 @@
 // SPDX-License-Identifier: MIT
 
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { toast } from '@/lib/toast';
+import { useViolations } from '@/hooks/use-violations';
+import { useRealSitesFromCameras } from '@/hooks/use-real-sites';
+import { SiteDetailModal } from '@/components/sites/SiteDetailModal';
+import type { SiteStatusSummary } from '@/types/models';
 import {
-  Building2, 
-  Plus, 
-  Search, 
-  Filter, 
-  MoreVertical, 
-  MapPin, 
-  Camera, 
-  ShieldAlert, 
+  Building2,
+  Plus,
+  Search,
+  Filter,
+  MoreVertical,
+  MapPin,
+  Camera,
+  ShieldAlert,
   ArrowUpRight,
   LayoutGrid,
   List as ListIcon,
@@ -21,10 +26,12 @@ import {
   AlertCircle,
   Clock,
   X,
-  ShieldCheck
+  ShieldCheck,
+  Eye,
+  Copy,
+  Trash2
 } from 'lucide-react';
 import { cn, formatPercentage } from '@/lib/utils';
-import { mockSiteStatusList } from '@/data/mock-dashboard';
 import { SiteStatus } from '@/types/enums';
 
 // --- Sub-components ---
@@ -158,6 +165,17 @@ export default function SitesPage() {
   const [statusFilter, setStatusFilter] = useState<'TẤT CẢ' | 'HOẠT ĐỘNG' | 'THIẾT LẬP'>('TẤT CẢ');
   const [notification, setNotification] = useState<any>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [customSites, setCustomSites] = useState<SiteStatusSummary[]>([]);
+  const [selectedSite, setSelectedSite] = useState<SiteStatusSummary | null>(null);
+  const { data: alerts = [] } = useViolations();
+
+  useEffect(() => {
+    try {
+      setCustomSites(JSON.parse(localStorage.getItem('safesight_custom_sites') || '[]'));
+    } catch {
+      setCustomSites([]);
+    }
+  }, []);
 
   const showNotification = (title: string, desc: string, type: 'success' | 'danger' | 'warning' = 'success') => {
     setNotification({ id: Math.random(), title, desc, type });
@@ -166,7 +184,21 @@ export default function SitesPage() {
 
   const handleRegister = (data: any) => {
     showNotification('Đã Đăng ký Công trình', `Đã tạo dự án thành công: ${data.name}`, 'success');
-    
+
+    // Site mới đăng ký -> chưa có camera nào -> trạng thái THIẾT LẬP, lưu localStorage để còn đó sau khi F5
+    const newSite: SiteStatusSummary = {
+      id: `custom-${Date.now()}`,
+      name: data.name,
+      complianceRate: 100,
+      activeAlerts: 0,
+      cameraCount: 0,
+      onlineCameras: 0,
+      status: SiteStatus.SETUP,
+    };
+    const updatedSites = [...customSites, newSite];
+    setCustomSites(updatedSites);
+    localStorage.setItem('safesight_custom_sites', JSON.stringify(updatedSites));
+
     // Log to system alerts (simulated persistence)
     const newAlert = {
       id: Math.random(),
@@ -178,34 +210,56 @@ export default function SitesPage() {
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       description: `Một công trình mới đã được đăng ký bởi quản trị viên.`
     };
-    
+
     const existingAlerts = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
     localStorage.setItem('safesight_alerts', JSON.stringify([newAlert, ...existingAlerts]));
-    
+
     // Dispatch event to update sidebar badge
     window.dispatchEvent(new Event('new-alert'));
   };
 
-  const filteredSites = mockSiteStatusList.filter(site => {
+  // Chỉ site TỰ ĐĂNG KÝ (localStorage) mới xoá được — site gom từ roster camera thật gắn với
+  // thiết bị vật lý, không phải thứ UI này nên tự xoá.
+  const handleDeleteCustomSite = (site: SiteStatusSummary) => {
+    if (!confirm(`Xoá công trình "${site.name}"?`)) return;
+    const updated = customSites.filter(s => s.id !== site.id);
+    setCustomSites(updated);
+    localStorage.setItem('safesight_custom_sites', JSON.stringify(updated));
+    toast(`Đã xoá công trình ${site.name}`, 'success');
+  };
+
+  // Công trình THẬT: gom theo site từ roster camera thật + số vi phạm thật đã ghi nhận cho site đó
+  const sitesFromCameras = useRealSitesFromCameras(alerts);
+
+  const allSites = [...sitesFromCameras, ...customSites];
+
+  const filteredSites = allSites.filter(site => {
     const matchesSearch = site.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = statusFilter === 'TẤT CẢ' || site.status === (statusFilter === 'HOẠT ĐỘNG' ? SiteStatus.ACTIVE : SiteStatus.SETUP);
     return matchesSearch && matchesStatus;
   });
 
   const stats = [
-    { title: 'Tổng số Công trình', value: mockSiteStatusList.length, icon: Building2, trend: 12, color: 'primary' },
-    { title: 'Dự án đang Hoạt động', value: mockSiteStatusList.filter(s => s.status === SiteStatus.ACTIVE).length, icon: Activity, trend: 5, color: 'success' },
-    { title: 'Camera Trực tuyến', value: mockSiteStatusList.reduce((acc, s) => acc + s.onlineCameras, 0), icon: Camera, trend: 0, color: 'info' },
-    { title: 'Cảnh báo An toàn', value: mockSiteStatusList.reduce((acc, s) => acc + s.activeAlerts, 0), icon: ShieldAlert, trend: -15, color: 'danger' },
+    { title: 'Tổng số Công trình', value: allSites.length, icon: Building2, color: 'primary' },
+    { title: 'Dự án đang Hoạt động', value: allSites.filter(s => s.status === SiteStatus.ACTIVE).length, icon: Activity, color: 'success' },
+    { title: 'Camera Trực tuyến', value: allSites.reduce((acc, s) => acc + s.onlineCameras, 0), icon: Camera, color: 'info' },
+    { title: 'Cảnh báo An toàn', value: allSites.reduce((acc, s) => acc + s.activeAlerts, 0), icon: ShieldAlert, color: 'danger' },
   ];
 
   return (
     <div className="space-y-8 pb-20 relative">
       {/* Modals */}
       {showRegisterModal && (
-        <RegisterSiteModal 
-          onClose={() => setShowRegisterModal(false)} 
+        <RegisterSiteModal
+          onClose={() => setShowRegisterModal(false)}
           onRegister={handleRegister}
+        />
+      )}
+      {selectedSite && (
+        <SiteDetailModal
+          site={selectedSite}
+          violations={alerts}
+          onClose={() => setSelectedSite(null)}
         />
       )}
 
@@ -356,12 +410,44 @@ export default function SitesPage() {
                       <span>Quận 9, TP. Thủ Đức</span>
                     </div>
                   </div>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); toast('Tùy chọn công trường (demo)', 'info'); }}
-                    className="p-1.5 rounded-lg hover:bg-[var(--background-secondary)] text-[var(--text-muted)] transition-colors"
-                  >
-                    <MoreVertical className="w-5 h-5" />
-                  </button>
+                  <DropdownMenu.Root>
+                    <DropdownMenu.Trigger asChild>
+                      <button
+                        onClick={(e) => e.stopPropagation()}
+                        className="p-1.5 rounded-lg hover:bg-[var(--background-secondary)] text-[var(--text-muted)] transition-colors"
+                      >
+                        <MoreVertical className="w-5 h-5" />
+                      </button>
+                    </DropdownMenu.Trigger>
+                    <DropdownMenu.Portal>
+                      <DropdownMenu.Content
+                        align="end"
+                        onClick={(e) => e.stopPropagation()}
+                        className="min-w-[200px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-2xl z-50"
+                      >
+                        <DropdownMenu.Item
+                          onSelect={() => setSelectedSite(site)}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] outline-none cursor-pointer"
+                        >
+                          <Eye className="w-3.5 h-3.5" /> Xem chi tiết
+                        </DropdownMenu.Item>
+                        <DropdownMenu.Item
+                          onSelect={() => { navigator.clipboard.writeText(site.id); toast('Đã sao chép ID công trình', 'success'); }}
+                          className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] outline-none cursor-pointer"
+                        >
+                          <Copy className="w-3.5 h-3.5" /> Sao chép ID công trình
+                        </DropdownMenu.Item>
+                        {site.id.startsWith('custom-') && (
+                          <DropdownMenu.Item
+                            onSelect={() => handleDeleteCustomSite(site)}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--danger)] hover:bg-[var(--danger-muted)] outline-none cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" /> Xoá công trường
+                          </DropdownMenu.Item>
+                        )}
+                      </DropdownMenu.Content>
+                    </DropdownMenu.Portal>
+                  </DropdownMenu.Root>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -407,7 +493,7 @@ export default function SitesPage() {
                     </div>
                   </div>
                   <button
-                    onClick={(e) => { e.stopPropagation(); toast('Đang mở chi tiết công trường (demo)', 'info'); }}
+                    onClick={(e) => { e.stopPropagation(); setSelectedSite(site); }}
                     className="flex items-center gap-1 text-[10px] font-black text-[var(--primary)] uppercase hover:underline"
                   >
                     Xem chi tiết <ArrowUpRight className="w-3 h-3" />
@@ -479,7 +565,7 @@ export default function SitesPage() {
                   </td>
                   <td className="px-6 py-4 text-right">
                     <button
-                      onClick={(e) => { e.stopPropagation(); toast('Đang mở chi tiết công trường (demo)', 'info'); }}
+                      onClick={(e) => { e.stopPropagation(); setSelectedSite(site); }}
                       className="p-2 rounded-lg hover:bg-[var(--surface-elevated)] text-[var(--text-muted)] hover:text-[var(--primary)] transition-all"
                     >
                       <ArrowUpRight className="w-4 h-4" />

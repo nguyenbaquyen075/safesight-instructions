@@ -19,38 +19,72 @@ import {
   ChevronRight,
   ShieldCheck
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import { mockViolations } from '@/data/mock-violations';
+import { useViolations } from '@/hooks/use-violations';
+import { ViolationDetailModal } from '@/components/violations/ViolationDetailModal';
 import { Severity } from '@/types/enums';
+import type { Violation } from '@/types/models';
 
 type SeverityFilter = 'TẤT CẢ' | 'NGHIÊM TRỌNG' | 'CAO' | 'TRUNG BÌNH' | 'THẤP';
+
+const READ_KEY = 'safesight_read_alerts';
 
 export default function AlertsPage() {
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
   const [search, setSearch] = useState('');
   const [mounted, setMounted] = useState(false);
-  const [customAlerts, setCustomAlerts] = useState<any[]>([]);
+  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const [selectedAlert, setSelectedAlert] = useState<Violation | null>(null);
+  const { data: allAlerts = [] } = useViolations();
 
   useEffect(() => {
     setMounted(true);
-    const saved = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
-    setCustomAlerts(saved);
+    try {
+      setReadIds(new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')));
+    } catch {
+      setReadIds(new Set());
+    }
   }, []);
 
   if (!mounted) return null;
 
-  const allAlerts = [...customAlerts, ...mockViolations];
+  const persistRead = (ids: Set<string>) => {
+    setReadIds(ids);
+    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(ids)));
+  };
+
+  const markRead = (id: string) => {
+    if (readIds.has(id)) return;
+    persistRead(new Set(readIds).add(id));
+  };
+
+  const markAllRead = () => {
+    persistRead(new Set([...readIds, ...filteredAlerts.map(a => a.id)]));
+    toast('Đã đánh dấu tất cả thông báo là đã đọc', 'success');
+  };
 
   const filteredAlerts = allAlerts.filter(alert => {
     const matchesFilter = filter === 'TẤT CẢ' || alert.severity === (filter === 'NGHIÊM TRỌNG' ? Severity.CRITICAL : filter === 'CAO' ? Severity.HIGH : filter === 'TRUNG BÌNH' ? Severity.MEDIUM : Severity.LOW);
-    const matchesSearch = alert.siteName.toLowerCase().includes(search.toLowerCase()) || 
+    const matchesSearch = alert.siteName.toLowerCase().includes(search.toLowerCase()) ||
                          alert.cameraName.toLowerCase().includes(search.toLowerCase());
     return matchesFilter && matchesSearch;
   });
 
+  const last24h = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const recent = allAlerts.filter(a => now - new Date(a.detectedAt).getTime() < last24h);
+
   return (
     <div className="space-y-8 pb-20 animate-fade-up">
+      {/* Detail Modal */}
+      {selectedAlert && (
+        <ViolationDetailModal
+          violation={selectedAlert}
+          onClose={() => setSelectedAlert(null)}
+        />
+      )}
+
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
@@ -59,7 +93,7 @@ export default function AlertsPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => toast('Đã đánh dấu tất cả thông báo là đã đọc', 'success')}
+            onClick={markAllRead}
             className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2"
           >
             <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />
@@ -71,9 +105,9 @@ export default function AlertsPage() {
       {/* Stats Summary */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         {[
-          { label: 'Lỗi Nghiêm trọng', value: '02', icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
-          { label: 'Vi phạm An toàn', value: '14', icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
-          { label: 'Thông tin Hệ thống', value: '128', icon: Info, color: 'text-blue-500', bg: 'bg-blue-500/10' },
+          { label: 'Lỗi Nghiêm trọng (24h)', value: recent.filter(a => a.severity === Severity.CRITICAL).length.toString(), icon: ShieldAlert, color: 'text-red-500', bg: 'bg-red-500/10' },
+          { label: 'Vi phạm An toàn (24h)', value: recent.filter(a => a.severity === Severity.HIGH || a.severity === Severity.MEDIUM).length.toString(), icon: AlertTriangle, color: 'text-amber-500', bg: 'bg-amber-500/10' },
+          { label: 'Tổng số Cảnh báo (24h)', value: recent.length.toString(), icon: Info, color: 'text-blue-500', bg: 'bg-blue-500/10' },
         ].map(stat => (
           <div key={stat.label} className="p-6 rounded-[2rem] bg-[var(--surface)] border border-[var(--border)] flex items-center gap-4">
             <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center", stat.bg, stat.color)}>
@@ -150,18 +184,21 @@ export default function AlertsPage() {
                       )}>
                         {alert.severity === Severity.CRITICAL ? 'NGHIÊM TRỌNG' : alert.severity === Severity.HIGH ? 'CAO' : alert.severity === Severity.MEDIUM ? 'TRUNG BÌNH' : 'THẤP'}
                       </span>
-                      <h3 className="text-lg font-black text-[var(--text-primary)] group-hover:text-[var(--primary-light)] transition-colors">{alert.type}</h3>
+                      {!readIds.has(alert.id) && (
+                        <span className="w-2 h-2 rounded-full bg-[var(--primary)] animate-pulse" title="Chưa đọc" />
+                      )}
+                      <h3 className="text-lg font-black text-[var(--text-primary)] group-hover:text-[var(--primary-light)] transition-colors">{getViolationTypeLabel(alert.type)}</h3>
                     </div>
                     <p className="text-sm text-[var(--text-muted)] font-medium">Mối nguy hiểm an toàn tiềm ẩn được phát hiện trên luồng camera công trường.</p>
                   </div>
                   <div className="flex items-center gap-4 text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-wider">
                     <div className="flex items-center gap-1.5 bg-[var(--background-secondary)] px-3 py-1.5 rounded-lg border border-[var(--border)]">
                       <Calendar className="w-3 h-3" />
-                      <span>{alert.date}</span>
+                      <span>{new Date(alert.detectedAt).toLocaleDateString()}</span>
                     </div>
                     <div className="flex items-center gap-1.5 bg-[var(--background-secondary)] px-3 py-1.5 rounded-lg border border-[var(--border)]">
                       <Clock className="w-3 h-3" />
-                      <span>{alert.time}</span>
+                      <span>{new Date(alert.detectedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   </div>
                 </div>
@@ -187,7 +224,7 @@ export default function AlertsPage() {
                   </div>
                   <div className="flex items-center justify-end">
                     <button
-                      onClick={() => toast(`Đang mở chi tiết sự kiện: ${alert.type} tại ${alert.cameraName}`, 'info')}
+                      onClick={() => { markRead(alert.id); setSelectedAlert(alert); }}
                       className="px-6 py-2 rounded-xl bg-[var(--primary)] text-white text-[10px] font-black uppercase tracking-widest hover:bg-[var(--primary-hover)] transition-all shadow-glow-primary active:scale-95 flex items-center gap-2"
                     >
                       Xem xét Sự kiện <ChevronRight className="w-4 h-4" />

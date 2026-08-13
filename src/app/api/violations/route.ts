@@ -2,13 +2,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { mockViolations } from '@/data/mock-violations';
 import { prisma } from '@/lib/prisma';
 import { notifyViolation } from '@/lib/alert-notifier';
 import type { Violation } from '@/types/models';
 
-// Vi phạm thật (do AI engine ghi qua POST bên dưới) hiện lên TRƯỚC, gộp với
-// mock để dashboard vẫn có dữ liệu demo khi chưa có vi phạm thật nào.
 async function getRealViolations(): Promise<Violation[]> {
   const rows = await prisma.violation.findMany({
     include: { camera: true, site: true },
@@ -40,8 +37,7 @@ export async function GET(request: NextRequest) {
   const severity = searchParams.get('severity');
   const status = searchParams.get('status');
 
-  const realViolations = await getRealViolations();
-  let violations = [...realViolations, ...mockViolations];
+  let violations = await getRealViolations();
 
   if (siteId) {
     violations = violations.filter(v => v.siteId === siteId);

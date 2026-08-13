@@ -4,13 +4,13 @@
 
 import { useState } from 'react';
 import { toast } from '@/lib/toast';
-import { 
-  User, 
-  Building, 
-  Bell, 
-  Shield, 
-  Key, 
-  Sliders, 
+import {
+  User,
+  Building,
+  Bell,
+  Shield,
+  Key,
+  Sliders,
   Save,
   ShieldAlert,
   Zap,
@@ -21,15 +21,17 @@ import {
   Siren,
   CheckCircle2,
   AlertCircle,
-  X
+  X,
+  Video
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { TelegramBotCard } from '@/components/settings/TelegramBotCard';
 import { AlertRulesCard } from '@/components/settings/AlertRulesCard';
+import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'monitoring' | 'notifications' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'cameras' | 'monitoring' | 'notifications' | 'security'>('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<any>(null);
 
@@ -48,6 +50,7 @@ export default function SettingsPage() {
 
   const tabs = [
     { id: 'profile', label: 'Tài khoản & Tổ chức', icon: User },
+    { id: 'cameras', label: 'Giám sát', icon: Video },
     { id: 'monitoring', label: 'Giám sát AI', icon: Sliders },
     { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'security', label: 'Bảo mật', icon: Shield },
@@ -187,11 +190,17 @@ export default function SettingsPage() {
             </div>
           )}
 
+          {activeTab === 'cameras' && (
+            <div className="space-y-6 animate-fade-up">
+              <CameraMonitoringCard />
+            </div>
+          )}
+
           {activeTab === 'monitoring' && (
             <div className="space-y-6 animate-fade-up">
               <SettingCard>
-                <SectionHeader 
-                  title="Độ nhạy Phát hiện AI" 
+                <SectionHeader
+                  title="Độ nhạy Phát hiện AI"
                   description="Điều chỉnh mức độ nghiêm ngặt của công cụ AI trong việc xác định vi phạm an toàn." 
                 />
                 <div className="space-y-8">

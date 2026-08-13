@@ -1,19 +1,19 @@
 // SPDX-License-Identifier: MIT
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mockSites } from '@/data/mock-sites';
+import { prisma } from '@/lib/prisma';
+import { toSiteDTO } from '@/lib/site-shape';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const site = mockSites.find(s => s.id === id);
-  
+  const site = await prisma.site.findUnique({ where: { id } });
+
   if (!site) {
     return NextResponse.json({ error: 'Site not found' }, { status: 404 });
   }
-  
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return NextResponse.json(site);
+
+  return NextResponse.json(toSiteDTO(site));
 }

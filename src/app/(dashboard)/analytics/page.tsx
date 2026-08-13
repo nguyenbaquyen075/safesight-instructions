@@ -19,20 +19,28 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import { useComplianceTrend, useViolationBreakdown } from '@/hooks/use-dashboard';
-import { 
-  ComplianceChart 
+import { useDashboardKPIs, useComplianceTrend, useViolationBreakdown } from '@/hooks/use-dashboard';
+import { useViolations } from '@/hooks/use-violations';
+import {
+  ComplianceChart
 } from '@/components/dashboard/ComplianceChart';
-import { 
-  ViolationDonut 
+import {
+  ViolationDonut
 } from '@/components/dashboard/ViolationDonut';
 
 export default function AnalyticsPage() {
   const [mounted, setMounted] = React.useState(false);
 
   // Các hook phải gọi TRƯỚC mọi return sớm (Rules of Hooks) — nếu không React vỡ trang
+  const { data: kpis } = useDashboardKPIs();
   const { data: trend } = useComplianceTrend();
   const { data: breakdown } = useViolationBreakdown();
+  const { data: violations = [] } = useViolations();
+
+  const todayKey = new Date().toDateString();
+  const camerasWithViolationToday = new Set(
+    violations.filter(v => new Date(v.detectedAt).toDateString() === todayKey).map(v => v.cameraId)
+  ).size;
 
   React.useEffect(() => {
     setMounted(true);
@@ -69,10 +77,10 @@ export default function AnalyticsPage() {
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {[
-          { label: 'Tuân thủ Tổng thể', value: '94.2%', trend: '+2.1%', icon: TrendingUp, color: 'success' },
-          { label: 'Vi phạm PPE', value: '142', trend: '-12%', icon: ShieldAlert, color: 'danger' },
-          { label: 'T.gian Phát hiện TB', value: '1.2s', trend: '-0.3s', icon: Clock, color: 'primary' },
-          { label: 'Công nhân hoạt động', value: '854', trend: '+45', icon: Users, color: 'info' },
+          { label: 'Tuân thủ Tổng thể', value: `${kpis?.complianceRate ?? 100}%`, trend: `${(kpis?.complianceTrend ?? 0) >= 0 ? '+' : ''}${kpis?.complianceTrend ?? 0}%`, icon: TrendingUp, color: 'success' },
+          { label: 'Vi phạm PPE hôm nay', value: `${kpis?.totalViolationsToday ?? 0}`, trend: `${(kpis?.violationsTrend ?? 0) >= 0 ? '+' : ''}${kpis?.violationsTrend ?? 0}%`, icon: ShieldAlert, color: 'danger' },
+          { label: 'Camera có vi phạm hôm nay', value: `${camerasWithViolationToday}`, trend: `${(kpis?.violationsTrend ?? 0) >= 0 ? '+' : ''}${kpis?.violationsTrend ?? 0}%`, icon: Users, color: 'info' },
+          { label: 'Camera trực tuyến', value: `${kpis?.activeCameras ?? 0}/${kpis?.totalCameras ?? 0}`, trend: `${kpis?.onlineRate ?? 0}%`, icon: Clock, color: 'primary' },
         ].map(kpi => (
           <div key={kpi.label} className="bg-[var(--surface)] border border-[var(--border)] p-6 rounded-[2rem] relative overflow-hidden group">
             <div className="flex justify-between items-start relative z-10">
@@ -136,14 +144,15 @@ export default function AnalyticsPage() {
               <ViolationDonut data={breakdown ?? []} />
            </div>
            <div className="grid grid-cols-2 gap-4 mt-10">
-              <div className="p-4 rounded-2xl bg-[var(--background-secondary)] border border-[var(--border)]">
-                 <p className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1">Thiếu Mũ</p>
-                 <p className="text-lg font-black text-white">62%</p>
-              </div>
-              <div className="p-4 rounded-2xl bg-[var(--background-secondary)] border border-[var(--border)]">
-                 <p className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1">Thiếu Áo</p>
-                 <p className="text-lg font-black text-white">25%</p>
-              </div>
+              {[0, 1].map(i => {
+                const entry = breakdown?.[i];
+                return (
+                  <div key={i} className="p-4 rounded-2xl bg-[var(--background-secondary)] border border-[var(--border)]">
+                     <p className="text-[8px] font-black text-[var(--text-muted)] uppercase tracking-widest mb-1">{entry?.label ?? 'Chưa có dữ liệu'}</p>
+                     <p className="text-lg font-black text-white">{entry ? `${entry.percentage}%` : '—'}</p>
+                  </div>
+                );
+              })}
            </div>
         </div>
       </div>

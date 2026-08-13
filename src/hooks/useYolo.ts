@@ -10,6 +10,7 @@ export interface Detection {
   confidence: number;
   isViolation: boolean;
   trackId?: number | null;   // mã theo dõi từng người (dùng chống ghi trùng vi phạm 1 đối tượng)
+  missingPpe?: string[];     // đồ bảo hộ đang thiếu, vd ['helmet','gloves'] (do ppe_tracker.py gửi)
   bbox: {
     top: string;
     left: string;

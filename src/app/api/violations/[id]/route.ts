@@ -1,19 +1,81 @@
 // SPDX-License-Identifier: MIT
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mockViolations } from '@/data/mock-violations';
+import { z } from 'zod';
+import { prisma } from '@/lib/prisma';
+import { assertSiteAccess } from '@/lib/auth/site-access';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   const { id } = await params;
-  const violation = mockViolations.find(v => v.id === id);
-  
+  const violation = await prisma.violation.findUnique({
+    where: { id },
+    include: { camera: true, site: true },
+  });
+
   if (!violation) {
     return NextResponse.json({ error: 'Violation not found' }, { status: 404 });
   }
-  
-  await new Promise((resolve) => setTimeout(resolve, 300));
-  return NextResponse.json(violation);
+
+  return NextResponse.json({
+    id: violation.id,
+    cameraId: violation.cameraId,
+    cameraName: violation.camera.name,
+    siteId: violation.siteId,
+    siteName: violation.site.name,
+    zoneId: violation.zoneId ?? undefined,
+    type: violation.type,
+    severity: violation.severity,
+    confidence: violation.confidence,
+    bboxData: JSON.parse(violation.bboxData),
+    snapshotUrl: violation.snapshotUrl,
+    clipUrl: violation.clipUrl ?? undefined,
+    status: violation.status.toLowerCase(),
+    detectedAt: violation.detectedAt.toISOString(),
+    createdAt: violation.createdAt.toISOString(),
+  });
+}
+
+const updateSchema = z.object({
+  status: z.enum(['open', 'under_review', 'resolved', 'false_positive']),
+});
+
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const existing = await prisma.violation.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const authError = await assertSiteAccess(existing.siteId);
+  if (authError) return authError;
+
+  const parsed = updateSchema.safeParse(await request.json().catch(() => ({})));
+  if (!parsed.success) {
+    return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  const updated = await prisma.violation.update({
+    where: { id },
+    data: { status: parsed.data.status },
+  });
+  return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });
+}
+
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  const { id } = await params;
+  const existing = await prisma.violation.findUnique({ where: { id } });
+  if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+
+  const authError = await assertSiteAccess(existing.siteId);
+  if (authError) return authError;
+
+  await prisma.violation.delete({ where: { id } });
+  return NextResponse.json({ success: true });
 }

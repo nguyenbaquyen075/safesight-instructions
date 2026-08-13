@@ -1,18 +1,20 @@
 // SPDX-License-Identifier: MIT
 
 import { NextRequest, NextResponse } from 'next/server';
-import { mockUsers } from '@/data/mock-users';
+import { prisma } from '@/lib/prisma';
+import { toUserDTO } from '@/lib/user-shape';
 
 export async function GET(request: NextRequest) {
-  const searchParams = request.nextUrl.searchParams;
-  const role = searchParams.get('role');
-  
-  let users = [...mockUsers];
-  
-  if (role) {
-    users = users.filter(u => u.role === role);
-  }
-  
-  await new Promise((resolve) => setTimeout(resolve, 500));
-  return NextResponse.json(users);
+  const role = request.nextUrl.searchParams.get('role');
+
+  const [rows, sites] = await Promise.all([
+    prisma.user.findMany({
+      where: role ? { role } : undefined,
+      orderBy: { createdAt: 'desc' },
+    }),
+    prisma.site.findMany({ select: { id: true, name: true } }),
+  ]);
+  const siteNameById = new Map(sites.map(s => [s.id, s.name]));
+
+  return NextResponse.json(rows.map(u => toUserDTO(u, siteNameById)));
 }

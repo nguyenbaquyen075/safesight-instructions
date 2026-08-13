@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT
 
 
-import { MoreHorizontal, Shield, Mail, Calendar, MapPin, Edit2, Trash2 } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { MoreHorizontal, Shield, Mail, Calendar, MapPin, Edit2, Trash2, Copy, UserCheck, UserX } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { UserRole } from '@/types/enums';
@@ -12,11 +13,13 @@ import { format } from 'date-fns';
 interface UserTableProps {
   users: User[];
   onEdit: (user: User) => void;
+  onDelete: (user: User) => void;
+  onToggleActive: (user: User) => void;
   isLoading?: boolean;
   isAdmin?: boolean;
 }
 
-export function UserTable({ users, onEdit, isLoading, isAdmin }: UserTableProps) {
+export function UserTable({ users, onEdit, onDelete, onToggleActive, isLoading, isAdmin }: UserTableProps) {
   if (isLoading) {
     return (
       <div className="w-full space-y-4">
@@ -116,19 +119,45 @@ export function UserTable({ users, onEdit, isLoading, isAdmin }: UserTableProps)
                           <Edit2 className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => toast(`Đã xóa người dùng ${user.name} (demo)`, 'success')}
+                          onClick={() => {
+                            if (confirm(`Xoá người dùng ${user.name}? Không thể hoàn tác.`)) onDelete(user);
+                          }}
                           className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--danger-muted)] transition-all"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
                       </>
                     )}
-                    <button
-                      onClick={() => toast(`Tùy chọn cho ${user.name} (demo)`, 'info')}
-                      className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-all"
-                    >
-                      <MoreHorizontal className="w-4 h-4" />
-                    </button>
+                    <DropdownMenu.Root>
+                      <DropdownMenu.Trigger asChild>
+                        <button className="p-2 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] transition-all">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </button>
+                      </DropdownMenu.Trigger>
+                      <DropdownMenu.Portal>
+                        <DropdownMenu.Content
+                          align="end"
+                          className="min-w-[200px] rounded-xl border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-2xl z-50"
+                        >
+                          <DropdownMenu.Item
+                            onSelect={() => { navigator.clipboard.writeText(user.email); toast('Đã sao chép email', 'success'); }}
+                            className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] outline-none cursor-pointer"
+                          >
+                            <Copy className="w-3.5 h-3.5" /> Sao chép email
+                          </DropdownMenu.Item>
+                          {isAdmin && (
+                            <DropdownMenu.Item
+                              onSelect={() => onToggleActive(user)}
+                              className="flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] outline-none cursor-pointer"
+                            >
+                              {user.isActive
+                                ? <><UserX className="w-3.5 h-3.5" /> Vô hiệu hoá tài khoản</>
+                                : <><UserCheck className="w-3.5 h-3.5" /> Kích hoạt tài khoản</>}
+                            </DropdownMenu.Item>
+                          )}
+                        </DropdownMenu.Content>
+                      </DropdownMenu.Portal>
+                    </DropdownMenu.Root>
                   </div>
                 </td>
               </tr>

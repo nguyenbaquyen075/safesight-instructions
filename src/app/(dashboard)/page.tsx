@@ -14,12 +14,14 @@ import {
 import Link from 'next/link';
 import { cn, formatPercentage } from '@/lib/utils';
 import { useDashboardKPIs, useComplianceTrend, useViolationBreakdown } from '@/hooks/use-dashboard';
-import { useAlerts } from '@/hooks/use-alerts';
-import { useSites } from '@/hooks/use-sites';
+import { useViolations } from '@/hooks/use-violations';
+import { useRealSitesFromCameras } from '@/hooks/use-real-sites';
 import { ComplianceChart } from '@/components/dashboard/ComplianceChart';
 import { ViolationDonut } from '@/components/dashboard/ViolationDonut';
 import { AlertTimeline } from '@/components/dashboard/AlertTimeline';
 import { SiteStatusGrid } from '@/components/dashboard/SiteStatusGrid';
+import { AlertChannel, AlertStatus, ViolationStatus } from '@/types/enums';
+import type { Alert } from '@/types/models';
 
 interface KPICardProps {
   title: string;
@@ -117,8 +119,22 @@ export default function DashboardPage() {
   const { data: kpis, isLoading: kpisLoading } = useDashboardKPIs();
   const { data: trend, isLoading: trendLoading } = useComplianceTrend();
   const { data: breakdown, isLoading: breakdownLoading } = useViolationBreakdown();
-  const { data: alerts, isLoading: alertsLoading } = useAlerts();
-  const { data: sites, isLoading: sitesLoading } = useSites();
+  const { data: violations = [], isLoading: alertsLoading } = useViolations();
+  const sites = useRealSitesFromCameras(violations);
+  const sitesLoading = alertsLoading;
+
+  // Bọc mỗi vi phạm thật thành 1 "Alert" để tái dùng AlertTimeline có sẵn (không có bảng Alert
+  // riêng cho luồng thật này — mỗi vi phạm THẬT đã tự thân là 1 cảnh báo trong hệ thống).
+  const alerts: Alert[] = violations.slice(0, 20).map(v => ({
+    id: v.id,
+    violationId: v.id,
+    violation: v,
+    channel: AlertChannel.IN_APP,
+    recipient: '',
+    status: v.status === ViolationStatus.RESOLVED ? AlertStatus.RESOLVED : AlertStatus.NEW,
+    sentAt: v.detectedAt,
+    createdAt: v.detectedAt,
+  }));
 
   return (
     <div className="space-y-6">
@@ -274,15 +290,7 @@ export default function DashboardPage() {
                   ))}
                </div>
             ) : (
-              <SiteStatusGrid sites={sites?.map(s => ({
-                id: s.id,
-                name: s.name,
-                complianceRate: s.complianceRate,
-                activeAlerts: s.activeAlerts,
-                cameraCount: s.cameraCount,
-                onlineCameras: s.onlineCameraCount,
-                status: s.status
-              })) ?? []} />
+              <SiteStatusGrid sites={sites} />
             )}
           </div>
         </div>
