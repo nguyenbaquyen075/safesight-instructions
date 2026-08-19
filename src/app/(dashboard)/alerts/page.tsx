@@ -87,14 +87,14 @@ export default function AlertsPage() {
 
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-black text-[var(--text-primary)] tracking-tight">Thông báo Hệ thống</h1>
           <p className="text-[var(--text-muted)] text-sm">Nhật ký thông báo thời gian thực cho tất cả các sự kiện an toàn và hệ thống.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={markAllRead}
-            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2 whitespace-nowrap"
           >
             <CheckCircle2 className="w-4 h-4 text-[var(--success)]" />
             Đánh dấu tất cả đã đọc

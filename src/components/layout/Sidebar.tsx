@@ -8,6 +8,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSession, signOut } from 'next-auth/react';
 import { UserRole } from '@/types/enums';
+import { canAccessPath } from '@/lib/auth/permissions';
 import {
   LayoutDashboard,
   Building2,
@@ -29,7 +30,6 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   badge?: number;
-  adminOnly?: boolean;
 }
 
 const navItems: NavItem[] = [
@@ -51,11 +51,7 @@ export function Sidebar() {
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole;
 
-  const filteredNavItems = navItems.filter(item => 
-    !item.adminOnly || 
-    userRole === UserRole.SUPER_ADMIN || 
-    userRole === UserRole.ORG_ADMIN
-  );
+  const filteredNavItems = navItems.filter(item => canAccessPath(userRole, item.href));
 
   useEffect(() => {
     const updateCount = () => {

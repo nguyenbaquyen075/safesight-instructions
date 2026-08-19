@@ -5,7 +5,7 @@ import { cn } from '@/lib/utils';
 
 export function SectionHeader({ title, description }: { title: string; description: string }) {
   return (
-    <div className="mb-6">
+    <div className="mb-6 min-w-0 flex-1">
       <h2 className="text-xl font-bold text-[var(--text-primary)]">{title}</h2>
       <p className="text-sm text-[var(--text-muted)]">{description}</p>
     </div>

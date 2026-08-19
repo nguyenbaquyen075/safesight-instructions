@@ -90,15 +90,15 @@ export default function SettingsPage() {
 
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-bold text-[var(--text-primary)]">Cài đặt</h1>
           <p className="text-[var(--text-muted)]">Cấu hình không gian làm việc SafeSight AI của bạn</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={handleSave}
             disabled={isSaving}
-            className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold transition-all shadow-glow-primary active:scale-95 disabled:opacity-50"
+            className="flex items-center justify-center gap-2 px-8 py-3 rounded-xl bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white font-bold transition-all shadow-glow-primary active:scale-95 disabled:opacity-50 whitespace-nowrap"
           >
             {isSaving ? (
               <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

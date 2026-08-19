@@ -116,18 +116,18 @@ export default function ViolationsPage() {
 
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-black text-[var(--text-primary)] tracking-tight">Thư viện Vi phạm</h1>
           <p className="text-[var(--text-muted)] text-sm">Lưu trữ bằng chứng về các sự kiện không tuân thủ an toàn.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <div className="flex bg-[var(--surface)] p-1 rounded-xl border border-[var(--border)]">
              {['ALL', Severity.CRITICAL, Severity.HIGH].map(s => (
-               <button 
+               <button
                  key={s}
                  onClick={() => setFilter(getFilterLabel(s) as any)}
                  className={cn(
-                   "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                   "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                    (filter === getFilterLabel(s)) ? "bg-[var(--primary)] text-white shadow-lg" : "text-[var(--text-muted)] hover:text-white"
                  )}
                >
@@ -137,7 +137,7 @@ export default function ViolationsPage() {
           </div>
           <button
             onClick={() => { exportViolationsCsv(allViolations); toast(`Đã xuất ${allViolations.length} vi phạm ra file CSV`, 'success'); }}
-            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2 whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             Xuất file

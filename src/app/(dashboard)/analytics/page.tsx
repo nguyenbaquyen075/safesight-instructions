@@ -52,21 +52,21 @@ export default function AnalyticsPage() {
     <div className="space-y-8 pb-20 animate-fade-up">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-3xl font-black text-[var(--text-primary)] tracking-tight">Phân tích An toàn</h1>
           <p className="text-[var(--text-muted)] text-sm">Tìm hiểu sâu về tuân thủ công trường và xu hướng phát hiện của AI.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 shrink-0">
           <button
             onClick={() => toast('Đang hiển thị dữ liệu 30 ngày qua', 'info')}
-            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-sm font-bold text-[var(--text-primary)] hover:bg-[var(--surface-hover)] transition-all flex items-center gap-2 whitespace-nowrap"
           >
             <Calendar className="w-4 h-4" />
             30 Ngày qua
           </button>
           <button
             onClick={() => { toast('Đang chuẩn bị bản in/PDF...', 'success'); setTimeout(() => window.print(), 300); }}
-            className="px-6 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-black uppercase tracking-widest hover:bg-[var(--primary-hover)] transition-all shadow-glow-primary flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-[var(--primary)] text-white text-sm font-black uppercase tracking-widest hover:bg-[var(--primary-hover)] transition-all shadow-glow-primary flex items-center gap-2 whitespace-nowrap"
           >
             <Download className="w-4 h-4" />
             Xuất PDF

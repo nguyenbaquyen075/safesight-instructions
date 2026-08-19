@@ -2,10 +2,15 @@
 // SPDX-License-Identifier: MIT
 
 
-import { usePathname } from 'next/navigation';
+import * as React from 'react';
+import { usePathname, useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { ShieldAlert } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { Toaster } from '@/components/ui/Toaster';
+import { canAccessPath } from '@/lib/auth/permissions';
+import { UserRole } from '@/types/enums';
 
 export default function DashboardLayout({
   children,
@@ -13,6 +18,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
+  const { data: session, status } = useSession();
+  const userRole = session?.user?.role as UserRole | undefined;
+  const allowed = status !== 'authenticated' || canAccessPath(userRole, pathname);
+
+  React.useEffect(() => {
+    if (status === 'authenticated' && !allowed) {
+      router.replace('/');
+    }
+  }, [status, allowed, router]);
 
   const getHeaderInfo = () => {
     if (pathname === '/') return { title: 'Bảng điều khiển Quản trị', subtitle: 'Tổng quan giám sát an toàn thời gian thực' };
@@ -34,7 +49,13 @@ export default function DashboardLayout({
       <div className="flex-1 ml-[260px] flex flex-col transition-all duration-300">
         <Header title={title} subtitle={subtitle} />
         <main className="flex-1 p-6 overflow-y-auto">
-          {children}
+          {allowed ? children : (
+            <div className="flex flex-col items-center justify-center gap-3 py-24 text-[var(--text-muted)]">
+              <ShieldAlert className="w-8 h-8 text-[var(--danger)]" />
+              <p className="text-sm font-bold">Bạn không có quyền xem trang này</p>
+              <p className="text-xs">Đang chuyển về Bảng điều khiển...</p>
+            </div>
+          )}
         </main>
       </div>
       <Toaster />

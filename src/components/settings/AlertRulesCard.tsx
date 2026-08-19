@@ -46,7 +46,7 @@ export function AlertRulesCard() {
         <select
           value={activeSiteId}
           onChange={(e) => setSiteId(e.target.value)}
-          className="px-3 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)] text-sm outline-none"
+          className="px-3 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)] text-sm outline-none shrink-0"
         >
           {sites?.map((site) => (
             <option key={site.id} value={site.id}>{site.name}</option>

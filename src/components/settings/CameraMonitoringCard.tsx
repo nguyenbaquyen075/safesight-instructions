@@ -34,7 +34,14 @@ function SourceBadge({ rtspUrl }: { rtspUrl: string }) {
   return null;
 }
 
-export function CameraMonitoringCard() {
+interface CameraMonitoringCardProps {
+  /** 'mic' đổi toàn bộ nhãn "camera" -> "mic" khi nhúng vào trang Loa công trường; dữ liệu/logic bên dưới vẫn thao tác trên camera vì mic gắn liền với camera tại vị trí đó. */
+  variant?: 'camera' | 'mic';
+}
+
+export function CameraMonitoringCard({ variant = 'camera' }: CameraMonitoringCardProps) {
+  const isMic = variant === 'mic';
+  const noun = isMic ? 'mic' : 'camera';
   const { data: allCameras, isLoading } = useCameras({ includeDemo: true });
   const deleteCamera = useDeleteCamera();
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
@@ -56,14 +63,14 @@ export function CameraMonitoringCard() {
   const handleDelete = async (camera: Camera) => {
     const isDemo = DEMO_IDS.has(camera.id);
     const warning = isDemo
-      ? `Xoá camera mẫu "${camera.name}"? Sẽ mất luôn lịch sử vi phạm demo gắn với camera này, không phục hồi được. Cần khởi động lại hệ thống để có tác dụng.`
-      : `Xoá camera "${camera.name}"? Cần khởi động lại hệ thống để AI engine bỏ luồng này.`;
+      ? `Xoá ${noun} mẫu "${camera.name}"? Sẽ mất luôn lịch sử vi phạm demo gắn với ${noun} này, không phục hồi được. Cần khởi động lại hệ thống để có tác dụng.`
+      : `Xoá ${noun} "${camera.name}"? Cần khởi động lại hệ thống để AI engine bỏ luồng này.`;
     if (!confirm(warning)) return;
     try {
       await deleteCamera.mutateAsync(camera.id);
-      toast('Đã xoá camera', 'success');
+      toast(`Đã xoá ${noun}`, 'success');
     } catch {
-      toast('Xoá camera thất bại', 'error');
+      toast(`Xoá ${noun} thất bại`, 'error');
     }
   };
 
@@ -73,21 +80,23 @@ export function CameraMonitoringCard() {
     <SettingCard>
       <div className="flex items-center justify-between mb-6">
         <SectionHeader
-          title="Giám sát camera"
-          description="Kết nối webcam để test hoặc camera IP thật (RTSP), quản lý riêng với các camera mẫu ở trang Cameras."
+          title={isMic ? 'Giám sát mic' : 'Giám sát camera'}
+          description={isMic
+            ? 'Camera tại vị trí này phát cảnh báo giọng nói — kết nối webcam để test hoặc camera IP thật (RTSP) làm mic, quản lý riêng với camera mẫu ở trang Cameras.'
+            : 'Kết nối webcam để test hoặc camera IP thật (RTSP), quản lý riêng với các camera mẫu ở trang Cameras.'}
         />
         <button
           onClick={handleAdd}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-bold hover:bg-[var(--primary-hover)]"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-[var(--primary)] text-white text-sm font-bold hover:bg-[var(--primary-hover)] shrink-0 whitespace-nowrap"
         >
-          <Plus className="w-4 h-4" /> Thêm camera
+          <Plus className="w-4 h-4" /> Thêm {noun}
         </button>
       </div>
 
       {/* Báo cáo nhanh */}
       <div className="grid grid-cols-3 gap-3 mb-6">
         <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-          <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">Camera thật</p>
+          <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">{isMic ? 'Mic thật' : 'Camera thật'}</p>
           <p className="text-xl font-black text-[var(--text-primary)]">{realCameras?.length ?? 0}</p>
         </div>
         <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
@@ -95,7 +104,7 @@ export function CameraMonitoringCard() {
           <p className="text-xl font-black text-[var(--success)]">{onlineReal}</p>
         </div>
         <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-          <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">Camera mẫu (demo)</p>
+          <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">{isMic ? 'Mic mẫu (demo)' : 'Camera mẫu (demo)'}</p>
           <p className="text-xl font-black text-[var(--text-muted)]">{demoCameras?.length ?? mockCameras.length}</p>
         </div>
       </div>
@@ -134,7 +143,7 @@ export function CameraMonitoringCard() {
         ))}
         {!isLoading && realCameras?.length === 0 && (
           <p className="text-sm text-[var(--text-muted)] text-center py-6">
-            Chưa có camera thật nào — bấm "Thêm camera" để kết nối webcam hoặc camera IP.
+            Chưa có {noun} thật nào — bấm "Thêm {noun}" để kết nối webcam hoặc camera IP.
           </p>
         )}
       </div>
@@ -145,7 +154,7 @@ export function CameraMonitoringCard() {
       <div className="mt-8 pt-6 border-t border-[var(--border)]">
         <div className="flex items-center gap-2 mb-3">
           <ShieldCheck className="w-4 h-4 text-[var(--text-muted)]" />
-          <h4 className="text-xs font-black text-[var(--text-muted)] uppercase tracking-widest">Camera mẫu trên trang Cameras (demo)</h4>
+          <h4 className="text-xs font-black text-[var(--text-muted)] uppercase tracking-widest">{isMic ? 'Mic mẫu trên trang Cameras (demo)' : 'Camera mẫu trên trang Cameras (demo)'}</h4>
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {demoCameras?.map((cam) => (
@@ -169,6 +178,7 @@ export function CameraMonitoringCard() {
         camera={editingCamera}
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
+        variant={variant}
       />
     </SettingCard>
   );

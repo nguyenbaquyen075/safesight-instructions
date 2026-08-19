@@ -400,6 +400,30 @@ export default function CamerasPage() {
 
   if (!mounted) return null;
 
+  // Danh sách camera online (thật + demo) + phát hiện AI hiện tại — dùng chung cho
+  // lưới xem trực tiếp bên dưới VÀ bảng tổng quan tuân thủ PPE cuối trang.
+  const demoTiles = mockCameras.filter(c => c.status === CameraStatus.ONLINE && existingDemoIds.has(c.id)).slice(0, 6).map(cam => {
+    const detections = getDetectionsForCamera(cam.id);
+    return { id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id) };
+  });
+  const realTiles = (realCameras ?? []).filter(c => c.status === CameraStatus.ONLINE).map(cam => {
+    const parsed = parseCameraSource(cam.rtspUrl);
+    const detections = getDetectionsForCamera(cam.id);
+    return { id: cam.id, cam, isDemo: false as const, detections, hasViolation: detections.some(d => d.isViolation), parsed };
+  });
+  const onlineCameraTiles = [...realTiles, ...demoTiles];
+  const violationCount = onlineCameraTiles.filter(c => c.hasViolation).length;
+  const visibleCameras = showViolationsOnly ? onlineCameraTiles.filter(c => c.hasViolation) : onlineCameraTiles;
+
+  const framePersons = onlineCameraTiles.flatMap(t => t.detections).filter(d => d.type === 'person');
+  const frameViolators = framePersons.filter(d => d.isViolation);
+  const missingPpeCounts: Record<string, number> = { helmet: 0, gloves: 0, boots: 0 };
+  framePersons.forEach(p => {
+    p.missingPpe?.forEach(m => {
+      if (m in missingPpeCounts) missingPpeCounts[m]++;
+    });
+  });
+
   return (
     <div className="space-y-8 pb-20 relative">
       {/* Notifications */}
@@ -479,19 +503,6 @@ export default function CamerasPage() {
       </div>
 
       {(() => {
-        const demoTiles = mockCameras.filter(c => c.status === CameraStatus.ONLINE && existingDemoIds.has(c.id)).slice(0, 6).map(cam => {
-          const detections = getDetectionsForCamera(cam.id);
-          return { id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id) };
-        });
-        const realTiles = (realCameras ?? []).filter(c => c.status === CameraStatus.ONLINE).map(cam => {
-          const parsed = parseCameraSource(cam.rtspUrl);
-          const detections = getDetectionsForCamera(cam.id);
-          return { id: cam.id, cam, isDemo: false as const, detections, hasViolation: detections.some(d => d.isViolation), parsed };
-        });
-        const onlineCameras = [...realTiles, ...demoTiles];
-        const violationCount = onlineCameras.filter(c => c.hasViolation).length;
-        const visibleCameras = showViolationsOnly ? onlineCameras.filter(c => c.hasViolation) : onlineCameras;
-
         return (
           <>
             <div className="flex items-center gap-3">
@@ -509,7 +520,7 @@ export default function CamerasPage() {
               </button>
               {showViolationsOnly && (
                 <span className="text-xs text-[var(--text-muted)]">
-                  Hiển thị {visibleCameras.length} / {onlineCameras.length} luồng
+                  Hiển thị {visibleCameras.length} / {onlineCameraTiles.length} luồng
                 </span>
               )}
               <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
@@ -617,62 +628,46 @@ export default function CamerasPage() {
         );
       })()}
 
-      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[3rem] p-10 mt-12 animate-fade-up border-white/5 shadow-2xl">
-        <div className="flex flex-col lg:flex-row gap-12 items-center">
-          <div className="flex-1 space-y-6">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--primary-muted)] text-[var(--primary)] text-xs font-black uppercase tracking-widest">
-              <ShieldCheck className="w-4 h-4" />
-              Bản thử nghiệm phân tích an toàn
+      <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[2rem] p-8 mt-4 animate-fade-up">
+        <div className="flex items-center gap-3 mb-2">
+          <span className="w-2 h-2 rounded-full bg-[var(--success)] animate-pulse shrink-0" />
+          <h2 className="text-xl font-black text-[var(--text-primary)] tracking-tight uppercase">Tổng quan tuân thủ PPE trực tiếp</h2>
+        </div>
+        <p className="text-sm text-[var(--text-muted)] max-w-2xl mb-6">
+          Số liệu thật từ AI đang phân tích {onlineCameraTiles.length} camera hoạt động — xác minh mũ bảo hộ, áo phản quang và giày bảo hộ theo thời gian thực.
+        </p>
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {[
+            { label: 'Người trong khung', value: framePersons.length, color: 'primary' },
+            { label: 'Đang vi phạm', value: frameViolators.length, color: frameViolators.length > 0 ? 'danger' : 'success' },
+            { label: 'Camera giám sát', value: onlineCameraTiles.length, color: 'primary' },
+            { label: 'Camera có vi phạm', value: violationCount, color: violationCount > 0 ? 'danger' : 'success' },
+          ].map(stat => (
+            <div key={stat.label} className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
+              <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">{stat.label}</p>
+              <p className={cn(
+                "text-2xl font-black",
+                stat.color === 'danger' ? 'text-[var(--danger)]' : stat.color === 'success' ? 'text-[var(--success)]' : 'text-[var(--text-primary)]'
+              )}>{stat.value}</p>
             </div>
-            <h2 className="text-4xl font-black text-[var(--text-primary)] leading-tight tracking-tighter">
-              Phân tích hành vi & <br /> Theo dõi PPE nâng cao
-            </h2>
-            <p className="text-[var(--text-muted)] text-lg leading-relaxed">
-              Công cụ AI của chúng tôi nhận diện mọi công nhân tại hiện trường, xác minh các thiết bị bảo hộ bắt buộc như mũ bảo hộ, áo phản quang và dây an toàn trong vài mili giây.
-            </p>
-            <div className="grid grid-cols-2 gap-6">
-              <div className="space-y-2 border-l-4 border-[var(--primary)] pl-4">
-                <p className="text-2xl font-black text-[var(--text-primary)]">99.2%</p>
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Độ chính xác phát hiện</p>
-              </div>
-              <div className="space-y-2 border-l-4 border-[var(--success)] pl-4">
-                <p className="text-2xl font-black text-[var(--text-primary)]">Thời gian thực</p>
-                <p className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Tốc độ xử lý</p>
-              </div>
+          ))}
+        </div>
+
+        <div className="grid sm:grid-cols-3 gap-3">
+          {[
+            { key: 'helmet', label: 'Thiếu mũ bảo hộ', value: missingPpeCounts.helmet },
+            { key: 'gloves', label: 'Thiếu găng tay', value: missingPpeCounts.gloves },
+            { key: 'boots', label: 'Thiếu giày bảo hộ', value: missingPpeCounts.boots },
+          ].map(item => (
+            <div key={item.key} className={cn(
+              "flex items-center justify-between p-3 rounded-xl border",
+              item.value > 0 ? "bg-[var(--danger-muted)] border-[var(--danger)]/30" : "bg-[var(--background-secondary)] border-[var(--border)]"
+            )}>
+              <span className="text-xs font-bold text-[var(--text-secondary)]">{item.label}</span>
+              <span className={cn("text-sm font-black", item.value > 0 ? "text-[var(--danger)]" : "text-[var(--text-muted)]")}>{item.value}</span>
             </div>
-          </div>
-          <div className="flex-1 relative w-full aspect-square lg:aspect-video rounded-[2.5rem] overflow-hidden border-8 border-[var(--background-secondary)] shadow-2xl">
-            <video
-              src="/videos/viphamlaodong.mp4"
-              autoPlay muted loop playsInline
-              className="w-full h-full object-fill"
-            />
-            <div className="absolute inset-0 bg-black/20" />
-            <AIDetectionBox detection={{
-              id: 'demo-1',
-              type: 'person',
-              label: 'ID CÔNG NHÂN: 294',
-              confidence: 0.99,
-              bbox: { top: '20%', left: '30%', width: '40%', height: '60%' },
-              isViolation: true
-            }} />
-            <div className="absolute top-8 right-8 p-4 rounded-2xl bg-black/60 backdrop-blur-md border border-white/10">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-3 h-3 rounded-full bg-[var(--success)] animate-pulse" />
-                <span className="text-[10px] font-black text-white uppercase tracking-widest">Tuân thủ PPE: Đạt</span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center gap-8">
-                  <span className="text-[10px] text-white/60 font-bold">Mũ bảo hộ</span>
-                  <span className="text-[10px] text-[var(--success)] font-black">ĐÃ PHÁT HIỆN</span>
-                </div>
-                <div className="flex justify-between items-center gap-8">
-                  <span className="text-[10px] text-white/60 font-bold">Áo phản quang</span>
-                  <span className="text-[10px] text-[var(--success)] font-black">ĐÃ PHÁT HIỆN</span>
-                </div>
-              </div>
-            </div>
-          </div>
+          ))}
         </div>
       </div>
     </div>

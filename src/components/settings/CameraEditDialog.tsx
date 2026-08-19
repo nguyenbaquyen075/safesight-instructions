@@ -17,6 +17,8 @@ interface CameraEditDialogProps {
   camera: Camera | null;
   isOpen: boolean;
   onClose: () => void;
+  /** 'mic' đổi nhãn "camera" -> "mic" khi mở từ trang Loa công trường; dữ liệu lưu vẫn là bản ghi camera. */
+  variant?: 'camera' | 'mic';
 }
 
 const CAMERA_TYPES: Camera['type'][] = ['fixed', 'ptz', 'dome', 'bullet'];
@@ -32,7 +34,9 @@ const EMPTY_FORM = {
   status: CameraStatus.OFFLINE as string,
 };
 
-export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogProps) {
+export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }: CameraEditDialogProps) {
+  const isMic = variant === 'mic';
+  const noun = isMic ? 'mic' : 'camera';
   const { data: sites } = useSites();
   const [form, setForm] = useState(EMPTY_FORM);
   const [webcams, setWebcams] = useState<MediaDeviceInfo[] | null>(null);
@@ -85,7 +89,7 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
   }, [isOpen, camera, sites]);
 
   const handleSave = async () => {
-    if (!form.name.trim()) { toast('Nhập tên camera', 'error'); return; }
+    if (!form.name.trim()) { toast(`Nhập tên ${noun}`, 'error'); return; }
     if (!form.siteId) { toast('Chọn công trình', 'error'); return; }
     if (!form.location.trim()) { toast('Nhập vị trí lắp đặt', 'error'); return; }
     if (!isDemo && form.sourceKind === 'rtsp' && !form.rtspUrl.trim().startsWith('rtsp://')) {
@@ -108,13 +112,13 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
       }
       toast(
         isDemo
-          ? 'Đã lưu thông tin camera mẫu'
-          : 'Đã lưu camera — khởi động lại hệ thống (npm run dev) để AI engine nhận nguồn mới',
+          ? `Đã lưu thông tin ${noun} mẫu`
+          : `Đã lưu ${noun} — khởi động lại hệ thống (npm run dev) để AI engine nhận nguồn mới`,
         'success'
       );
       onClose();
     } catch (err) {
-      toast(err instanceof Error ? err.message : 'Lưu camera thất bại', 'error');
+      toast(err instanceof Error ? err.message : `Lưu ${noun} thất bại`, 'error');
     }
   };
 
@@ -126,17 +130,17 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
         <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm" />
         <Dialog.Content className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border border-[var(--border)] bg-[var(--surface)] p-6 shadow-2xl rounded-xl max-h-[85vh] overflow-y-auto">
           <Dialog.Title className="text-lg font-bold text-[var(--text-primary)]">
-            {isDemo ? 'Sửa camera mẫu (demo)' : camera ? 'Sửa camera' : 'Thêm camera'}
+            {isDemo ? `Sửa ${noun} mẫu (demo)` : camera ? `Sửa ${noun}` : `Thêm ${noun}`}
           </Dialog.Title>
           <Dialog.Description className="text-sm text-[var(--text-muted)]">
             {isDemo
-              ? 'Camera mẫu dùng sẵn video demo cố định — sửa được tên/vị trí/loại/trạng thái, không đổi được nguồn video.'
-              : 'Kết nối webcam để test, hoặc camera IP thật qua RTSP khi triển khai công trường.'}
+              ? `${isMic ? 'Mic' : 'Camera'} mẫu dùng sẵn video demo cố định — sửa được tên/vị trí/loại/trạng thái, không đổi được nguồn video.`
+              : `Kết nối webcam để test, hoặc ${noun} IP thật qua RTSP khi triển khai công trường.`}
           </Dialog.Description>
 
           <div className="grid gap-5">
             <div className="space-y-1.5">
-              <label className="text-sm font-medium text-[var(--text-secondary)]">Tên camera</label>
+              <label className="text-sm font-medium text-[var(--text-secondary)]">Tên {noun}</label>
               <input
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -161,7 +165,7 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
                 </select>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium text-[var(--text-secondary)]">Loại camera</label>
+                <label className="text-sm font-medium text-[var(--text-secondary)]">Loại {noun}</label>
                 <select
                   value={form.type}
                   onChange={(e) => setForm({ ...form, type: e.target.value as Camera['type'] })}
@@ -186,7 +190,7 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
               <div className="space-y-1.5">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Nguồn video</label>
                 <p className="text-xs text-[var(--text-muted)] px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-                  Video mẫu cố định — không đổi được. Muốn dùng webcam/camera thật, bấm "Thêm camera" để tạo camera mới.
+                  Video mẫu cố định — không đổi được. Muốn dùng webcam/{noun} thật, bấm "Thêm {noun}" để tạo {noun} mới.
                 </p>
               </div>
             ) : (
@@ -263,8 +267,8 @@ export function CameraEditDialog({ camera, isOpen, onClose }: CameraEditDialogPr
                 </select>
                 <p className="text-[10px] text-[var(--text-muted)]">
                   {isDemo
-                    ? 'Đổi khác "online" để ẩn camera này khỏi lưới xem trực tiếp ở trang Camera.'
-                    : 'Đổi khác "online" để ĐÓNG camera này — AI ngừng phân tích và ẩn khỏi lưới xem trực tiếp. Cần khởi động lại hệ thống (npm run dev) để có tác dụng.'}
+                    ? `Đổi khác "online" để ẩn ${noun} này khỏi lưới xem trực tiếp ở trang Camera.`
+                    : `Đổi khác "online" để ĐÓNG ${noun} này — AI ngừng phân tích và ẩn khỏi lưới xem trực tiếp. Cần khởi động lại hệ thống (npm run dev) để có tác dụng.`}
                 </p>
               </div>
             )}
