@@ -59,3 +59,8 @@ __pycache__/
 
 # git worktrees (local scratch, not committed)
 .worktrees/
+
+# Dataset train (3.3GB: ảnh gộp + zip gốc) — quá nặng cho git, GitHub chặn file >100MB.
+# Zip gộp tự dựng lại được bằng data_train/merge_datasets.py nên chỉ giữ script.
+/data_train/*
+!/data_train/merge_datasets.py
