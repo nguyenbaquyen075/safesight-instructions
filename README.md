@@ -56,6 +56,10 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # trong DB, app throw lỗi "TELEGRAM_ENCRYPT_KEY is not set" ngay lần
                       # đầu lưu token nếu thiếu, sinh bằng
                       # `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
+                      #
+                      # ROBOFLOW_API_KEY (tuỳ chọn — chỉ cần nếu dùng Roboflow Workflow để
+                      # đối chiếu kết quả trên ảnh tĩnh, xem mục "Đối chiếu bằng Roboflow
+                      # Workflow" bên dưới; lấy ở app.roboflow.com/settings/api)
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không
 #    Violation write sẽ lỗi 404 vì cameraId chưa tồn tại)
@@ -87,6 +91,51 @@ Model, ngưỡng confidence và các tham số nhận diện nằm ở đầu fi
 - `CONFIRM_CONF` / `CONFIRM_DELAY` — ngưỡng độ tin cậy và thời gian tồn tại liên tục tối thiểu trước khi CHỐT một vi phạm để ghi DB (mặc định 0.6 / 3 giây), giảm báo động giả.
 - Nguồn video/camera map tại `src/data/camera-videos.json`.
 
+## Đối chiếu bằng Roboflow Workflow (ảnh tĩnh)
+
+`ai-engine/roboflow_workflow.py` gọi workflow **"Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic"**
+trên Roboflow Serverless để nhận diện PPE trên **một ảnh tĩnh** — dùng khi cần đối chiếu
+model cloud với model local `ppe_multiclass.pt`. Pipeline camera trực tiếp **vẫn chạy model
+local**, không gọi cloud từng frame (tốn credit + trễ mạng).
+
+```python
+from roboflow_workflow import detect_ppe
+
+detect_ppe("anh.jpg")                     # đường dẫn file
+detect_ppe(frame)                         # frame OpenCV (numpy BGR)
+detect_ppe("https://.../anh.jpg")         # URL, bắt buộc https
+# -> [{"class": "Person", "confidence": 0.87,
+#      "bbox": {"left": "...%", "top": "...%", "width": "...%", "height": "...%"}}, ...]
+```
+
+`bbox` trả về theo dạng phần trăm giống `_bbox_pct()` trong `ppe_tracker.py`, nên dùng lại
+được ngay với dashboard và `_draw_violation_box()`. Cần `ROBOFLOW_API_KEY` trong `.env.local`.
+
+Smoke test (gọi mạng thật, tốn 1 credit):
+
+```bash
+.venv/bin/python ai-engine/test_roboflow_workflow.py
+```
+
+### Demo đo độ ổn định trên nguồn video
+
+`ai-engine/demo_roboflow_stream.py` lấy mẫu frame từ một nguồn video, gửi lên Roboflow theo
+nhịp rồi báo cáo tỉ lệ thành công / độ trễ — dùng để **kiểm chứng** trước khi tin dùng.
+Đây là công cụ đo, không phải pipeline production. **Mỗi frame gửi đi = 1 credit.**
+
+```bash
+.venv/bin/python ai-engine/demo_roboflow_stream.py                       # video mẫu, 20 frame
+.venv/bin/python ai-engine/demo_roboflow_stream.py --source 0            # webcam
+.venv/bin/python ai-engine/demo_roboflow_stream.py --source rtsp://...   # camera IP
+.venv/bin/python ai-engine/demo_roboflow_stream.py --frames 50
+```
+
+Ảnh đã khoanh khung được lưu sẵn vào `public/snapshots/roboflow/` (đã gitignore), tên file
+kèm số detection — `rf_002_2det.jpg`, `rf_003_0det.jpg` — nên lướt thư mục là biết ngay frame
+nào bắt được gì, khỏi phải render video. Truyền `--save-dir ""` nếu không muốn lưu.
+
+Thoát `0` nếu mọi lần gọi thành công, `1` nếu có lần trượt.
+
 ## Cấu trúc thư mục chính
 
 ```
@@ -98,6 +147,8 @@ Model, ngưỡng confidence và các tham số nhận diện nằm ở đầu fi
 ├── ai-engine/                  # AI/CV engine (Python + bridge Node.js)
 │   ├── yolo_inference.py       #   Vòng lặp inference chính
 │   ├── ppe_tracker.py          #   Logic tracking + xác nhận vi phạm
+│   ├── roboflow_workflow.py    #   Client Roboflow Workflow (ảnh tĩnh, đối chiếu)
+│   ├── demo_roboflow_stream.py #   Demo đo độ ổn định Roboflow trên nguồn video
 │   └── yolo_bridge.js          #   Socket.IO bridge (room theo camera)
 ├── prisma/                     # Schema DB + seed script
 ├── public/videos/              # Video mẫu cho demo AI
