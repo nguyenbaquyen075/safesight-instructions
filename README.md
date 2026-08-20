@@ -136,6 +136,19 @@ nào bắt được gì, khỏi phải render video. Truyền `--save-dir ""` n�
 
 Thoát `0` nếu mọi lần gọi thành công, `1` nếu có lần trượt.
 
+### Xem trực tiếp trên dashboard
+
+Trang **`/roboflow`** ("Kiểm thử Roboflow" ở thanh bên) cho kéo thả một ảnh rồi hiện luôn
+khung detection kèm class/confidence và độ trễ — dùng khi muốn mắt thường đối chiếu model
+cloud với model local, khỏi chạy script.
+
+- Ảnh được thu nhỏ về 640px **ngay trên trình duyệt** (canvas) trước khi gửi, giống
+  `MAX_IMAGE_SIDE` trong `roboflow_workflow.py`.
+- `POST /api/roboflow` giữ `ROBOFLOW_API_KEY` ở phía server — trình duyệt không bao giờ
+  thấy key, nên không gọi thẳng Roboflow từ client.
+- Route **bắt buộc đăng nhập** và trang chỉ mở cho `SUPER_ADMIN` / `ORG_ADMIN`, vì
+  **mỗi lần chạy tốn 1 credit Roboflow**.
+
 ## Cấu trúc thư mục chính
 
 ```

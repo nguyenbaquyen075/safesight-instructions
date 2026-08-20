@@ -27,6 +27,8 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 | `mock_yolo.js` | Giả lập detection để test frontend khi không chạy Python (không được gọi trong `npm run dev` mặc định) |
 | `roboflow_workflow.py` | Gọi Roboflow Workflow trên **ảnh tĩnh** để đối chiếu với model local (xem mục bên dưới) |
 | `env_local.py` | Đọc `.env.local` dùng chung cho các script Python trong `ai-engine/` |
+| `src/app/api/roboflow/route.ts` | Route gọi Roboflow phía server — giữ API key khỏi lộ ra trình duyệt, bắt buộc đăng nhập |
+| `src/app/(dashboard)/roboflow/page.tsx` | Trang `/roboflow`: kéo thả ảnh → xem khung detection của model cloud |
 | `public/videos/` | Video đầu vào mẫu |
 | `public/snapshots/` | Ảnh chụp vi phạm (tự sinh, tự xoá khi tắt dự án) |
 

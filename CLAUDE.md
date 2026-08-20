@@ -9,7 +9,7 @@
 - Do not git push, deploy across environments, run migrations, restart unrelated services, or change production config without explicit approval.
 - Protect old local bots and production systems unless the operator clearly authorizes a change.
 - Prefer structured APIs, parsers, and existing project patterns over ad hoc rewrites.
-- Keep live camera inference on the local `ppe_multiclass.pt` model. `ai-engine/roboflow_workflow.py` (Roboflow Workflow) is for single still images only — do not call it per frame in the video loop, it costs credits and adds network latency. Video through Roboflow needs the WebRTC path instead; ask the operator before going there.
+- Keep live camera inference on the local `ppe_multiclass.pt` model. `ai-engine/roboflow_workflow.py` (Roboflow Workflow) is for single still images only — as is its UI counterpart `POST /api/roboflow` behind the `/roboflow` page — do not call it per frame in the video loop, it costs credits and adds network latency. Video through Roboflow needs the WebRTC path instead; ask the operator before going there.
 - When a requested deliverable is actionable but leaves style or implementation details open, choose a sensible default and proceed. Do not ask the operator to choose between style options unless the choice is genuinely blocking, risky, or changes the product contract.
 # Coding Guidelines & Workflows
 
