@@ -93,6 +93,11 @@ class PPEViolationTracker:
     # Đủ để chặn nhiễu nhưng KHÔNG quá gắt (0.45 làm sót mũ thật -> báo THIẾU MŨ oan).
     HELMET_MIN_CONF = 0.35
 
+    # GĂNG/GIÀY: box nhỏ, hay bị che, model kém tin cậy hơn mũ/áo -> lọc riêng
+    # trước khi tính present/missing, cùng ý tưởng HELMET_MIN_CONF, tránh 1 khung
+    # nhiễu thoáng qua (vừa đủ self.confidence=0.25) làm chốt sai còn/thiếu.
+    PART_MIN_CONF = 0.35
+
     # Ngưỡng RIÊNG để CHỐT vi phạm (ghi DB) — cao hơn ngưỡng detect thô (self.confidence)
     # vì detect thô ưu tiên bắt sớm cho khung UI mượt, còn ghi DB cần chắc chắn hơn.
     CONFIRM_CONF = 0.6
@@ -113,7 +118,11 @@ class PPEViolationTracker:
         bị bỏ qua. Tăng giá trị -> bỏ qua nhiều hơn; giảm -> bắt cả vật xa hơn.
 
         required_ppe: danh sách PPE BẮT BUỘC. Người thiếu bất kỳ món nào -> VI PHẠM
-        (khung đỏ). Mặc định bắt buộc mũ + áo (găng/giày detect kém nên không ép).
+        (khung đỏ). Mặc định bắt buộc mũ + áo. Găng/giày CHƯA bật mặc định — đã thử
+        thêm 'gloves'/'boots' vào required_ppe và test bằng camera thật: model gần
+        như KHÔNG BAO GIỜ nhận ra người đang đeo găng/giày (tỉ lệ detect dương tính
+        quá thấp so với mũ/áo), nên bật lên sẽ báo vi phạm oan ~mọi người ~liên tục.
+        Cần model detect gang/giày tốt hơn (train lại) trước khi bật mặc định.
         """
 
         # Use GPU if available
@@ -200,6 +209,13 @@ class PPEViolationTracker:
                 continue
             is_viol = it['name'].startswith('no_')
             base = it['name'][3:] if is_viol else it['name']  # no_helmet -> helmet
+
+            # GĂNG/GIÀY: box nhỏ dễ nhiễu -> chỉ vẽ khi đủ tin cậy (PART_MIN_CONF).
+            # KHÔNG ép tâm khung phải nằm trong khung người: tay giơ lên/ra ngoài
+            # thân (test cận cam, thao tác...) làm khung tay thò ra ngoài khung
+            # người -> ép điều kiện này sẽ lọc mất tay/chân thật (đã gặp lỗi này).
+            if base in ('gloves', 'boots') and it['conf'] < self.PART_MIN_CONF:
+                continue
             vn = self.PPE_VN.get(base, base.upper())
             label = f"THIẾU {vn}" if is_viol else vn
             final_detections.append({
@@ -242,6 +258,10 @@ class PPEViolationTracker:
                             helmet_on_head = True
                             head_helmet_box = it['box']
                             present.add('helmet')
+                    continue
+
+                # GĂNG/GIÀY: bỏ qua khung tin cậy thấp (nhiễu), tránh chốt sai còn/thiếu.
+                if base in ('gloves', 'boots') and it['conf'] < self.PART_MIN_CONF:
                     continue
 
                 # PPE khác (áo/găng/giày...): xét theo toàn thân (tâm trong khung người)
@@ -309,24 +329,7 @@ class PPEViolationTracker:
                     "bbox": self._bbox_pct(head_region, frame),
                 })
 
-            # Khung riêng cho CHÂN/GIÀY — suy ra vùng chân từ khung người (phần dưới),
-            # để luôn ghim được kể cả khi model không nhìn rõ giày. Nếu model có bắt
-            # được giày thật (boots/no_boots) thì dùng khung đó (đã vẽ ở Tầng 1).
-            has_foot_box = any(
-                it['name'] in ('boots', 'no_boots') and self._center_inside(it['box'], p['box'])
-                for it in items
-            )
-            if not has_foot_box:
-                px1, py1, px2, py2 = p['box']
-                pw, ph = px2 - px1, py2 - py1
-                foot_box = [px1 + pw * 0.20, py2 - ph * 0.15, px2 - pw * 0.20, py2]
-                final_detections.append({
-                    "id": f"foot-{p['id'] if p['id'] is not None else int(px1)}",
-                    "type": "ppe",
-                    "label": "GIÀY",
-                    "confidence": float(p['conf']),
-                    "isViolation": False,
-                    "bbox": self._bbox_pct(foot_box, frame),
-                })
+            # Giày: KHÔNG còn khung ước lượng bịa vị trí — model không thấy rõ thì
+            # không vẽ, tránh khung sai chỗ (khung thật đã vẽ ở Tầng 1 nếu có).
 
         return final_detections
