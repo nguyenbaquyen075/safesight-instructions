@@ -1,17 +1,46 @@
-# 08 — Lộ trình train model thêm loại PPE (găng tay, giày, kính…)
+# 08 — Bắt găng tay / giày chuẩn hơn (train lại model)
 
-> ⚠️ **Thực tế cần biết:** Model hiện tại `ppe_v8s_custom.pt` chỉ có **4 lớp**: `helmet`, `vest`, `no_helmet`, `no_vest`. Muốn nhận diện **găng tay / giày bảo hộ / kính / khẩu trang** thì **BẮT BUỘC train một model mới** — không sửa code là có được. Đây là công việc dữ liệu + huấn luyện, mất **ngày → tuần** tuỳ dữ liệu, không phải vài phút.
+> ✅ **Cập nhật thực tế:** Model đang chạy `ppe_multiclass.pt` **ĐÃ CÓ SẴN** 11 lớp — gồm cả
+> `gloves`/`no_gloves`/`boots`/`no_boots` (train từ dataset Roboflow `detech-ppe-7qydu`, xem
+> `training/detech_ppe_colab.md`). **KHÔNG cần train model mới từ đầu** — vấn đề còn lại là
+> model **detect gloves/boots kém chính xác** (recall thấp: test camera thật cho thấy model
+> hiếm khi nhận dương tính dù người có mang găng/giày). Bài toán ở đây là **train LẠI cho tốt
+> hơn**, không phải "thêm lớp mới".
 
-## Bức tranh tổng thể
+## Trạng thái hiện tại (đã làm)
+- `ppe_tracker.py`: đã có khung riêng cho gloves/boots (Tầng 1), lọc theo `PART_MIN_CONF=0.35`
+  để bớt khung nhiễu tin cậy thấp. Khung "GIÀY" bịa vị trí (khi model không thấy gì) đã bị xoá —
+  giờ chỉ hiện khung THẬT, không có thì thôi.
+- `required_ppe` trong `PPEViolationTracker.__init__` **CHƯA** bao gồm `gloves`/`boots` — cố tình
+  để vậy vì bật lên sẽ báo vi phạm oan hàng loạt (xem cảnh báo trên).
+- `yolo_inference.py`: `PPE_VIOLATION_MAP` đã map sẵn `gloves`→`safety_gloves`,
+  `boots`→`safety_footwear` — DB (`ViolationType` enum) đã sẵn sàng nhận 2 loại này.
+
+## Bức tranh tổng thể (để bật enforcement)
 
 ```
-Thu thập ảnh → Gán nhãn (label) → Train YOLOv8 → Xuất .pt mới → Thay model → Cập nhật logic vi phạm
+Train lại model (nhiều epoch/imgsz hơn cho vật nhỏ) → So mAP gloves/boots với model cũ
+  → Thay .pt vào repo → Chạy thử, xem log present=[...] có ổn định không
+  → Bật 'gloves','boots' vào required_ppe → Theo dõi tỉ lệ báo vi phạm có hợp lý không
 ```
+
+## Cách train lại (nhanh nhất — dùng ĐÚNG dataset đã có)
+Xem chi tiết đầy đủ ở **[`training/detech_ppe_colab.md`](../training/detech_ppe_colab.md)** —
+hướng dẫn Colab từng bước (cần Roboflow API key), đã tinh chỉnh riêng cho vật nhỏ:
+`yolov8m` (thay `yolov8s`) + `imgsz 960` (thay 640) — độ phân giải cao hơn giữ đủ chi tiết
+bàn tay/bàn chân thay vì bị downsample mất.
+
+Nếu muốn train **local** (máy không GPU, vd Mac M1) thay vì Colab: chậm hơn nhiều
+(có thể mất cả ngày thay vì 60-120 phút trên GPU T4) — chỉ nên dùng để test nhanh với
+cấu hình nhẹ hơn (`yolov8s`, `imgsz 640`, ít epoch hơn) trước khi đầu tư train nặng.
+
+## Muốn thêm HẲN lớp mới (kính, khẩu trang, dây an toàn...)
+Phần dưới đây vẫn áp dụng nếu cần lớp **chưa có trong model hiện tại** (model hiện đã có
+sẵn `goggles`/`no_goggle` — chỉ chưa được bật trong `required_ppe`, xem 06).
 
 ## Bước 1 — Xác định danh sách lớp (class)
-Ví dụ mở rộng lên 8 lớp:
-`helmet, no_helmet, vest, no_vest, gloves, no_gloves, boots, no_boots`
-→ Chốt danh sách trước, vì nó quyết định cách gán nhãn.
+Model hiện tại đã có 11 lớp — chỉ cần mở rộng nếu muốn thêm lớp THỰC SỰ mới (vd khẩu trang,
+dây an toàn) chưa từng có trong dataset `detech-ppe-7qydu`.
 
 ## Bước 2 — Thu thập dữ liệu ảnh
 - **Nguồn tốt nhất:** trích khung hình từ **chính camera công trường thật** của dự án (đa dạng góc, ánh sáng, khoảng cách).
