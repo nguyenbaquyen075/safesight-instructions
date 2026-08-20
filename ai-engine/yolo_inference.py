@@ -12,23 +12,9 @@ import sys
 import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
+from env_local import load_dotenv_local
 
-def _load_dotenv_local():
-    """Đọc .env.local (KEY=VALUE) ở gốc repo nếu có, không ghi đè biến đã
-    set qua shell. Tự parse thay vì thêm dependency python-dotenv chỉ để
-    đọc vài dòng KEY=VALUE."""
-    if not os.path.exists(".env.local"):
-        return
-    with open(".env.local", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip())
-
-
-_load_dotenv_local()
+load_dotenv_local()
 
 # Configuration
 BRIDGE_URL = "http://localhost:4001/detections"
@@ -106,6 +92,8 @@ def load_real_camera_overrides():
 PPE_VIOLATION_MAP = {
     "helmet": ("hard_hat", "critical"),
     "vest": ("safety_vest", "high"),
+    "gloves": ("safety_gloves", "medium"),
+    "boots": ("safety_footwear", "medium"),
 }
 
 
@@ -133,7 +121,7 @@ def report_violation(cam_id, detection):
     (snapshotUrl được yolo_inference.py gắn vào detection ở vòng lặp chính).
     """
     vtype = severity = None
-    for ppe in ("helmet", "vest"):  # helmet ưu tiên vì nghiêm trọng hơn
+    for ppe in ("helmet", "vest", "gloves", "boots"):  # ưu tiên theo mức nghiêm trọng
         if ppe in detection.get("missingPpe", []):
             vtype, severity = PPE_VIOLATION_MAP[ppe]
             break
