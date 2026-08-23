@@ -4,13 +4,24 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { auth } from '@/auth';
 
-// Cùng workflow với ai-engine/roboflow_workflow.py — lấy từ Roboflow API, không đoán:
+// Cùng 2 workflow với ai-engine/roboflow_workflow.py — lấy từ Roboflow API, không đoán.
+// Spec CẢ HAI giống hệt nhau, chỉ khác model bọc bên trong:
 //   inputs : image (InferenceImage), KHÔNG có parameter nào khác
 //   outputs: predictions (JsonField) -> {"image": {...}, "predictions": [...]}
 // Route này tồn tại vì key KHÔNG được lộ ra client; trình duyệt không gọi thẳng Roboflow.
 const WORKSPACE_NAME = 'les-workspace-puz7q';
-const WORKFLOW_ID = 'detech-ppe-vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2-logic';
-const ENDPOINT = `https://serverless.roboflow.com/${WORKSPACE_NAME}/workflows/${WORKFLOW_ID}`;
+
+// Allowlist cố định: client CHỈ chọn được key trong đây, không truyền slug tuỳ ý —
+// mỗi lần gọi tốn credit nên không để người dùng ghép URL sang workflow bất kỳ.
+const WORKFLOWS = {
+  'detech-ppe': 'detech-ppe-vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2-logic',
+  'ppes-kaxsi': 'ppes-vppes-kaxsi-ea9pf-1-yolo11n-t1-logic',
+} as const;
+type WorkflowKey = keyof typeof WORKFLOWS;
+const DEFAULT_WORKFLOW: WorkflowKey = 'detech-ppe';
+
+const endpointFor = (w: WorkflowKey) =>
+  `https://serverless.roboflow.com/${WORKSPACE_NAME}/workflows/${WORKFLOWS[w]}`;
 
 // Tên output do chính workflow khai báo — đọc theo key này, không đoán tên khác.
 const OUTPUT_NAME = 'predictions';
@@ -24,6 +35,7 @@ const MAX_BASE64_LENGTH = 8 * 1024 * 1024;
 
 const bodySchema = z.object({
   image: z.string().min(1).max(MAX_BASE64_LENGTH),
+  workflow: z.enum(Object.keys(WORKFLOWS) as [WorkflowKey, ...WorkflowKey[]]).optional(),
 });
 
 interface Detection {
@@ -70,7 +82,7 @@ function parseDetections(entry: Record<string, unknown>): Detection[] {
 
 /** Gọi workflow 1 lần, thử lại khi lỗi mạng / 429 / 5xx (backoff 1s, 2s).
  *  4xx khác (sai key, ảnh hỏng) fail ngay — thử lại vô ích. */
-async function runWorkflow(apiKey: string, base64: string): Promise<Detection[]> {
+async function runWorkflow(apiKey: string, base64: string, workflow: WorkflowKey): Promise<Detection[]> {
   const payload = {
     api_key: apiKey,
     inputs: { image: { type: 'base64', value: base64 } },
@@ -78,7 +90,7 @@ async function runWorkflow(apiKey: string, base64: string): Promise<Detection[]>
 
   for (let attempt = 0; ; attempt++) {
     try {
-      const resp = await fetch(ENDPOINT, {
+      const resp = await fetch(endpointFor(workflow), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -137,10 +149,12 @@ export async function POST(request: NextRequest) {
   // Client gửi data URL ("data:image/jpeg;base64,....") -> Roboflow chỉ nhận phần sau dấu phẩy.
   const base64 = parsed.data.image.replace(/^data:[^;]+;base64,/, '');
 
+  const workflow = parsed.data.workflow ?? DEFAULT_WORKFLOW;
+
   const started = Date.now();
   try {
-    const detections = await runWorkflow(apiKey, base64);
-    return NextResponse.json({ detections, latencyMs: Date.now() - started });
+    const detections = await runWorkflow(apiKey, base64, workflow);
+    return NextResponse.json({ detections, workflow, latencyMs: Date.now() - started });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Gọi Roboflow thất bại';
     console.error('[roboflow]', message);

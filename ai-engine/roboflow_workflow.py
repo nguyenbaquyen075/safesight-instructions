@@ -1,18 +1,30 @@
 # SPDX-License-Identifier: MIT
-"""Gọi Roboflow Workflow "Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic"
-để nhận diện PPE trên MỘT ẢNH TĨNH (không phải luồng video).
+"""Gọi Roboflow Workflow để nhận diện PPE trên MỘT ẢNH TĨNH (không phải luồng video).
+
+Hỗ trợ 2 workflow (xem WORKFLOWS bên dưới):
+  - "Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic"  -> key 'detech-ppe' (mặc định)
+  - "PPEs vppes-kaxsi-ea9pf-1-yolo11n-t1 Logic"              -> key 'ppes-kaxsi'
 
 Dùng khi cần đối chiếu/kiểm thử kết quả của model trên cloud, còn pipeline
 camera trực tiếp vẫn chạy model local ppe_multiclass.pt qua ppe_tracker.py
 (gọi cloud từng frame sẽ tốn credit và trễ mạng).
 
-Định nghĩa workflow (nguồn sự thật, lấy từ Roboflow API):
+Định nghĩa CẢ HAI workflow (nguồn sự thật, lấy từ Roboflow API — giống hệt nhau):
   - inputs : image (InferenceImage) — KHÔNG có parameter nào khác
   - outputs: predictions  -> {"image": {...}, "predictions": [...]}
-  - steps  : bọc model les-workspace-puz7q/detech-ppe-7qydu-vnlwm-1-yolo26n-t2
+  - steps  : một block roboflow_core/inner_workflow@v1 bọc model tương ứng
 
 Lưu ý: tên workflow có chữ "Logic" nhưng spec KHÔNG có block logic nào — nó
 trả về prediction thô của model, việc xét đủ/thiếu PPE vẫn nằm ở ppe_tracker.py.
+
+VÌ SAO gọi REST bằng requests thay vì package chính chủ `inference-sdk`
+(InferenceHTTPClient)? KHÔNG phải do lười — `inference-sdk` khai báo
+requires_python ">=3.10,<3.13", còn .venv của dự án chạy Python 3.14.2 (bản đang
+gánh torch 2.13 + ultralytics 8.4 cho AI engine). pip không tìm được bản nào hợp
+lệ. Muốn dùng SDK thì phải hạ Python và dựng lại toàn bộ venv — lớn hơn hẳn phạm
+vi một client HTTP. Đoạn POST dưới đây làm đúng những gì SDK làm: cùng endpoint,
+cùng payload, có timeout/retry/typed error. ĐỪNG đổi sang SDK mà không kiểm tra
+lại phiên bản Python trước.
 
 Chạy thử: .venv/bin/python ai-engine/test_roboflow_workflow.py
 """
@@ -27,8 +39,33 @@ import requests
 from env_local import load_dotenv_local
 
 WORKSPACE_NAME = "les-workspace-puz7q"
-WORKFLOW_ID = "detech-ppe-vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2-logic"
-ENDPOINT = f"https://serverless.roboflow.com/{WORKSPACE_NAME}/workflows/{WORKFLOW_ID}"
+
+# Hai workflow cùng workspace. Đã đối chiếu spec qua Roboflow API: cấu trúc GIỐNG HỆT
+# nhau — input `image` (InferenceImage), KHÔNG parameter, output `predictions`
+# (JsonField) — chỉ khác model bọc bên trong. Nên dùng chung một client thay vì tách
+# file thứ hai gần như trùng lặp.
+#
+#   detech-ppe : model detech-ppe-7qydu-vnlwm-1-yolo26n-t2 (train từ dataset Detech PPE)
+#   ppes-kaxsi : model ppes-kaxsi-ea9pf-1-yolo11n-t1       (train từ dataset ppes-kaxsi)
+#
+# ⚠️ Hai model KHÁC TỪ VỰNG lớp: detech-ppe trả 'gloves' (số nhiều) khớp ppe_tracker.py,
+# còn ppes-kaxsi trả 'glove' (số ít). Muốn map sang ppe_tracker phải chuẩn hoá tên trước.
+WORKFLOWS = {
+    "detech-ppe": "detech-ppe-vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2-logic",
+    "ppes-kaxsi": "ppes-vppes-kaxsi-ea9pf-1-yolo11n-t1-logic",
+}
+DEFAULT_WORKFLOW = "detech-ppe"
+
+
+def _endpoint(workflow):
+    """Tên workflow -> URL. Chỉ nhận key trong WORKFLOWS, không ghép chuỗi tuỳ ý."""
+    try:
+        slug = WORKFLOWS[workflow]
+    except KeyError:
+        raise RoboflowWorkflowError(
+            f"Workflow không hợp lệ: {workflow!r}. Chọn một trong {sorted(WORKFLOWS)}"
+        ) from None
+    return f"https://serverless.roboflow.com/{WORKSPACE_NAME}/workflows/{slug}"
 
 # Tên output do chính workflow khai báo — đọc theo key này, không đoán tên khác.
 OUTPUT_NAME = "predictions"
@@ -122,10 +159,11 @@ def _parse_detections(entry):
     return detections
 
 
-def detect_ppe(image, timeout=30, retries=2):
+def detect_ppe(image, timeout=30, retries=2, workflow=DEFAULT_WORKFLOW):
     """Chạy workflow trên 1 ảnh -> list detection [{class, confidence, bbox%}].
 
     image  : URL https, frame OpenCV, bytes ảnh, hoặc đường dẫn file.
+    workflow: key trong WORKFLOWS ('detech-ppe' mặc định, hoặc 'ppes-kaxsi').
     timeout: giây cho mỗi request.
     retries: số lần thử LẠI khi lỗi mạng / 429 / 5xx (backoff 1s, 2s...).
              Lỗi 4xx khác (sai API key, ảnh hỏng) fail ngay, thử lại vô ích.
@@ -139,11 +177,12 @@ def detect_ppe(image, timeout=30, retries=2):
             "Thiếu ROBOFLOW_API_KEY — thêm vào .env.local (lấy ở app.roboflow.com/settings/api)"
         )
 
+    endpoint = _endpoint(workflow)
     payload = {"api_key": api_key, "inputs": {"image": _as_workflow_image(image)}}
 
     for attempt in range(retries + 1):
         try:
-            resp = _session.post(ENDPOINT, json=payload, timeout=timeout)
+            resp = _session.post(endpoint, json=payload, timeout=timeout)
             if resp.status_code == 429 or resp.status_code >= 500:
                 raise RoboflowWorkflowError(
                     f"Roboflow trả {resp.status_code}", resp.status_code

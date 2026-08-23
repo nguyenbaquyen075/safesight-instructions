@@ -9,8 +9,9 @@ Chạy: .venv/bin/python ai-engine/test_roboflow_workflow.py
 
 import cv2
 
-from roboflow_workflow import (OUTPUT_NAME, RoboflowWorkflowError,
-                               _parse_detections, detect_ppe)
+from roboflow_workflow import (DEFAULT_WORKFLOW, OUTPUT_NAME, WORKFLOWS,
+                               RoboflowWorkflowError, _parse_detections,
+                               detect_ppe)
 
 # Video ĐÃ commit trong repo -> test chạy được ngay sau khi clone, khỏi thêm ảnh mẫu.
 SAMPLE_VIDEO = "public/videos/samples1.mp4"
@@ -45,21 +46,30 @@ def demo():
     except RoboflowWorkflowError:
         pass
 
-    # 2) Gọi thật 1 lần trên frame lấy từ video mẫu.
+    # 1c) Workflow không có trong WORKFLOWS phải bị chặn TRƯỚC khi gọi mạng
+    # (khỏi ghép chuỗi URL tuỳ ý và đốt credit vào endpoint không tồn tại).
+    assert DEFAULT_WORKFLOW in WORKFLOWS
+    try:
+        detect_ppe(b"khong-bao-gio-doc-toi", workflow="khong-ton-tai")
+        raise AssertionError("workflow lạ phải bị từ chối")
+    except RoboflowWorkflowError as e:
+        assert "khong-ton-tai" in str(e), e
+
+    # 2) Gọi thật trên frame lấy từ video mẫu — MỖI workflow tốn 1 credit.
     cap = cv2.VideoCapture(SAMPLE_VIDEO)
     cap.set(cv2.CAP_PROP_POS_FRAMES, 30)
     ok, frame = cap.read()
     cap.release()
     assert ok, f"không đọc được frame từ {SAMPLE_VIDEO}"
 
-    detections = detect_ppe(frame)
-    assert isinstance(detections, list), "detect_ppe phải trả về list"
-    for d in detections:
-        assert {"class", "confidence", "bbox"} <= set(d), f"thiếu key trong {d}"
-        assert set(d["bbox"]) == {"left", "top", "width", "height"}
-
-    print(f"OK: workflow trả {len(detections)} detection — "
-          f"{sorted({d['class'] for d in detections})}")
+    for name in WORKFLOWS:
+        detections = detect_ppe(frame, workflow=name)
+        assert isinstance(detections, list), "detect_ppe phải trả về list"
+        for d in detections:
+            assert {"class", "confidence", "bbox"} <= set(d), f"thiếu key trong {d}"
+            assert set(d["bbox"]) == {"left", "top", "width", "height"}
+        print(f"OK [{name}]: trả {len(detections)} detection — "
+              f"{sorted({d['class'] for d in detections})}")
 
 
 if __name__ == "__main__":

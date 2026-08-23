@@ -63,6 +63,12 @@ trên cùng một khung hình.
 | Output | `predictions` → `{"image": {width, height}, "predictions": [...]}` |
 | Model bên trong | `les-workspace-puz7q/detech-ppe-7qydu-vnlwm-1-yolo26n-t2` |
 
+**Workflow thứ hai** — `PPEs vppes-kaxsi-ea9pf-1-yolo11n-t1 Logic` (key `ppes-kaxsi`) có spec
+**giống hệt**, chỉ khác model bên trong (`ppes-kaxsi-ea9pf-1-yolo11n-t1`, train từ dataset
+ppes-kaxsi đã gộp vào `data_train/merged`). Vì vậy dùng chung `roboflow_workflow.py` qua tham
+số `workflow=` thay vì tách file thứ hai. Hai model **khác từ vựng lớp**: `gloves` (số nhiều)
+so với `glove` (số ít).
+
 > [!NOTE]
 > Tên workflow có chữ "Logic" nhưng spec **không có block logic nào** — nó chỉ bọc model và
 > trả prediction thô. Việc xét đủ/thiếu PPE vẫn nằm ở `ppe_tracker.py`.

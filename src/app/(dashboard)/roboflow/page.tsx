@@ -10,6 +10,13 @@ import { cn } from '@/lib/utils';
 // vì trả theo phần trăm. Giống MAX_IMAGE_SIDE trong ai-engine/roboflow_workflow.py.
 const MAX_IMAGE_SIDE = 640;
 
+// Khớp allowlist trong src/app/api/roboflow/route.ts — route chỉ nhận 2 key này.
+const WORKFLOW_LABELS = {
+  'detech-ppe': 'Detech PPE (yolo26n)',
+  'ppes-kaxsi': 'PPEs kaxsi (yolo11n)',
+} as const;
+type WorkflowKey = keyof typeof WORKFLOW_LABELS;
+
 interface Detection {
   class: string;
   confidence: number;
@@ -48,9 +55,15 @@ export default function RoboflowPage() {
   const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [dragging, setDragging] = React.useState(false);
+  const [workflow, setWorkflow] = React.useState<WorkflowKey>('detech-ppe');
   const inputRef = React.useRef<HTMLInputElement>(null);
+  // Giữ lại file vừa thả để bấm đổi model là chạy lại được, khỏi kéo thả lần nữa.
+  // Dùng state chứ không phải ref: giá trị này được ĐỌC TRONG RENDER (hiện dòng nhắc
+  // tốn credit), mà ref đổi thì React không re-render -> dòng nhắc sẽ không hiện ra.
+  const [lastFile, setLastFile] = React.useState<File | null>(null);
 
-  async function handleFile(file: File) {
+  async function handleFile(file: File, wf: WorkflowKey = workflow) {
+    setLastFile(file);
     setError(null);
     setDetections(null);
     setLatencyMs(null);
@@ -62,7 +75,7 @@ export default function RoboflowPage() {
       const resp = await fetch('/api/roboflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: dataUrl }),
+        body: JSON.stringify({ image: dataUrl, workflow: wf }),
       });
       const body = await resp.json();
       if (!resp.ok) throw new Error(typeof body.error === 'string' ? body.error : 'Gọi Roboflow thất bại');
@@ -90,6 +103,33 @@ export default function RoboflowPage() {
           <strong className="text-[var(--warning)]">Mỗi lần chạy tốn 1 credit Roboflow.</strong>
         </p>
       </header>
+
+      {/* Chọn model cloud */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-sm text-[var(--text-secondary)]">Model:</span>
+        {(Object.keys(WORKFLOW_LABELS) as WorkflowKey[]).map((key) => (
+          <button
+            key={key}
+            onClick={() => {
+              setWorkflow(key);
+              if (lastFile) handleFile(lastFile, key);
+            }}
+            className={cn(
+              'px-3 py-1.5 rounded-lg text-sm font-medium border transition-colors',
+              workflow === key
+                ? 'bg-[var(--primary-muted)] text-[var(--primary-light)] border-[var(--primary)]'
+                : 'text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--surface)]'
+            )}
+          >
+            {WORKFLOW_LABELS[key]}
+          </button>
+        ))}
+        {lastFile && (
+          <span className="text-xs text-[var(--text-muted)]">
+            (đổi model sẽ chạy lại ảnh hiện tại — tốn thêm 1 credit)
+          </span>
+        )}
+      </div>
 
       {/* Vùng thả ảnh */}
       <div

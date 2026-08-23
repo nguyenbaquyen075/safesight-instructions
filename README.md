@@ -111,6 +111,21 @@ detect_ppe("https://.../anh.jpg")         # URL, bắt buộc https
 `bbox` trả về theo dạng phần trăm giống `_bbox_pct()` trong `ppe_tracker.py`, nên dùng lại
 được ngay với dashboard và `_draw_violation_box()`. Cần `ROBOFLOW_API_KEY` trong `.env.local`.
 
+**Hai workflow dùng chung một client.** Spec của cả hai giống hệt nhau (input `image`, không
+parameter, output `predictions`) nên `detect_ppe()` nhận thêm tham số `workflow`:
+
+| Key | Workflow | Model bên trong |
+|---|---|---|
+| `detech-ppe` (mặc định) | Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic | `detech-ppe-7qydu-vnlwm-1-yolo26n-t2` |
+| `ppes-kaxsi` | PPEs vppes-kaxsi-ea9pf-1-yolo11n-t1 Logic | `ppes-kaxsi-ea9pf-1-yolo11n-t1` |
+
+```python
+detect_ppe(frame, workflow="ppes-kaxsi")
+```
+
+⚠️ Hai model **khác từ vựng lớp**: `detech-ppe` trả `gloves` (số nhiều, khớp `ppe_tracker.py`),
+`ppes-kaxsi` trả `glove` (số ít). Muốn map sang tracker phải chuẩn hoá tên trước.
+
 Smoke test (gọi mạng thật, tốn 1 credit):
 
 ```bash
@@ -148,6 +163,8 @@ cloud với model local, khỏi chạy script.
   thấy key, nên không gọi thẳng Roboflow từ client.
 - Route **bắt buộc đăng nhập** và trang chỉ mở cho `SUPER_ADMIN` / `ORG_ADMIN`, vì
   **mỗi lần chạy tốn 1 credit Roboflow**.
+- Chọn model bằng 2 nút ở đầu trang; đổi model sẽ chạy lại đúng ảnh đang xem (tốn thêm
+  1 credit). Client chỉ gửi được key trong allowlist của route, không truyền slug tuỳ ý.
 
 ## Cấu trúc thư mục chính
 
