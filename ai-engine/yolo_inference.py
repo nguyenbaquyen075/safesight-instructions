@@ -273,7 +273,8 @@ def run_inference():
     def make_tracker():
         return PPEViolationTracker(
             model_path=MODEL_PATH,
-            confidence=0.25,       # Ngưỡng thấp hơn -> bắt cả vật nhỏ/mờ như GIÀY
+            confidence=0.15,       # Ngưỡng thô THẤP để găng/giày (conf 0.15-0.30) lọt vào;
+                                   # lọc chặt lại theo từng lớp ở PPEViolationTracker.PART_MIN_CONF
             min_height_ratio=0.0,  # TẮT lọc kích thước — hiện tất cả khung, kể cả vật nhỏ/xa
             imgsz=640              # Nét cao -> bắt mũ/vật nhỏ chắc tay hơn (ưu tiên CHÍNH XÁC).
                                    # Video đã cắt còn cảnh đứng nên bù lại phần chậm.

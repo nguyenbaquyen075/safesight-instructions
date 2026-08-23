@@ -1,0 +1,17 @@
+# BoT-SORT tuỳ chỉnh cho PPE — copy botsort.yaml mặc định, chỉ hạ 2 ngưỡng ĐẦU VÀO.
+# Lý do: mặc định new_track_thresh/track_high_thresh = 0.25 nên MỌI khung có conf
+# dưới 0.25 bị tracker vứt TRƯỚC khi ppe_tracker.py kịp xét -> giày (cao nhất 0.30,
+# đa số 0.15-0.25 trên samples1.mp4) gần như không bao giờ tới được logic PPE.
+# Người luôn conf 0.5-0.8 nên hạ ngưỡng không làm loãng track người.
+tracker_type: botsort
+track_high_thresh: 0.15
+track_low_thresh: 0.1
+new_track_thresh: 0.15
+track_buffer: 30
+match_thresh: 0.8
+fuse_score: True
+gmc_method: sparseOptFlow
+proximity_thresh: 0.5
+appearance_thresh: 0.8
+with_reid: False
+model: auto

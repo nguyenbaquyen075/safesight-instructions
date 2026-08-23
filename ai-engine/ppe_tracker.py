@@ -10,6 +10,11 @@ import os
 import json
 from datetime import datetime
 
+# BoT-SORT mặc định vứt mọi khung conf < 0.25 TRƯỚC khi tới logic PPE ở dưới ->
+# giày/găng (khung nhỏ, conf thấp) không bao giờ tới nơi. File này hạ ngưỡng đó.
+TRACKER_CFG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'botsort_ppe.yaml')
+
+
 class InstanceDetector:
     """Detect PPE compliance per instance with configurable settings - From tailieu/Construction-Site-Safety-PPE-Detection"""
     
@@ -96,7 +101,14 @@ class PPEViolationTracker:
     # GĂNG/GIÀY: box nhỏ, hay bị che, model kém tin cậy hơn mũ/áo -> lọc riêng
     # trước khi tính present/missing, cùng ý tưởng HELMET_MIN_CONF, tránh 1 khung
     # nhiễu thoáng qua (vừa đủ self.confidence=0.25) làm chốt sai còn/thiếu.
-    PART_MIN_CONF = 0.35
+    # Ngưỡng RIÊNG cho từng lớp: đo trên samples1.mp4 (60 frame), giày CAO NHẤT chỉ
+    # 0.30 -> mức 0.35 dùng chung lọc sạch 100% khung giày dù box vẽ đúng bàn chân.
+    # Giày yếu vì dataset train chỉ có ~1.2k nhãn boots. Train lại xong thì nâng lại.
+    PART_MIN_CONF = {'gloves': 0.25, 'boots': 0.20}
+    # Lớp KHÔNG nằm trong dict trên (vest, no_goggle, no_gloves...) giữ sàn 0.25 —
+    # đúng bằng ngưỡng conf thô cũ, để việc hạ conf thô xuống 0.15 (cho giày lọt)
+    # không kéo theo một đống khung đỏ 'THIẾU GOGGLE/GĂNG' rác (mAP 0.003-0.04).
+    OTHER_MIN_CONF = 0.25
 
     # Ngưỡng RIÊNG để CHỐT vi phạm (ghi DB) — cao hơn ngưỡng detect thô (self.confidence)
     # vì detect thô ưu tiên bắt sớm cho khung UI mượt, còn ghi DB cần chắc chắn hơn.
@@ -104,6 +116,9 @@ class PPEViolationTracker:
     # Trạng thái "thiếu PPE" phải tồn tại LIÊN TỤC bằng này giây mới chốt là vi phạm
     # (người cúi xuống/mũ lệch 1 khoảnh khắc -> không tính, tránh báo oan).
     CONFIRM_DELAY = 3.0
+    # Thấy món PPE trên người này trong bao nhiêu giây gần nhất thì vẫn tính là CÓ.
+    # Dài hơn -> ít báo oan hơn nhưng phát hiện tháo đồ chậm hơn đúng bằng ngần đó.
+    EVIDENCE_WINDOW = 2.0
 
     def __init__(self,
                  model_path: str = 'ppe_v8s_custom.pt',
@@ -145,6 +160,9 @@ class PPEViolationTracker:
         # ponytail: dict không tự dọn track đã rời khung hình lâu -> phình dần theo phiên chạy dài;
         # nếu chạy 24/7 thì thêm bước dọn định kỳ (vd theo max_age của tracker).
         self._violation_since = {}
+        # trackId -> {tên PPE: lần cuối NHÌN THẤY món đó trên người này}
+        # ponytail: cùng vấn đề dọn rác như _violation_since ở trên, dọn chung một thể.
+        self._ppe_last_seen = {}
 
     @staticmethod
     def _center_inside(inner, outer):
@@ -170,8 +188,14 @@ class PPEViolationTracker:
         """
         final_detections = []
 
+        # augment=True (TTA): model chạy thêm ở nhiều tỉ lệ/lật ảnh rồi gộp kết quả.
+        # Đo 150 frame samples1.mp4: frame BẮT ĐƯỢC GIÀY 44.7% -> 74.0% (găng đứng yên
+        # ~75%). Giá phải trả: 14.5 -> 7.2 fps. Đổi tốc độ lấy chân, bỏ chữ này là về cũ.
+        # iou=0.5 (mặc định 0.7): TTA đẻ box trùng (4 box cho 2 bàn chân) -> siết NMS
+        # bớt 19% box thừa mà KHÔNG mất frame nào.
         results = self.model.track(frame, persist=True, conf=self.confidence,
-                                   imgsz=self.imgsz, verbose=False)[0]
+                                   imgsz=self.imgsz, tracker=TRACKER_CFG,
+                                   augment=True, iou=0.5, verbose=False)[0]
         if results.boxes is None:
             return final_detections
 
@@ -214,7 +238,7 @@ class PPEViolationTracker:
             # KHÔNG ép tâm khung phải nằm trong khung người: tay giơ lên/ra ngoài
             # thân (test cận cam, thao tác...) làm khung tay thò ra ngoài khung
             # người -> ép điều kiện này sẽ lọc mất tay/chân thật (đã gặp lỗi này).
-            if base in ('gloves', 'boots') and it['conf'] < self.PART_MIN_CONF:
+            if it['conf'] < self.PART_MIN_CONF.get(base, self.OTHER_MIN_CONF):
                 continue
             vn = self.PPE_VN.get(base, base.upper())
             label = f"THIẾU {vn}" if is_viol else vn
@@ -261,7 +285,7 @@ class PPEViolationTracker:
                     continue
 
                 # GĂNG/GIÀY: bỏ qua khung tin cậy thấp (nhiễu), tránh chốt sai còn/thiếu.
-                if base in ('gloves', 'boots') and it['conf'] < self.PART_MIN_CONF:
+                if it['conf'] < self.PART_MIN_CONF.get(base, self.OTHER_MIN_CONF):
                     continue
 
                 # PPE khác (áo/găng/giày...): xét theo toàn thân (tâm trong khung người)
@@ -271,6 +295,22 @@ class PPEViolationTracker:
                     else:
                         present.add(base)
 
+            # BẰNG CHỨNG THEO THỜI GIAN — chống báo oan.
+            # Trước: mất DẤU món đồ đúng 1 khung là kết luận thiếu ngay. Đo trên 283
+            # ảnh có nhãn: 11.3% người ĐANG đeo găng bị bảo thiếu, giày 9.1%.
+            # Giờ: đã nhìn thấy món đồ trên người này trong EVIDENCE_WINDOW giây gần
+            # nhất thì vẫn tính là CÓ. Người đeo găng chỉ bị kết luận thiếu khi suốt
+            # cả cửa sổ đó không khung nào thấy găng.
+            # Đánh đổi: ai tháo đồ ra thì chậm bị phát hiện đúng bằng EVIDENCE_WINDOW.
+            tid = p['id']
+            now = time.time()
+            if tid is not None:
+                seen = self._ppe_last_seen.setdefault(tid, {})
+                for base in present:
+                    seen[base] = now
+                present = present | {k for k, ts in seen.items()
+                                     if now - ts <= self.EVIDENCE_WINDOW}
+
             missing = [req for req in self.required_ppe
                        if req in explicit_missing or req not in present]
             is_violation = len(missing) > 0
@@ -278,7 +318,6 @@ class PPEViolationTracker:
             # Chốt vi phạm để GHI DB: cần conf cao hơn (CONFIRM_CONF) VÀ trạng thái
             # thiếu PPE tồn tại liên tục >= CONFIRM_DELAY giây. isViolation (dưới) vẫn
             # bật ngay để khung UI phản hồi tức thời — chỉ "confirmed" mới bị delay.
-            tid = p['id']
             confirmed = False
             if is_violation and p['conf'] >= self.CONFIRM_CONF:
                 since = self._violation_since.setdefault(tid, time.time())
