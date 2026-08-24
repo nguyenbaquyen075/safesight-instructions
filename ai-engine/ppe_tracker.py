@@ -181,7 +181,15 @@ class PPEViolationTracker:
         # chết một chỗ, anh giơ tay lên thì ô vẫn ở ngang hông, và khi tay/chân
         # KHÔNG có trong khung hình thì vẫn vẽ ô vào chỗ trống. Dùng điểm khớp thì
         # khung bám đúng tay/chân, và không thấy thì KHÔNG VẼ.
-        self.pose_model = YOLO('yolov8n-pose.pt').to(device)
+        # Không có sẵn file thì ultralytics tự tải (~6.5MB) -> CẦN MẠNG lần đầu.
+        # Không có mạng thì chạy tiếp không có model tư thế, chỉ mất khung chỉ chỗ
+        # tay/chân — KHÔNG được để cả hệ thống camera chết vì một file phụ.
+        try:
+            self.pose_model = YOLO('yolov8n-pose.pt').to(device)
+        except Exception as e:
+            print(f"⚠️  Không nạp được yolov8n-pose.pt ({e}) — bỏ khung chỉ chỗ "
+                  f"tay/chân, phần còn lại vẫn chạy bình thường.")
+            self.pose_model = None
         self.parts_classes = {c.lower() for c in parts_classes} if parts_model_path else set()
         self.parts_model = YOLO(parts_model_path).to(device) if parts_model_path else None
         if self.parts_model is not None:
@@ -251,11 +259,13 @@ class PPEViolationTracker:
         confs = results.boxes.conf.cpu().tolist()
 
         # Điểm khớp cho cả khung hình, khớp với người sau bằng IoU
-        _pose = self.pose_model.predict(frame, conf=0.3, verbose=False)[0]
-        _pose_boxes = _pose.boxes.xyxy.cpu().tolist() if _pose.boxes is not None else []
-        _pose_kp = _pose.keypoints.xy.cpu().tolist() if _pose.keypoints is not None else []
-        _pose_kc = (_pose.keypoints.conf.cpu().tolist()
-                    if (_pose.keypoints is not None and _pose.keypoints.conf is not None) else [])
+        _pose_boxes, _pose_kp, _pose_kc = [], [], []
+        if self.pose_model is not None:
+            _pose = self.pose_model.predict(frame, conf=0.3, verbose=False)[0]
+            _pose_boxes = _pose.boxes.xyxy.cpu().tolist() if _pose.boxes is not None else []
+            _pose_kp = _pose.keypoints.xy.cpu().tolist() if _pose.keypoints is not None else []
+            _pose_kc = (_pose.keypoints.conf.cpu().tolist()
+                        if (_pose.keypoints is not None and _pose.keypoints.conf is not None) else [])
 
         persons = []   # {'box','id','conf'}
         items = []     # {'name','box','conf'}  (mọi PPE trừ person)
@@ -565,11 +575,13 @@ class PPEViolationTracker:
         confs = results.boxes.conf.cpu().tolist()
 
         # Điểm khớp cho cả khung hình, khớp với người sau bằng IoU
-        _pose = self.pose_model.predict(frame, conf=0.3, verbose=False)[0]
-        _pose_boxes = _pose.boxes.xyxy.cpu().tolist() if _pose.boxes is not None else []
-        _pose_kp = _pose.keypoints.xy.cpu().tolist() if _pose.keypoints is not None else []
-        _pose_kc = (_pose.keypoints.conf.cpu().tolist()
-                    if (_pose.keypoints is not None and _pose.keypoints.conf is not None) else [])
+        _pose_boxes, _pose_kp, _pose_kc = [], [], []
+        if self.pose_model is not None:
+            _pose = self.pose_model.predict(frame, conf=0.3, verbose=False)[0]
+            _pose_boxes = _pose.boxes.xyxy.cpu().tolist() if _pose.boxes is not None else []
+            _pose_kp = _pose.keypoints.xy.cpu().tolist() if _pose.keypoints is not None else []
+            _pose_kc = (_pose.keypoints.conf.cpu().tolist()
+                        if (_pose.keypoints is not None and _pose.keypoints.conf is not None) else [])
 
         persons = []   # {'box','id','conf'}
         items = []     # {'name','box','conf'}  (mọi PPE trừ person)
