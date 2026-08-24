@@ -273,6 +273,21 @@ def run_inference():
     def make_tracker():
         return PPEViolationTracker(
             model_path=MODEL_PATH,
+            # Người KHÔNG đeo găng / KHÔNG đi giày cũng là vi phạm — anh yêu cầu
+            # 24/08/2026. Giá phải trả, đo bằng ai-engine/eval_ppe_decision.py trên
+            # 283 ảnh có nhãn: găng báo oan 11.3%, giày 9.1% (người ĐANG đeo mà bị
+            # bảo thiếu). Muốn tắt lại thì bỏ 'gloves','boots' khỏi dòng dưới.
+            required_ppe=('helmet', 'vest', 'gloves', 'boots'),
+            # GĂNG lấy từ model phụ ppe_v3_clean.pt (báo oan 11.3% -> 8.7%,
+            # bỏ lọt giữ 0.4%). CHỈ găng — đã quét ngưỡng và thấy model phụ
+            # làm GIÀY tệ hơn (oan 12.6% vs 6.3% của model gốc tại cùng mức lọt).
+            # Người/mũ/áo/giày vẫn do model gốc lo -> mũ 4.7% và áo 3.1% không đổi.
+            # Giá: 2 lần suy luận mỗi khung. Bỏ 2 dòng dưới là về 1 model.
+            # KHÔNG dùng model phụ. v3 thắng trên ảnh công trường (báo oan 11.3%
+            # -> 8.7%) NHƯNG thua hẳn ở CẬN CẢNH webcam — đo bằng cách phóng to dần
+            # một bàn tay đã bắt chắc: tay chiếm 12% khung thì gốc 0.55 / v3 0.37;
+            # chiếm 25% thì gốc còn 0.08 / v3 MẤT HẲN. Anh thử bằng webcam nên
+            # v3 làm hỏng đúng thứ đang cần. Giữ model gốc, và chạy nhanh gấp đôi.
             confidence=0.15,       # Ngưỡng thô THẤP để găng/giày (conf 0.15-0.30) lọt vào;
                                    # lọc chặt lại theo từng lớp ở PPEViolationTracker.PART_MIN_CONF
             min_height_ratio=0.0,  # TẮT lọc kích thước — hiện tất cả khung, kể cả vật nhỏ/xa

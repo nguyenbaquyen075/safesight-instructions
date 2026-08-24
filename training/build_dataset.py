@@ -102,8 +102,53 @@ def remap_label(lines, names, stats):
     return out
 
 
-def collect(ds_dir, split, want=None):
-    """Đọc 1 split -> [(đường dẫn ảnh, các dòng nhãn đã đổi id, tập lớp có mặt)]."""
+# Lớp cần học cho mục tiêu hiện tại (găng + giày), gồm CẢ nhãn phủ định.
+# Bỏ quên nhãn phủ định ở đây là vứt đúng thứ hiếm nhất: ảnh "chân trần" chỉ có
+# no_boots chứ không có boots, lọc theo nhãn dương là loại sạch chúng — đúng lỗi
+# đã làm v5 vòng đầu chỉ còn 63 nhãn no_boots.
+CAN_HOC = {'gloves', 'boots', 'no_gloves', 'no_boots'}
+
+
+def _du_nhan(lines, names):
+    """Mọi người trong ảnh đều được đánh dấu ĐỦ tay, chân VÀ áo?
+
+    Chạy trên NHÃN GỐC (trước remap) vì phép kiểm cần lớp `no-vest` — lớp đó bị
+    vứt lúc remap (schema 11 lớp không có no_vest), kiểm sau remap là mù về áo.
+    Đó chính là lỗi của vòng v3: lọc sạch tay/chân nhưng bỏ quên áo, kết quả áo
+    hỏng từ 3.1% lên 9.5% báo oan.
+
+    Ảnh có 5 người mà chỉ 1 nhãn găng nghĩa là 4 người kia tay hiện rõ nhưng
+    không được gán nhãn -> với YOLO đó là hard negative, dạy model "chỗ này KHÔNG
+    phải găng".
+    """
+    c = collections.Counter()
+    dien_tich = []
+    for l in lines:
+        q = l.split()
+        c[canon(names[int(q[0])])] += 1
+        dien_tich.append(float(q[3]) * float(q[4]))
+    nguoi = c['Person']
+    if nguoi == 0:
+        # Ảnh KHÔNG có người: hai khả năng trái ngược nhau.
+        #  - ảnh CẮT CẬN một bàn chân/bàn tay -> không có người thật để gán nhãn,
+        #    dùng được, và đây là nguồn hiếm dạy model "chân trần trông thế nào".
+        #  - ảnh CẢNH RỘNG có người mà quên gán nhãn (kiểu dataset ppes) -> đầu độc.
+        # Phân biệt bằng kích thước: ảnh cắt cận có hộp chiếm phần lớn khung
+        # (đo trên bộ balanced: median 34% khung), ảnh cảnh rộng thì hộp bé tí.
+        return bool(dien_tich) and max(dien_tich) >= 0.15
+    tay = c['gloves'] + c['no_gloves']
+    chan = c['boots'] + c['no_boots']
+    # canon('no-vest') trả None (bị vứt) -> đếm riêng bằng khoá None, đó chính là
+    # nhãn "người này không mặc áo" mà mình cần để biết áo ĐÃ được soát.
+    ao = c['vest'] + c[None]
+    return tay >= nguoi and chan >= nguoi and ao >= nguoi
+
+
+def collect(ds_dir, split, want=None, sach=False):
+    """Đọc 1 split -> [(đường dẫn ảnh, các dòng nhãn đã đổi id, tập lớp có mặt)].
+
+    sach=True: chỉ giữ ảnh mà MỌI người đều có nhãn tay và nhãn chân.
+    """
     names = read_names(ds_dir)
     stats = {'lop_la': collections.Counter(), 'bo_box': collections.Counter()}
     items = []
@@ -114,6 +159,8 @@ def collect(ds_dir, split, want=None):
             continue
         with open(lbl) as f:
             lines = [l.strip() for l in f if l.strip()]
+        if sach and not _du_nhan(lines, names):
+            continue
         new = remap_label(lines, names, stats)
         if not new:
             continue
@@ -156,6 +203,8 @@ def main():
     ap.add_argument('--big', default='PPE-Detection-1', help='thư mục dataset aseiro đã tải')
     ap.add_argument('--detech', default='Detech-PPE-1', help='thư mục dataset Detech đã tải')
     ap.add_argument('--out', default='ppe_train_v2')
+    ap.add_argument('--clean', action='store_true',
+                    help='chỉ lấy ảnh mà mọi người đều có nhãn tay VÀ nhãn chân')
     ap.add_argument('--cap', type=int, default=12000,
                     help='trần số ảnh lấy từ dataset lớn (Colab free ~4h/phiên)')
     a = ap.parse_args()
@@ -167,16 +216,21 @@ def main():
     # Chỉ lấy ảnh CÓ găng hoặc giày — thứ đang thiếu. Ảnh chỉ có mũ/áo không
     # giúp gì cho báo oan găng/giày mà vẫn tốn thời gian train.
     print('== dataset lớn (aseiro) ==')
-    big = collect(a.big, 'train', want={'gloves', 'boots'})
-    co_gang = [x for x in big if 'gloves' in x[2]]
-    chi_giay = [x for x in big if 'gloves' not in x[2]]
-    random.shuffle(chi_giay)
-    # Găng hiếm hơn giày (7.413 vs 16.538) -> giữ TOÀN BỘ ảnh có găng trước.
-    chosen = co_gang + chi_giay[:max(0, a.cap - len(co_gang))]
-    print(f'  ảnh có găng {len(co_gang)}, chỉ có giày {len(chi_giay)} -> lấy {len(chosen)}')
+    big = collect(a.big, 'train', want=CAN_HOC, sach=a.clean)
+    # Cắt theo ĐỘ HIẾM, không cắt ngẫu nhiên. Nhãn phủ định (no_boots/no_gloves =
+    # chân trần, tay trần) là thứ hiếm nhất và là thứ DUY NHẤT dạy model "thiếu đồ
+    # trông thế nào". Cắt ngẫu nhiên là chặt mất chúng -> model tưởng ai cũng đủ đồ
+    # -> bỏ lọt người vi phạm thật. Đúng lỗi đã làm hỏng vòng v4 (0 nhãn no_boots).
+    co_am = [x for x in big if x[2] & {'no_boots', 'no_gloves'}]
+    con_lai = [x for x in big if not (x[2] & {'no_boots', 'no_gloves'})]
+    random.shuffle(co_am)
+    random.shuffle(con_lai)
+    chosen = co_am[:a.cap] + con_lai[:max(0, a.cap - len(co_am))]
+    print(f'  ảnh có nhãn PHỦ ĐỊNH {len(co_am)} (giữ trước), '
+          f'còn lại {len(con_lai)} -> lấy tổng {len(chosen)}')
 
     print('== dataset Detech (đúng miền) ==')
-    det_train = collect(a.detech, 'train')
+    det_train = collect(a.detech, 'train', sach=a.clean)
     det_valid = collect(a.detech, 'valid')
     det_test = collect(a.detech, 'test')
     print(f'  train {len(det_train)} | valid {len(det_valid)} | test {len(det_test)}')
@@ -187,7 +241,7 @@ def main():
     # val trong lúc train = valid của dataset lớn. KHÔNG dùng valid/test của
     # Detech: đó là tập chấm điểm cuối, dùng làm val thì best.pt sẽ được chọn
     # để vừa lòng chính tập mình sắp dùng để nghiệm thu.
-    big_valid = collect(a.big, 'valid', want={'gloves', 'boots'})
+    big_valid = collect(a.big, 'valid', want=CAN_HOC, sach=a.clean)
     random.shuffle(big_valid)
     write(big_valid[:1500], a.out, 'valid', 'big_')
 
@@ -225,6 +279,16 @@ def selftest():
     assert out == [f'{TARGET_ID["gloves"]} .5 .5 .1 .1',
                    f'{TARGET_ID["Person"]} .5 .5 .2 .2'], out
     assert stats['bo_box']['no-vest'] == 1
+    # bộ lọc sạch chạy trên TÊN GỐC: 1 người + găng + giày + áo -> nhận
+    N = ['person', 'gloves', 'boots', 'vest', 'no-vest', 'no-gloves']
+    mk = lambda *ids: [f'{i} 0 0 0 0' for i in ids]
+    assert _du_nhan(mk(0, 1, 2, 3), N)                 # đủ cả ba
+    assert _du_nhan(mk(0, 5, 2, 4), N)                 # no-gloves + no-vest cũng tính là đã soát
+    assert not _du_nhan(mk(0, 1, 2), N)                # thiếu áo  <- lỗi của v3
+    assert not _du_nhan(mk(0, 0, 1, 2, 3), N)          # 2 người, 1 bộ nhãn
+    # ảnh không người: cắt cận (hộp to) thì nhận, cảnh rộng (hộp bé) thì loại
+    assert _du_nhan(['2 0.5 0.5 0.6 0.6'], N)          # cắt cận bàn chân
+    assert not _du_nhan(['2 0.5 0.5 0.05 0.05'], N)    # hộp bé -> cảnh rộng thiếu nhãn
     print('selftest OK')
 
 

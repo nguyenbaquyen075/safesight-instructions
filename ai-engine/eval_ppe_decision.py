@@ -63,13 +63,16 @@ def _pct_to_box(bb, w, h):
     return [left, top, left + f(bb['width']) * w / 100, top + f(bb['height']) * h / 100]
 
 
-def evaluate(ppe, model_path='ppe_multiclass.pt', verbose=True):
+def evaluate(ppe, model_path='ppe_multiclass.pt', verbose=True, parts_model=None):
     # Ảnh tĩnh rời rạc -> tắt cửa sổ bằng chứng theo thời gian (chỉ có nghĩa với video),
     # nếu không track id bị dùng lại giữa 2 ảnh sẽ mang bằng chứng của người khác sang.
     PPEViolationTracker.EVIDENCE_WINDOW = 0.0
+    PPEViolationTracker.HOLD_SECONDS = 0.0
     tracker = PPEViolationTracker(model_path=os.path.join(REPO, model_path),
                                   confidence=0.15, min_height_ratio=0.0,
-                                  required_ppe=(ppe,), imgsz=640)
+                                  required_ppe=(ppe,), imgsz=640,
+                                  parts_model_path=(os.path.join(REPO, parts_model)
+                                                    if parts_model else None))
     r = {'oan': 0, 'lot': 0, 'dung_du': 0, 'dung_thieu': 0, 'khong_thay_nguoi': 0}
     for split in ('valid', 'test'):
         pattern = os.path.join(REPO, 'data_train/detech_ppe', split, 'images/*.jpg')
@@ -125,14 +128,26 @@ def evaluate(ppe, model_path='ppe_multiclass.pt', verbose=True):
     return r
 
 
-# Ngưỡng để được phép bật món PPE đó vào required_ppe (bắt đầu phạt người thật).
-NGUONG_OAN_TOI_DA = 0.01
+# Yêu cầu của anh 24/08/2026: "bắt chuẩn và không oan". Đó là HAI chiều, phải
+# đạt cả hai mới được tính là xong — giảm báo oan bằng cách dễ dãi hơn với người
+# vi phạm thật thì bỏ lọt sẽ tăng, và đó KHÔNG phải là tiến bộ.
+NGUONG_OAN_TOI_DA = 0.01   # không oan: người ĐANG đeo mà bị bảo thiếu
+NGUONG_LOT_TOI_DA = 0.02   # bắt chuẩn: người KHÔNG đeo mà bảo đủ
+
+
+def _phan_xet(res, ppe):
+    oan_dat = res['ty_le_oan'] <= NGUONG_OAN_TOI_DA
+    lot_dat = res['ty_le_lot'] <= NGUONG_LOT_TOI_DA
+    print(f"  không oan (<= {NGUONG_OAN_TOI_DA*100:.0f}%) : "
+          f"{'ĐẠT' if oan_dat else 'CHƯA'}  ({res['ty_le_oan']*100:.1f}%)")
+    print(f"  bắt chuẩn (<= {NGUONG_LOT_TOI_DA*100:.0f}%): "
+          f"{'ĐẠT' if lot_dat else 'CHƯA'}  ({res['ty_le_lot']*100:.1f}%)")
+    ok = oan_dat and lot_dat
+    print(f"  => {'ĐƯỢC' if ok else 'CHƯA được'} bật '{ppe}' vào required_ppe")
+    return ok
+
 
 if __name__ == '__main__':
     targets = sys.argv[1:] or ['gloves', 'boots']
     for ppe in targets:
-        res = evaluate(ppe)
-        dat = res['ty_le_oan'] <= NGUONG_OAN_TOI_DA
-        print(f"  => {'ĐẠT' if dat else 'CHƯA ĐẠT'} ngưỡng báo oan "
-              f"{NGUONG_OAN_TOI_DA*100:.0f}% -> "
-              f"{'có thể' if dat else 'CHƯA được'} bật '{ppe}' vào required_ppe")
+        _phan_xet(evaluate(ppe), ppe)
