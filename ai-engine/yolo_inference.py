@@ -283,11 +283,16 @@ def run_inference():
             # làm GIÀY tệ hơn (oan 12.6% vs 6.3% của model gốc tại cùng mức lọt).
             # Người/mũ/áo/giày vẫn do model gốc lo -> mũ 4.7% và áo 3.1% không đổi.
             # Giá: 2 lần suy luận mỗi khung. Bỏ 2 dòng dưới là về 1 model.
-            # KHÔNG dùng model phụ. v3 thắng trên ảnh công trường (báo oan 11.3%
-            # -> 8.7%) NHƯNG thua hẳn ở CẬN CẢNH webcam — đo bằng cách phóng to dần
-            # một bàn tay đã bắt chắc: tay chiếm 12% khung thì gốc 0.55 / v3 0.37;
-            # chiếm 25% thì gốc còn 0.08 / v3 MẤT HẲN. Anh thử bằng webcam nên
-            # v3 làm hỏng đúng thứ đang cần. Giữ model gốc, và chạy nhanh gấp đôi.
+            # Model phụ CHỈ cho GIÀY (ppe_boots.pt), train từ chính dữ liệu của anh:
+            # detech train + ppes (cả 3 split — nhãn giày của ppes nằm gần hết ở
+            # valid/test, bỏ sót chỗ này là mất 606 nhãn "chân trần").
+            # no_boots: 88 -> 694 nhãn. mAP tập giày 0.373 -> 0.883 sau 20 epoch.
+            # CHỈ giày — găng KHÔNG dùng model phụ: đã thử ppe_v3_clean.pt, nó
+            # thắng trên ảnh công trường nhưng THUA ở cận cảnh webcam (tay chiếm
+            # 25% khung: gốc 0.08, v3 mất hẳn), tức hỏng đúng thứ anh hay thử.
+            # Người/mũ/áo/găng vẫn do model gốc lo -> mũ 4.7%, áo 3.1% không đổi.
+            parts_model_path='ppe_boots.pt',
+            parts_classes=('boots',),
             confidence=0.15,       # Ngưỡng thô THẤP để găng/giày (conf 0.15-0.30) lọt vào;
                                    # lọc chặt lại theo từng lớp ở PPEViolationTracker.PART_MIN_CONF
             min_height_ratio=0.0,  # TẮT lọc kích thước — hiện tất cả khung, kể cả vật nhỏ/xa

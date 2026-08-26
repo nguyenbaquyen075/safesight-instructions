@@ -203,11 +203,24 @@ def main():
     ap.add_argument('--big', default='PPE-Detection-1', help='thư mục dataset aseiro đã tải')
     ap.add_argument('--detech', default='Detech-PPE-1', help='thư mục dataset Detech đã tải')
     ap.add_argument('--out', default='ppe_train_v2')
+    ap.add_argument('--only', default=None,
+                    help="chỉ học các lớp này, cách nhau bằng dấu phẩy "
+                         "(vd 'boots,no_boots' để train model CHUYÊN GIÀY). "
+                         "Model chuyên dùng làm model phụ nên các lớp khác bị "
+                         "bỏ cũng không sao — chúng vẫn do model chính lo.")
+    ap.add_argument('--all-splits', action='store_true',
+                    help='lấy cả valid/test của dataset lớn (nhãn giày của ppes '
+                         'nằm gần hết ở valid/test chứ không ở train)')
     ap.add_argument('--clean', action='store_true',
                     help='chỉ lấy ảnh mà mọi người đều có nhãn tay VÀ nhãn chân')
     ap.add_argument('--cap', type=int, default=12000,
                     help='trần số ảnh lấy từ dataset lớn (Colab free ~4h/phiên)')
     a = ap.parse_args()
+
+    global CAN_HOC
+    if a.only:
+        CAN_HOC = {x.strip() for x in a.only.split(',')}
+        print(f'CHỈ học các lớp: {sorted(CAN_HOC)}')
 
     random.seed(0)
     if os.path.exists(a.out):
@@ -217,6 +230,9 @@ def main():
     # giúp gì cho báo oan găng/giày mà vẫn tốn thời gian train.
     print('== dataset lớn (aseiro) ==')
     big = collect(a.big, 'train', want=CAN_HOC, sach=a.clean)
+    if a.all_splits:
+        for _s in ('valid', 'test'):
+            big += collect(a.big, _s, want=CAN_HOC, sach=a.clean)
     # Cắt theo ĐỘ HIẾM, không cắt ngẫu nhiên. Nhãn phủ định (no_boots/no_gloves =
     # chân trần, tay trần) là thứ hiếm nhất và là thứ DUY NHẤT dạy model "thiếu đồ
     # trông thế nào". Cắt ngẫu nhiên là chặt mất chúng -> model tưởng ai cũng đủ đồ
