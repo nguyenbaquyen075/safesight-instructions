@@ -191,7 +191,17 @@ class PPEViolationTracker:
                   f"tay/chân, phần còn lại vẫn chạy bình thường.")
             self.pose_model = None
         self.parts_classes = {c.lower() for c in parts_classes} if parts_model_path else set()
-        self.parts_model = YOLO(parts_model_path).to(device) if parts_model_path else None
+        # File .pt bị .gitignore chặn nên KHÔNG đi kèm repo. Máy mới clone về mà
+        # thiếu ppe_boots.pt thì quay về dùng model chính cho giày (bỏ lọt cao hơn
+        # nhưng vẫn chạy), thay vì để cả luồng camera chết vì một file phụ.
+        self.parts_model = None
+        if parts_model_path:
+            try:
+                self.parts_model = YOLO(parts_model_path).to(device)
+            except Exception as e:
+                print(f"⚠️  Không nạp được model phụ {parts_model_path} ({e}) — "
+                      f"dùng model chính cho {sorted(self.parts_classes)}.")
+                self.parts_classes = set()
         if self.parts_model is not None:
             print(f"  + model phụ cho {sorted(self.parts_classes)}: {parts_model_path}")
 

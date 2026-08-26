@@ -91,6 +91,25 @@ Model, ngưỡng confidence và các tham số nhận diện nằm ở đầu fi
 - `CONFIRM_CONF` / `CONFIRM_DELAY` — ngưỡng độ tin cậy và thời gian tồn tại liên tục tối thiểu trước khi CHỐT một vi phạm để ghi DB (mặc định 0.6 / 3 giây), giảm báo động giả.
 - Nguồn video/camera map tại `src/data/camera-videos.json`.
 
+## File model cần có (KHÔNG nằm trong repo)
+
+Mọi file `.pt` đều bị `.gitignore` chặn. Máy mới clone về phải chép tay:
+
+| file | vai trò | thiếu thì sao |
+|---|---|---|
+| `ppe_multiclass.pt` | model chính — người, mũ, áo, găng | **không chạy được** |
+| `ppe_boots.pt` | model phụ, CHỈ lớp giày | chạy tiếp bằng model chính, giày bỏ lọt cao hơn |
+| `yolov8n-pose.pt` | toạ độ cổ tay/cổ chân để đặt khung "THIẾU GĂNG/GIÀY" | chạy tiếp, mất khung chỉ chỗ (ultralytics tự tải nếu có mạng) |
+
+Hai file phụ đều có đường lui, chỉ `ppe_multiclass.pt` là bắt buộc.
+
+Nghiệm thu sau khi thay model — chạy cả hai, đừng tin mAP:
+
+```bash
+.venv/bin/python ai-engine/eval_ppe_decision.py            # báo oan / bỏ lọt, 4 lớp
+.venv/bin/python ai-engine/sweep_threshold.py <model> boots [model_phụ]  # quét ngưỡng
+```
+
 ## Đối chiếu bằng Roboflow Workflow (ảnh tĩnh)
 
 `ai-engine/roboflow_workflow.py` gọi workflow **"Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic"**
