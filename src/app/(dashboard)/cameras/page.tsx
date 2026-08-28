@@ -45,12 +45,96 @@ import { DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 // --- Video của từng camera ---
 // Đọc từ NGUỒN DUY NHẤT src/data/camera-videos.json (YOLO cũng đọc chính file này).
 // Gán video nào cho 1 ô -> ô đó chiếu đúng video ĐÓ và YOLO tự phân tích -> tự bắt lỗi.
-function videoForCamera(cameraId: string): string {
+// Ưu tiên video anh tự chọn qua Cài đặt > Giám sát (lưu trong DB dạng
+// "video:ten.mp4"), rồi mới đến video mặc định trong camera-videos.json.
+// Thiếu bước này thì đổi video xong trang vẫn chiếu video cũ — file json là
+// tĩnh, không biết gì về lựa chọn mới.
+function videoForCamera(cameraId: string, source?: string): string {
+  if (source?.startsWith('video:')) {
+    const file = source.slice(6);
+    if (file && !file.includes('/') && !file.includes('..')) {
+      return `/videos/${encodeURIComponent(file)}`;
+    }
+  }
   const file = (cameraVideos as Record<string, string>)[cameraId] || '210321.mp4';
-  return `/videos/${file}`;
+  return `/videos/${encodeURIComponent(file)}`;
 }
 
 // --- Sub-components ---
+
+/** Video demo + lớp khung nhận diện, GIỮ ĐÚNG TỈ LỆ video.
+ *
+ * Trước đây video dùng `object-fill` -> kéo giãn cho vừa ô. Video ngang 16:9 thì
+ * không thấy gì, nhưng video DỌC quay bằng điện thoại (1080x1920) bị bóp dẹt,
+ * người trong hình méo hẳn đi.
+ *
+ * Không thể chỉ đổi sang `object-contain`: toạ độ khung nhận diện là % của KHUNG
+ * HÌNH VIDEO, còn lớp phủ lại phủ kín Ô. Video co lại mà lớp phủ vẫn nguyên thì
+ * khung lệch khỏi người. Nên bọc CẢ HAI vào một khung con đúng tỉ lệ video —
+ * video vừa khít khung con, lớp phủ cũng vừa khít, hai bên luôn khớp nhau.
+ */
+// Tốc độ phát video mẫu. PHẢI KHỚP với TOC_DO_PHAT trong ai-engine/yolo_inference.py
+// — AI nhảy tới vị trí theo đồng hồ NHÂN hệ số này, lệch nhau thì khung nhận diện
+// trôi khỏi hình. 0.5 = chậm một nửa, khung dễ theo mắt hơn.
+const TOC_DO_PHAT = 0.75;
+
+function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detections: Detection[]; aiPos?: number }) {
+  const [ratio, setRatio] = React.useState<number | null>(null);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  // TUA video theo vị trí AI đang phân tích. Không có bước này thì hai bên chỉ
+  // khớp TỐC ĐỘ chứ không khớp ĐIỂM XUẤT PHÁT: mở trang 30s sau khi AI chạy ->
+  // trình duyệt phát giây 0 còn AI phân tích giây 22, khung nhận diện đè lên
+  // cảnh hoàn toàn khác. Đó là lý do khung "không bao giờ đúng vật thể".
+  React.useEffect(() => {
+    const v = videoRef.current;
+    if (!v || aiPos == null || !Number.isFinite(aiPos)) return;
+    // Chỉ tua khi lệch đáng kể, tránh giật hình mỗi lần nhận gói tin
+    if (Math.abs(v.currentTime - aiPos) > 0.5) v.currentTime = aiPos;
+  }, [aiPos]);
+  return (
+    // overflow-hidden + khung con PHỦ KÍN ô (không phải vừa trong ô): video dọc
+    // sẽ tràn ra trên/dưới rồi bị cắt, thay vì để hai dải đen hai bên. Khung nhận
+    // diện nằm CÙNG khung con nên bị cắt y hệt -> vẫn khớp đúng người.
+    // Phủ kín ô (chiều cao do ô quyết định), giữ đúng tỉ lệ, phần thừa bị CẮT —
+    // không méo, không viền đen. Khung nhận diện nằm cùng khối nên cắt y hệt.
+    <div className="absolute inset-0 overflow-hidden bg-black">
+      <div
+        className="relative w-full h-full"
+        // PHỦ KÍN ô mà KHÔNG méo: giữ đúng tỉ lệ video rồi phóng to tới khi cạnh
+        // ngắn chạm mép ô, phần thừa bị cắt (overflow-hidden ở thẻ cha).
+        // Video dọc 9:16 trong ô ngang -> tràn trên/dưới, không còn viền đen.
+        // Khung nhận diện nằm CÙNG khối này nên bị cắt y hệt, vẫn khớp người.
+      >
+        <video
+          ref={videoRef}
+          src={src}
+          autoPlay muted loop playsInline
+          onLoadedMetadata={(e) => {
+            const v = e.currentTarget;
+            if (v.videoWidth && v.videoHeight) setRatio(v.videoWidth / v.videoHeight);
+            v.playbackRate = TOC_DO_PHAT;
+          }}
+          onRateChange={(e) => {
+            // Trình duyệt reset playbackRate khi video lặp lại -> đặt lại
+            const v = e.currentTarget;
+            if (v.playbackRate !== TOC_DO_PHAT) v.playbackRate = TOC_DO_PHAT;
+          }}
+          className="w-full h-full object-cover opacity-70"
+        />
+        <div className="absolute inset-0 pointer-events-none">
+          {/* KHÔNG vẽ khung NGƯỜI — nó bao cả người nên che mất khung mũ/áo/găng/giày
+              bên trong. Dữ liệu người vẫn giữ nguyên cho phần thống kê và ghi DB,
+              chỉ bỏ phần hiển thị. */}
+          {detections.filter((d) => d.type !== 'person').map((d) => (
+            <AIDetectionBox key={d.id} detection={d} />
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 
 function AIDetectionBox({ detection }: { detection: Detection }) {
   const { label, confidence, bbox, isViolation, type } = detection;
@@ -317,7 +401,7 @@ export default function CamerasPage() {
   const [showViolationsOnly, setShowViolationsOnly] = React.useState(false);
   const [voiceMode, setVoiceMode] = React.useState<'demo' | 'broadcast'>('demo');
 
-  const { isConnected, lastEvent, getDetectionsForCamera } = useYolo();
+  const { isConnected, lastEvent, getDetectionsForCamera, getVideoPosForCamera } = useYolo();
   const { data: allCameras, isLoading: camerasLoading } = useCameras({ includeDemo: true });
   const realCameras = allCameras?.filter(c => !DEMO_CAMERA_IDS.has(c.id));
   // Camera demo đã bị xoá (qua Cài đặt > Giám sát) sẽ mất khỏi đây -> không hiện
@@ -385,7 +469,7 @@ export default function CamerasPage() {
           date: new Date().toLocaleDateString(),
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           timestamp: now,
-          clipUrl: videoForCamera(cam.id),   // video vi phạm ĐÚNG của camera này (chỉ trả 1 lần)
+          clipUrl: videoForCamera(cam.id, cam.rtspUrl),   // video vi phạm ĐÚNG của camera này (chỉ trả 1 lần)
           description: `AI phát hiện ${v.label} tại khu vực ${cam.name}.`
         };
 
@@ -404,7 +488,12 @@ export default function CamerasPage() {
   // lưới xem trực tiếp bên dưới VÀ bảng tổng quan tuân thủ PPE cuối trang.
   const demoTiles = mockCameras.filter(c => c.status === CameraStatus.ONLINE && existingDemoIds.has(c.id)).slice(0, 6).map(cam => {
     const detections = getDetectionsForCamera(cam.id);
-    return { id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id) };
+    // Ô demo lấy thông tin hiển thị từ mock-cameras.ts (file TĨNH), nhưng nguồn
+    // video phải lấy từ DB — đó mới là chỗ ghi video anh chọn qua Cài đặt. Thiếu
+    // dòng này thì đổi video xong ô vẫn chiếu video cũ, trong khi AI đã phân tích
+    // video mới -> khung nhận diện nằm lệch hẳn khỏi hình.
+    const fromDb = allCameras?.find(c => c.id === cam.id);
+    return { id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id, fromDb?.rtspUrl) };
   });
   const realTiles = (realCameras ?? []).filter(c => c.status === CameraStatus.ONLINE).map(cam => {
     const parsed = parseCameraSource(cam.rtspUrl);
@@ -559,7 +648,15 @@ export default function CamerasPage() {
             <div
               key={cam.id}
               className={cn(
-                "group relative bg-black rounded-[2rem] overflow-hidden border-2 transition-all duration-500 hover:shadow-2xl animate-fade-up h-[320px]",
+                // Ô DEMO không ép chiều cao: để video tự quyết định, ô cao lên theo
+                // đúng tỉ lệ video. Ép h-[320px] thì video dọc 9:16 bị cắt gần hết,
+                // chỉ còn dải giữa. Ô webcam/RTSP vẫn giữ 320px như cũ.
+                "group relative bg-black rounded-[2rem] overflow-hidden border-2 transition-all duration-500 hover:shadow-2xl animate-fade-up",
+                // 360px cho ô demo: 320px thì video dọc 9:16 bị cắt gần hết, còn để ô
+                // tự cao theo tỉ lệ video thì ô dài quá khổ. 360 là mức vừa.
+                // Mọi ô CÙNG chiều cao 460px — webcam/RTSP trước đây 320px nên
+                // lưới cao thấp so le, nhìn lệch.
+                "h-[460px]",
                 hasViolation ? "border-red-600 shadow-[0_0_30px_rgba(220,38,38,0.4)]" : isDemo ? "border-white/5" : "border-[var(--primary)]/40"
               )}
               style={{ animationDelay: `${idx * 100}ms` }}
@@ -578,11 +675,7 @@ export default function CamerasPage() {
               </div>
 
               {isDemo ? (
-                <video
-                  src={videoUrl}
-                  autoPlay muted loop playsInline
-                  className="absolute inset-0 w-full h-full object-fill opacity-70 group-hover:scale-105 transition-transform duration-1000"
-                />
+                <DemoVideoWithBoxes src={videoUrl!} detections={detections} aiPos={getVideoPosForCamera(cam.id)} />
               ) : tile.parsed.type === 'webcam' ? (
                 <WebcamPreview deviceIndex={tile.parsed.index} className="absolute inset-0 w-full h-full object-cover" />
               ) : (
@@ -592,11 +685,14 @@ export default function CamerasPage() {
                 </div>
               )}
 
-              <div className="absolute inset-0 pointer-events-none">
-                {detections.map(d => (
-                  <AIDetectionBox key={d.id} detection={d} />
-                ))}
-              </div>
+              {/* Ô demo tự vẽ khung bên trong DemoVideoWithBoxes (để khớp tỉ lệ video) */}
+              {!isDemo && (
+                <div className="absolute inset-0 pointer-events-none">
+                  {detections.filter(d => d.type !== 'person').map(d => (
+                    <AIDetectionBox key={d.id} detection={d} />
+                  ))}
+                </div>
+              )}
 
               <div className="absolute bottom-4 left-6 right-6 flex justify-between items-end z-40">
                 <div>

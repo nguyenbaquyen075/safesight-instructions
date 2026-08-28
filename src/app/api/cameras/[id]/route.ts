@@ -29,7 +29,7 @@ const updateSchema = z.object({
   // giá trị này) — DB lưu chữ HOA (khớp default trong schema.prisma), chuyển ở dưới.
   status: z.enum(['online', 'offline', 'degraded', 'maintenance']).optional(),
   source: z.string().refine(isValidCameraSource, {
-    message: 'source phải là "webcam:<số>" hoặc bắt đầu bằng "rtsp://"',
+    message: 'source phải là "webcam:<số>", "rtsp://..." hoặc "video:<tên file>"',
   }).optional(),
 });
 
@@ -55,8 +55,15 @@ export async function PATCH(
   // thoải mái, nhưng KHÔNG cho đổi nguồn video vì AI engine sẽ luôn bỏ qua giá trị
   // này với camera demo (xem yolo_inference.py: load_real_camera_overrides), đổi ở
   // đây sẽ không có tác dụng gì -> chặn sớm để khỏi đánh lừa người dùng.
-  if (isDemo && source) {
-    return NextResponse.json({ error: 'Camera mẫu (demo) không đổi được nguồn video' }, { status: 400 });
+  // Camera demo: CHO đổi sang video mẫu khác ("video:ten.mp4") — yolo_inference.py
+  // tôn trọng giá trị này và ghi đè camera-videos.json. Nhưng KHÔNG cho gán webcam/
+  // RTSP: camera demo tồn tại để mô phỏng, gán nguồn sống vào sẽ lẫn lộn với camera
+  // thật và làm hỏng ý nghĩa của bộ demo.
+  if (isDemo && source && !source.startsWith('video:')) {
+    return NextResponse.json(
+      { error: 'Camera mẫu (demo) chỉ đổi được sang video mẫu khác' },
+      { status: 400 },
+    );
   }
 
   const camera = await prisma.camera.update({

@@ -64,3 +64,10 @@ __pycache__/
 # Zip gộp tự dựng lại được bằng data_train/merge_datasets.py nên chỉ giữ script.
 /data_train/*
 !/data_train/merge_datasets.py
+# Ảnh webcam của anh: KHÔNG tái tạo được (quay tay trần / tay đeo găng để dạy
+# model phân biệt ở cự ly gần). Nhẹ (~8MB) nên giữ trong repo.
+# gang_tu_gan/ thì KHÔNG giữ — 90MB và dựng lại được từ 2 video đã commit.
+!/data_train/tay_tran/
+!/data_train/tay_tran/**
+!/data_train/tay_gang/
+!/data_train/tay_gang/**

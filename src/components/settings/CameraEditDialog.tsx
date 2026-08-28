@@ -10,6 +10,7 @@ import { useSites } from '@/hooks/use-sites';
 import { useCreateCamera, useUpdateCamera } from '@/hooks/use-cameras';
 import { parseCameraSource } from '@/lib/camera-source';
 import { mockCameras } from '@/data/mock-cameras';
+import cameraVideos from '@/data/camera-videos.json';
 import { CameraStatus } from '@/types/enums';
 import type { Camera } from '@/types/models';
 
@@ -28,9 +29,10 @@ const EMPTY_FORM = {
   siteId: '',
   location: '',
   type: 'fixed' as Camera['type'],
-  sourceKind: 'webcam' as 'webcam' | 'rtsp',
+  sourceKind: 'webcam' as 'webcam' | 'rtsp' | 'video',
   webcamIndex: '0',
   rtspUrl: '',
+  videoFile: '',
   status: CameraStatus.OFFLINE as string,
 };
 
@@ -40,6 +42,16 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
   const { data: sites } = useSites();
   const [form, setForm] = useState(EMPTY_FORM);
   const [webcams, setWebcams] = useState<MediaDeviceInfo[] | null>(null);
+  const [videos, setVideos] = useState<{ name: string; sizeMB: number }[] | null>(null);
+  const [uploading, setUploading] = useState(false);
+  useEffect(() => {
+    if (!isOpen) return;
+    fetch('/api/videos')
+      .then((r) => (r.ok ? r.json() : { videos: [] }))
+      .then((d) => setVideos(d.videos ?? []))
+      .catch(() => setVideos([]));
+  }, [isOpen]);
+
   const createCamera = useCreateCamera();
   const updateCamera = useUpdateCamera();
   const isDemo = !!camera && mockCameras.some((m) => m.id === camera.id);
@@ -75,15 +87,23 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
       setForm({ ...EMPTY_FORM, siteId: sites?.[0]?.id ?? '' });
       return;
     }
+    const demo = mockCameras.some((m) => m.id === camera.id);
     const parsed = parseCameraSource(camera.rtspUrl);
     setForm({
       name: camera.name,
       siteId: camera.siteId,
       location: camera.location,
       type: camera.type,
-      sourceKind: parsed.type === 'rtsp' ? 'rtsp' : 'webcam',
+      // Camera demo LUÔN mở ở chế độ Video mẫu. DB của chúng có sẵn một chuỗi
+      // "rtsp://..." GIẢ (seed chỉ để khớp khoá ngoại) — đọc nguyên si sẽ mở nhầm
+      // ô nhập RTSP và anh không thấy nút tải video đâu cả.
+      sourceKind: demo ? 'video' : parsed.type === 'rtsp' ? 'rtsp' : parsed.type === 'video' ? 'video' : 'webcam',
       webcamIndex: parsed.type === 'webcam' ? String(parsed.index) : '0',
       rtspUrl: parsed.type === 'rtsp' ? parsed.url : '',
+      // Chưa chọn video riêng thì hiện video mặc định đang phát (camera-videos.json)
+      videoFile: parsed.type === 'video'
+        ? parsed.file
+        : (demo ? (cameraVideos as Record<string, string>)[camera.id] ?? '' : ''),
       status: camera.status,
     });
   }, [isOpen, camera, sites]);
@@ -97,15 +117,24 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
       return;
     }
 
+    if (form.sourceKind === 'video' && !form.videoFile) {
+      toast('Chọn video mẫu, hoặc tải một video lên', 'error');
+      return;
+    }
+
     const source = form.sourceKind === 'webcam'
       ? `webcam:${Math.max(0, Number(form.webcamIndex) || 0)}`
-      : form.rtspUrl.trim();
+      : form.sourceKind === 'video'
+        ? `video:${form.videoFile}`
+        : form.rtspUrl.trim();
 
     try {
       if (camera) {
         await updateCamera.mutateAsync({
           id: camera.id,
-          data: { name: form.name, location: form.location, type: form.type, status: form.status, ...(isDemo ? {} : { source }) },
+          // Camera demo CHỈ gửi source khi là video mẫu — API chặn webcam/RTSP cho demo.
+          data: { name: form.name, location: form.location, type: form.type, status: form.status,
+                  ...(isDemo && !source.startsWith('video:') ? {} : { source }) },
         });
       } else {
         await createCamera.mutateAsync({ name: form.name, siteId: form.siteId, location: form.location, type: form.type, source });
@@ -186,18 +215,13 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
               />
             </div>
 
-            {isDemo ? (
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Nguồn video</label>
-                <p className="text-xs text-[var(--text-muted)] px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
-                  Video mẫu cố định — không đổi được. Muốn dùng webcam/{noun} thật, bấm "Thêm {noun}" để tạo {noun} mới.
-                </p>
-              </div>
-            ) : (
+            {(
               <div className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Nguồn video</label>
+                {/* Camera demo CHỈ đổi được sang video mẫu khác — gán webcam/RTSP vào
+                    camera mô phỏng sẽ lẫn lộn với camera thật (API cũng chặn). */}
                 <div className="flex gap-1.5">
-                  {(['webcam', 'rtsp'] as const).map((kind) => (
+                  {(isDemo ? (['video'] as const) : (['webcam', 'rtsp', 'video'] as const)).map((kind) => (
                     <button
                       key={kind}
                       type="button"
@@ -209,12 +233,65 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
                           : "bg-[var(--background)] border-[var(--border)] text-[var(--text-secondary)]"
                       )}
                     >
-                      {kind === 'webcam' ? 'Webcam' : 'Camera IP (RTSP)'}
+                      {kind === 'webcam' ? 'Webcam' : kind === 'rtsp' ? 'Camera IP (RTSP)' : 'Video mẫu'}
                     </button>
                   ))}
                 </div>
 
-                {form.sourceKind === 'webcam' ? (
+                {form.sourceKind === 'video' ? (
+                  <div className="space-y-1.5">
+                    <select
+                      value={form.videoFile}
+                      onChange={(e) => setForm({ ...form, videoFile: e.target.value })}
+                      className="w-full px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] text-sm outline-none"
+                    >
+                      <option value="">— Chọn video mẫu —</option>
+                      {(videos ?? []).map((v) => (
+                        <option key={v.name} value={v.name}>{v.name} ({v.sizeMB}MB)</option>
+                      ))}
+                    </select>
+
+                    <label className={cn(
+                      "flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-dashed text-xs cursor-pointer",
+                      uploading
+                        ? "border-[var(--border)] text-[var(--text-muted)] cursor-wait"
+                        : "border-[var(--primary)] text-[var(--primary-light)] hover:bg-[var(--primary-muted)]"
+                    )}>
+                      <input
+                        type="file"
+                        accept="video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska"
+                        className="hidden"
+                        disabled={uploading}
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0];
+                          e.target.value = '';        // chọn lại cùng file vẫn kích hoạt
+                          if (!f) return;
+                          setUploading(true);
+                          try {
+                            const fd = new FormData();
+                            fd.append('file', f);
+                            const r = await fetch('/api/videos', { method: 'POST', body: fd });
+                            const d = await r.json();
+                            if (!r.ok) throw new Error(d.error || 'Tải lên thất bại');
+                            setVideos((prev) => [...(prev ?? []), { name: d.name, sizeMB: Math.round(f.size / 1024 / 1024 * 10) / 10 }]);
+                            setForm((prev) => ({ ...prev, videoFile: d.name }));
+                            toast(`Đã tải lên ${d.name}`, 'success');
+                          } catch (err) {
+                            toast(err instanceof Error ? err.message : 'Tải lên thất bại', 'error');
+                          } finally {
+                            setUploading(false);
+                          }
+                        }}
+                      />
+                      {uploading ? 'Đang tải lên...' : '⬆ Tải video từ máy lên'}
+                    </label>
+
+                    <p className="text-[10px] text-[var(--text-muted)]">
+                      Camera mô phỏng: phát video mẫu lặp lại và vẫn được AI phân tích như camera thật.
+                      Video lưu ở public/videos/, tối đa 200MB.
+                    </p>
+                  </div>
+                ) : form.sourceKind === 'webcam' ? (
                   <div className="space-y-1.5">
                     {webcams === null ? (
                       <p className="text-xs text-[var(--text-muted)] px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">

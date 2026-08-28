@@ -71,3 +71,4 @@ if last is not None:
         cv2.putText(last, f'{VN.get(n, n)} {cf:.2f}', (b[0], max(14, b[1] - 5)), 0, 0.6, col, 2)
     cv2.imwrite(out, last)
     print(f'Khung cuối đã vẽ khung: {out}')
+r

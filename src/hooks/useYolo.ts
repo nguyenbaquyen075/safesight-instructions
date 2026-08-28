@@ -30,6 +30,8 @@ export const useYolo = (cameraId?: string) => {
   const [isConnected, setIsConnected] = useState(false);
   const [lastEvent, setLastEvent] = useState<string | null>(null);
   const [detectionsMap, setDetectionsMap] = useState<Record<string, Detection[]>>({});
+  // cameraId -> giây trong video mà AI vừa phân tích (chỉ có với camera video mẫu)
+  const [videoPosMap, setVideoPosMap] = useState<Record<string, number>>({});
   const socketRef = useRef<Socket | null>(null);
   // Thời điểm cuối mỗi camera có detection (để giữ khung "dính" tránh nhấp nháy)
   const lastSeenRef = useRef<Record<string, number>>({});
@@ -70,7 +72,12 @@ export const useYolo = (cameraId?: string) => {
       setIsConnected(false);
     });
 
-    socket.on('yolo-data', (data: { cameraId: string; detections: Detection[] }) => {
+    socket.on('yolo-data', (data: { cameraId: string; detections: Detection[]; videoPos?: number }) => {
+      // Vị trí (giây) AI đang phân tích -> trang camera tua video theo, để khung
+      // nhận diện khớp ĐÚNG cảnh đang hiện chứ không phải cảnh khác trong video.
+      if (typeof data.videoPos === 'number') {
+        setVideoPosMap(prev => ({ ...prev, [data.cameraId]: data.videoPos as number }));
+      }
       // Chỉ cập nhật khi CÓ vật; frame trống thì GIỮ khung cũ (chống nhấp nháy)
       if (data.detections.length > 0) {
         lastSeenRef.current[data.cameraId] = Date.now();
@@ -114,5 +121,10 @@ export const useYolo = (cameraId?: string) => {
     [detectionsMap]
   );
 
-  return { isConnected, lastEvent, getDetectionsForCamera };
+  const getVideoPosForCamera = useCallback(
+    (cameraId: string) => videoPosMap[cameraId],
+    [videoPosMap]
+  );
+
+  return { isConnected, lastEvent, getDetectionsForCamera, getVideoPosForCamera };
 };

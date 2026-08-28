@@ -45,8 +45,9 @@ def load_real_camera_overrides():
     vẫn phát video demo như cũ (camera-videos.json).
 
     Quy ước lưu trong cột rtspUrl (khớp src/lib/camera-source.ts):
-      "webcam:0"    -> webcam theo index 0
-      "rtsp://..."  -> camera IP thật qua RTSP
+      "webcam:0"      -> webcam theo index 0
+      "rtsp://..."    -> camera IP thật qua RTSP
+      "video:ten.mp4" -> video mẫu trong public/videos/ (camera mô phỏng)
 
     QUAN TRỌNG: camera DEMO (cam-001, cam-002...) cũng có sẵn 1 giá trị rtspUrl
     kiểu "rtsp://192.168.x.x..." trong DB — đó là dữ liệu GIẢ, seed chỉ để khớp
@@ -76,8 +77,11 @@ def load_real_camera_overrides():
 
     overrides = {}
     for cam_id, rtsp_url, status in rows:
-        if cam_id in demo_cam_ids:
-            continue  # camera DEMO -> luôn dùng video mẫu, bỏ qua dù rtspUrl trông giống thật
+        if cam_id in demo_cam_ids and not (rtsp_url or "").startswith("video:"):
+            # Camera DEMO chưa được gắn video riêng -> để camera-videos.json lo.
+            # Còn nếu anh đã chọn video khác qua Cài đặt > Giám sát (rtspUrl = "video:...")
+            # thì tôn trọng lựa chọn đó, ghi đè video mặc định trong json.
+            continue
         if (status or "").upper() != "ONLINE":
             print(f"⏸️  Camera {cam_id} đang tắt (status={status}) — bỏ qua.")
             continue
@@ -86,6 +90,18 @@ def load_real_camera_overrides():
             overrides[cam_id] = int(webcam_match.group(1))
         elif (rtsp_url or "").startswith("rtsp://"):
             overrides[cam_id] = rtsp_url
+        elif (rtsp_url or "").startswith("video:"):
+            # Camera MÔ PHỎNG: anh tự gắn video mẫu qua Cài đặt > Giám sát, không
+            # phải sửa camera-videos.json rồi khởi động lại như trước.
+            name = rtsp_url[6:]
+            if os.path.basename(name) != name or not name:
+                print(f"⚠️ Camera {cam_id}: tên video không hợp lệ ({name!r}) — bỏ qua.")
+                continue
+            path = os.path.join("public", "videos", name)
+            if not os.path.exists(path):
+                print(f"⚠️ Camera {cam_id}: không tìm thấy {path} — bỏ qua.")
+                continue
+            overrides[cam_id] = path
     return overrides
 
 # PPE thiếu -> (type, severity) khớp src/types/enums.ts (ViolationType/Severity)
@@ -235,6 +251,11 @@ def get_video_source(source_config):
 # Đặt file ppe_multiclass.pt (đổi tên từ best.pt của Colab) vào gốc repo.
 MODEL_PATH = "ppe_multiclass.pt"
 
+# Tốc độ phát video mẫu. PHẢI KHỚP với playbackRate bên giao diện
+# (src/app/(dashboard)/cameras/page.tsx, hằng TOC_DO_PHAT) — lệch nhau thì khung
+# nhận diện lại trôi khỏi hình như trước. 0.5 = chậm một nửa, khung dễ theo mắt.
+TOC_DO_PHAT = 0.75
+
 # Dùng 1 kết nối HTTP tái sử dụng (keep-alive) cho nhẹ
 session = requests.Session()
 
@@ -291,8 +312,12 @@ def run_inference():
             # thắng trên ảnh công trường nhưng THUA ở cận cảnh webcam (tay chiếm
             # 25% khung: gốc 0.08, v3 mất hẳn), tức hỏng đúng thứ anh hay thử.
             # Người/mũ/áo/găng vẫn do model gốc lo -> mũ 4.7%, áo 3.1% không đổi.
-            parts_model_path='ppe_boots.pt',
-            parts_classes=('boots',),
+            # Mỗi lớp yếu một model chuyên lo, train từ dữ liệu của chính dự án:
+            #   giày — ppe_boots.pt  (no_boots 88 -> 694 nhãn)
+            #   găng — ppe_gang.pt   (126 khung từ 2 video của anh; trên cam-008
+            #                         nhận ra găng 5% -> 70% số khung)
+            # Người/mũ/áo vẫn do model chính lo -> không thể bị ảnh hưởng.
+            parts_models={'boots': 'ppe_boots.pt', 'gloves': 'ppe_gang.pt'},
             confidence=0.15,       # Ngưỡng thô THẤP để găng/giày (conf 0.15-0.30) lọt vào;
                                    # lọc chặt lại theo từng lớp ở PPEViolationTracker.PART_MIN_CONF
             min_height_ratio=0.0,  # TẮT lọc kích thước — hiện tất cả khung, kể cả vật nhỏ/xa
@@ -310,9 +335,14 @@ def run_inference():
         if not cap.isOpened():
             print(f"⚠️ Không mở được nguồn sống '{source_config}' cho {cam_id} — bỏ qua.")
             continue
+        # Video mẫu là FILE, không phải nguồn sống -> is_live=False để hết video thì
+        # tua về đầu phát lại. Để True thì camera mô phỏng chạy hết 1 lượt rồi đứng im.
+        la_file = isinstance(source_config, str) and not source_config.startswith("rtsp")
         streams.append({"path": str(source_config), "cap": cap, "tracker": make_tracker(),
-                        "cams": [cam_id], "is_live": True})
-        print(f"📹 {cam_id} -> nguồn sống ({source_config})")
+                        "cams": [cam_id], "is_live": not la_file,
+                        "bat_dau": None if not la_file else time.time()})
+        loai = "video mẫu (lặp)" if la_file else "nguồn sống"
+        print(f"📹 {cam_id} -> {loai} ({source_config})")
 
     # Các camera DEMO (không phải camera thật ở trên) vẫn phát video mẫu như cũ —
     # mở 1 luồng (video + tracker riêng) cho mỗi video, cams dùng chung 1 video gộp vào 1 luồng.
@@ -349,6 +379,20 @@ def run_inference():
     while True:
         for st in streams:
             cap = st["cap"]
+
+            # VIDEO FILE: nhảy tới đúng vị trí theo ĐỒNG HỒ THẬT, bỏ qua khung ở giữa.
+            # Trình duyệt phát 30 fps, AI chỉ kịp ~4 fps và trước đây đọc TUẦN TỰ từng
+            # khung -> sau 1 phút AI mới tới giây thứ 8 còn anh đang xem giây 60, khung
+            # nhận diện thuộc về thời điểm hoàn toàn khác với hình đang hiện.
+            # Nhảy theo đồng hồ thì AI luôn phân tích đúng đoạn anh đang nhìn.
+            if not st["is_live"] and st.get("bat_dau"):
+                _fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+                _tong = cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0
+                if _tong > 0:
+                    _troi = (time.time() - st["bat_dau"]) * 1000.0 * TOC_DO_PHAT
+                    _dai = _tong / _fps * 1000.0
+                    cap.set(cv2.CAP_PROP_POS_MSEC, _troi % _dai)
+
             success, frame = cap.read()
             if not success:
                 # Nguồn sống (webcam/RTSP) không có khái niệm "hết video" -> chỉ là
@@ -359,6 +403,12 @@ def run_inference():
                 continue
 
             # Phân tích ĐÚNG video của luồng này -> khung khớp người trong ô đó
+            vi_tri_video = None
+            if not st["is_live"]:
+                _p = cap.get(cv2.CAP_PROP_POS_MSEC)
+                if _p and _p > 0:
+                    vi_tri_video = _p / 1000.0
+
             detections = st["tracker"].process_frame(frame)
 
             violations = [d for d in detections if d.get('isViolation')]
@@ -368,7 +418,13 @@ def run_inference():
                 try:
                     session.post(BRIDGE_URL, json={
                         "cameraId": cam_id,
-                        "detections": detections
+                        "detections": detections,
+                        # VỊ TRÍ (giây) trong video mà AI VỪA phân tích. Trình duyệt
+                        # tua theo số này. Thiếu nó thì hai bên chỉ khớp TỐC ĐỘ chứ
+                        # không khớp ĐIỂM XUẤT PHÁT: anh mở trang 30s sau khi AI chạy
+                        # -> trình duyệt phát giây 0 còn AI phân tích giây 22, khung
+                        # nhận diện thuộc về cảnh hoàn toàn khác.
+                        "videoPos": vi_tri_video,
                     }, timeout=0.1)
                 except:
                     pass

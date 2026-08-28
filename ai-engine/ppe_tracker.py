@@ -120,7 +120,21 @@ class PPEViolationTracker:
     CONFIRM_DELAY = 3.0
     # Thấy món PPE trên người này trong bao nhiêu giây gần nhất thì vẫn tính là CÓ.
     # Dài hơn -> ít báo oan hơn nhưng phát hiện tháo đồ chậm hơn đúng bằng ngần đó.
-    EVIDENCE_WINDOW = 2.0
+    # 12 giây (trước là 2). Nguyên tắc anh đặt: THẤY RỒI THÌ GIỮ XANH, chỉ khi
+    # cả một khoảng dài không thấy nữa (họ cởi ra) mới báo thiếu.
+    # Model chỉ nhận ra găng ở ~23% số khung trên video thật, nên cửa sổ 2s có
+    # nhiều đoạn trống > 2s -> lật sang đỏ oan trong khi găng vẫn đang đeo.
+    # Đánh đổi: ai tháo đồ ra thì chậm bị phát hiện đúng 12 giây.
+    # Thời gian QUAN SÁT trước khi được phép buộc tội. Người vừa vào khung hình,
+    # model chưa kịp nhìn thấy găng/giày -> KHÔNG kết luận thiếu ngay. Đo trên
+    # video thật: găng chỉ được nhận ra từ khung 47/90, nên 46 khung đầu bị báo
+    # thiếu oan dù người ta đang đeo. Chưa đủ thời gian quan sát thì không vẽ gì.
+    THOI_GIAN_QUAN_SAT = 3.0
+    # 2.5s (trước 12s). Anh cần ĐEO VÀO / THÁO RA lúc nào cũng bắt kịp — nhớ 12
+    # giây thì tháo găng ra vẫn xanh suốt 12 giây. Hạ được xuống vì model găng
+    # giờ nhận chắc ở cả cự ly webcam (81% khi có găng, 86% khi tay trần) nên
+    # không cần bù bằng trí nhớ dài nữa.
+    EVIDENCE_WINDOW = 2.5
     # GIỮ KHUNG găng/giày bao lâu sau lần cuối nhìn thấy. Model chỉ bắt được
     # ~65% số khung nên cứ 3 khung lại mất 1 -> khung nhấp nháy. Chẩn đoán 8/8
     # ca lỗi cho thấy model CÓ thấy nhưng conf 0.12-0.22 (dưới ngưỡng), tức chỉ
@@ -130,7 +144,22 @@ class PPEViolationTracker:
     #   1.0s -> găng 77% / giày 80% ; 1.5s -> 80/87 ; 2.0s -> 83/93 ; 3.0s -> 83/98
     # Găng bão hoà ở 2.0s. Chọn 3.0s chỉ thêm 5 điểm giày mà đổi lấy thêm 1 giây
     # mù khi người ta THÁO đồ ra. Đặt bằng EVIDENCE_WINDOW cho nhất quán.
-    HOLD_SECONDS = 2.0
+    HOLD_SECONDS = 2.5
+    # Ba model PPE ăn 93% thời gian (216+203+195 ms) còn model tư thế chỉ 45 ms.
+    # Mà tư thế mới quyết định VỊ TRÍ khung, còn PPE quyết định CÓ/THIẾU — thứ
+    # thay đổi rất chậm (không ai tháo găng trong 1/10 giây).
+    # -> chạy PPE mỗi N khung, tư thế mọi khung. Khung vẫn bám tay mượt.
+    # N=3 chọn bằng đo (40 khung, video của anh):
+    #   N=1  2.0 fps  găng 97%      N=3  3.7 fps  găng 95%
+    #   N=2  2.7 fps  găng 97%      N=4  4.0 fps  găng 92%
+    # N=3: nhanh gần gấp đôi, mất 2 điểm. Cần chính xác tuyệt đối thì để N=2
+    # (nhanh hơn 35% mà không mất gì).
+    PPE_MOI_N_KHUNG = 3
+    # Độ tin cậy TỐI THIỂU để coi là NGƯỜI thật. Ngưỡng thô để 0.15 cho bắt được
+    # găng/giày mờ, nhưng người thì không được dễ dãi vậy: đo trên webcam phòng
+    # TRỐNG, model vẫn "thấy người" ở 22/45 khung với conf thấp tới 0.20 (bóng đổ,
+    # đồ vật) rồi từ người giả đó vẽ ra THIẾU MŨ / THIẾU ÁO.
+    NGUONG_NGUOI = 0.45
 
     def __init__(self,
                  model_path: str = 'ppe_v8s_custom.pt',
@@ -138,8 +167,7 @@ class PPEViolationTracker:
                  min_height_ratio: float = 0.10,
                  required_ppe = ('helmet', 'vest'),
                  imgsz: int = 480,
-                 parts_model_path: str = None,
-                 parts_classes = ('gloves', 'boots')):
+                 parts_models: dict = None):
         """Initialize tracking system with newly trained model.
 
         min_height_ratio: chỉ xét đối tượng CHÍNH ở gần (box cao >= tỉ lệ này so
@@ -190,20 +218,20 @@ class PPEViolationTracker:
             print(f"⚠️  Không nạp được yolov8n-pose.pt ({e}) — bỏ khung chỉ chỗ "
                   f"tay/chân, phần còn lại vẫn chạy bình thường.")
             self.pose_model = None
-        self.parts_classes = {c.lower() for c in parts_classes} if parts_model_path else set()
-        # File .pt bị .gitignore chặn nên KHÔNG đi kèm repo. Máy mới clone về mà
-        # thiếu ppe_boots.pt thì quay về dùng model chính cho giày (bỏ lọt cao hơn
-        # nhưng vẫn chạy), thay vì để cả luồng camera chết vì một file phụ.
-        self.parts_model = None
-        if parts_model_path:
+        # MODEL PHỤ theo TỪNG LỚP: {'gloves': 'ppe_gang.pt', 'boots': 'ppe_boots.pt'}.
+        # Mỗi lớp yếu được một model chuyên lo, các lớp còn lại (người/mũ/áo) vẫn do
+        # model chính sinh ra -> không thể bị ảnh hưởng.
+        # File .pt bị .gitignore chặn nên KHÔNG đi kèm repo. Thiếu file nào thì lớp
+        # đó quay về model chính (kém hơn nhưng vẫn chạy), không làm chết cả hệ thống.
+        self.parts_models = {}
+        for lop, duong_dan in (parts_models or {}).items():
             try:
-                self.parts_model = YOLO(parts_model_path).to(device)
+                self.parts_models[lop.lower()] = YOLO(duong_dan).to(device)
+                print(f"  + model phụ cho '{lop}': {duong_dan}")
             except Exception as e:
-                print(f"⚠️  Không nạp được model phụ {parts_model_path} ({e}) — "
-                      f"dùng model chính cho {sorted(self.parts_classes)}.")
-                self.parts_classes = set()
-        if self.parts_model is not None:
-            print(f"  + model phụ cho {sorted(self.parts_classes)}: {parts_model_path}")
+                print(f"⚠️  Không nạp được model phụ {duong_dan} cho '{lop}' ({e}) "
+                      f"— dùng model chính cho lớp này.")
+        self.parts_classes = set(self.parts_models)
 
         # trackId -> thời điểm ĐẦU TIÊN thấy người này vi phạm liên tục (để tính CONFIRM_DELAY).
         # ponytail: dict không tự dọn track đã rời khung hình lâu -> phình dần theo phiên chạy dài;
@@ -214,6 +242,17 @@ class PPEViolationTracker:
         self._ppe_last_seen = {}
         # trackId -> {tên món: (hộp theo TỈ LỆ trong khung người, thời điểm, conf)}
         self._part_memory = {}
+        # trackId -> lần ĐẦU TIÊN thấy người này (để tính thời gian quan sát)
+        self._lan_dau_thay = {}
+        self._dem_khung = 0          # đếm khung để biết khi nào chạy lại model PPE
+        self._items_cu = []          # kết quả PPE của lần chạy gần nhất
+
+    @staticmethod
+    def _noi_rong(box, ti_le):
+        """Nới khung ra mỗi chiều `ti_le` lần kích thước, để ôm cả tay/chân thò ra."""
+        w, h = box[2] - box[0], box[3] - box[1]
+        return [box[0] - w * ti_le, box[1] - h * ti_le,
+                box[2] + w * ti_le, box[3] + h * ti_le]
 
     @staticmethod
     def _to_rel(box, p):
@@ -257,6 +296,7 @@ class PPEViolationTracker:
         # ~75%). Giá phải trả: 14.5 -> 7.2 fps. Đổi tốc độ lấy chân, bỏ chữ này là về cũ.
         # iou=0.5 (mặc định 0.7): TTA đẻ box trùng (4 box cho 2 bàn chân) -> siết NMS
         # bớt 19% box thừa mà KHÔNG mất frame nào.
+        self._dem_khung += 1
         results = self.model.track(frame, persist=True, conf=self.confidence,
                                    imgsz=self.imgsz, tracker=TRACKER_CFG,
                                    augment=True, iou=0.5, verbose=False)[0]
@@ -291,6 +331,8 @@ class PPEViolationTracker:
                 continue
 
             if low == 'person':
+                if conf < self.NGUONG_NGUOI:
+                    continue          # không đủ tin là người -> bỏ, khỏi vẽ gì
                 persons.append({'box': box, 'id': track_id, 'conf': conf})
             else:
                 items.append({'name': low, 'box': box, 'conf': conf})
@@ -300,22 +342,33 @@ class PPEViolationTracker:
 
         # Thay khung GĂNG/GIÀY bằng kết quả model phụ (nếu có). Chỉ đụng đúng
         # những lớp trong parts_classes — người/mũ/áo giữ nguyên của model chính.
-        if self.parts_model is not None:
+        if self.parts_models:
             def _base(n):
                 return n[3:] if n.startswith('no_') else n
             items = [it for it in items if _base(it['name']) not in self.parts_classes]
-            pr = self.parts_model.predict(frame, conf=self.confidence, imgsz=self.imgsz,
-                                          augment=True, iou=0.5, verbose=False)[0]
-            for box, cid, cf in zip(pr.boxes.xyxy.cpu().tolist(),
-                                    pr.boxes.cls.int().cpu().tolist(),
-                                    pr.boxes.conf.cpu().tolist()):
-                nm = self.parts_model.names[cid].lower()
-                base = nm[3:] if nm.startswith('no_') else nm
-                if base not in self.parts_classes:
-                    continue
-                if (box[3] - box[1]) / frame.shape[0] < self.min_height_ratio:
-                    continue
-                items.append({'name': nm, 'box': box, 'conf': cf})
+            # Giữa hai chu kỳ: dùng lại kết quả PPE gần nhất thay vì chạy lại 2 model
+            # nặng (~400ms). Vị trí khung vẫn tươi vì lấy từ model tư thế bên dưới.
+            if self._dem_khung % self.PPE_MOI_N_KHUNG != 0 and self._items_cu:
+                items = items + list(self._items_cu)
+                self.parts_models_bo_qua = True
+            else:
+                self.parts_models_bo_qua = False
+                _moi = []
+                for lop, mp in self.parts_models.items():
+                    pr = mp.predict(frame, conf=self.confidence, imgsz=self.imgsz,
+                                    augment=True, iou=0.5, verbose=False)[0]
+                    for box, cid, cf in zip(pr.boxes.xyxy.cpu().tolist(),
+                                            pr.boxes.cls.int().cpu().tolist(),
+                                            pr.boxes.conf.cpu().tolist()):
+                        nm = mp.names[cid].lower()
+                        # mỗi model phụ CHỈ đóng góp đúng lớp nó phụ trách
+                        if _base(nm) != lop:
+                            continue
+                        if (box[3] - box[1]) / frame.shape[0] < self.min_height_ratio:
+                            continue
+                        _moi.append({'name': nm, 'box': box, 'conf': cf})
+                items = items + _moi
+                self._items_cu = _moi
 
         # --- GIỮ KHUNG găng/giày qua các khung hình model trượt ---
         # Với mỗi người đang được bám vết: món nào THẤY ở khung này thì ghi nhớ vị
@@ -364,53 +417,10 @@ class PPEViolationTracker:
             _giu_lai = list(_tot.values())
             items = [it for it in items if not it['name'].startswith('no_')] + _giu_lai
 
-        # --- Tầng 1: khung từng bộ phận ---
-        for it in items:
-            # MŨ xử lý riêng ở Tầng 2 (chỉ tính khi ĐỘI trên đầu). Mũ treo/cầm/để chỗ
-            # khác -> KHÔNG vẽ khung ở đây, tránh nhiễu (đúng ý: không đội thì bắt làm gì).
-            if it['name'] in ('helmet', 'no_helmet'):
-                continue
-            is_viol = it['name'].startswith('no_')
-            base = it['name'][3:] if is_viol else it['name']  # no_helmet -> helmet
-
-            # KHÔNG vẽ khung đỏ buộc tội cho món KHÔNG nằm trong required_ppe.
-            # Đo trên luồng camera thật: no_gloves ra 179 khung / no_helmet-style
-            # nhiều hơn cả gloves (165), conf ngang nhau (p50 0.46 vs 0.52) -> model
-            # lật qua lật lại trên cùng đôi tay, khung xanh/đỏ nhấp nháy. Mà lớp
-            # no_gloves có mAP 0.003, no_goggle 0.041 — buộc tội bằng thứ đó là vô
-            # căn cứ. Món không phạt thì chỉ hiện khung dương (xanh) cho anh xem.
-            # KHÔNG vẽ khung đỏ từ lớp phủ định — nhưng VẪN để chúng tham gia quyết
-            # định ở Tầng 2. Hai việc khác nhau: đo thử bỏ chúng khỏi quyết định thì
-            # bỏ lọt vọt lên (găng 0.4%->3.5%, giày 1.6%->2.7%, vượt ngưỡng 2%), tức
-            # dù mAP thấp (0.003-0.04) chúng vẫn góp phần bắt vi phạm thật.
-            # Còn trên MÀN HÌNH thì chúng chỉ là nhiễu: 93 khung "THIẾU GĂNG" so với
-            # 196 khung "GĂNG" trên cùng đoạn video. Nhãn của TỪNG NGƯỜI ở Tầng 2 đã
-            # nói rõ ai thiếu gì rồi, không cần khung đỏ rời rạc chồng lên.
-            # Vẽ khung đỏ cho món BẮT BUỘC bị thiếu (THIẾU GĂNG / THIẾU GIÀY...),
-            # để anh nhìn thấy ngay chỗ nào trên người đang thiếu đồ — không chỉ có
-            # một khung to bao cả người. Món KHÔNG bắt buộc thì bỏ qua, tránh khung
-            # đỏ vô nghĩa (vd THIẾU KÍNH khi hệ thống không hề phạt kính).
-            # Không vẽ khung từ lớp no_* nữa — găng/giày đã có khung theo vùng cơ
-            # thể ở Tầng 2 (đúng chỗ, luôn có). Giữ lại chỉ gây khung lệch chồng lên.
-            if is_viol:
-                continue
-
-            # GĂNG/GIÀY: box nhỏ dễ nhiễu -> chỉ vẽ khi đủ tin cậy (PART_MIN_CONF).
-            # KHÔNG ép tâm khung phải nằm trong khung người: tay giơ lên/ra ngoài
-            # thân (test cận cam, thao tác...) làm khung tay thò ra ngoài khung
-            # người -> ép điều kiện này sẽ lọc mất tay/chân thật (đã gặp lỗi này).
-            if it['conf'] < self.PART_MIN_CONF.get(base, self.OTHER_MIN_CONF):
-                continue
-            vn = self.PPE_VN.get(base, base.upper())
-            label = f"THIẾU {vn}" if is_viol else vn
-            final_detections.append({
-                "id": f"item-{it['name']}-{int(it['box'][0])}-{int(it['box'][1])}",
-                "type": "ppe",
-                "label": label,
-                "confidence": float(it['conf']),
-                "isViolation": is_viol,
-                "bbox": self._bbox_pct(it['box'], frame),
-            })
+        # KHÔNG vẽ khung thô của model nữa. Trước đây mỗi vật model thấy là một
+        # khung, cộng thêm khung suy ra ở Tầng 2 -> màn hình chi chít khung chồng
+        # nhau, cùng một bàn chân vừa xanh vừa đỏ. Giờ MỖI NGƯỜI, MỖI MÓN đúng
+        # MỘT khung: xanh = có, đỏ = thiếu. Không còn trạng thái thứ ba.
 
         # --- Tầng 2: khung từng người + xét đủ/thiếu PPE ---
         for p in persons:
@@ -421,324 +431,38 @@ class PPEViolationTracker:
             # dưới đất -> KHÔNG tính là đội -> người này bị coi là THIẾU MŨ (vi phạm).
             # Nới rộng 2 bên + cao hơn đỉnh đầu 1 chút để ôm trọn mũ (mũ hay cao/lệch
             # hơn khung người -> nếu bó hẹp sẽ trượt mất mũ thật -> báo thiếu mũ oan).
-            head_region = [px1 + pw * 0.05, py1 - ph * 0.08,
-                           px2 - pw * 0.05, py1 + ph * 0.35]
-
-            present, explicit_missing = set(), set()
-            helmet_on_head = False
-            head_helmet_box = None
-            for it in items:
-                name = it['name']
-                is_no = name.startswith('no_')
-                base = name[3:] if is_no else name
-
-                if base == 'helmet':
-                    # Mũ BẢO HỘ: chỉ xét khi ở TRÊN ĐẦU (tâm trong vùng đầu) VÀ đủ
-                    # tin cậy (loại mũ thường / vật giống mũ). Ngoài vùng đầu -> bỏ qua.
-                    if (self._center_inside(it['box'], head_region)
-                            and it['conf'] >= self.HELMET_MIN_CONF):
-                        if is_no:
-                            explicit_missing.add('helmet')
-                        else:
-                            helmet_on_head = True
-                            head_helmet_box = it['box']
-                            present.add('helmet')
-                    continue
-
-                # GĂNG/GIÀY: bỏ qua khung tin cậy thấp (nhiễu), tránh chốt sai còn/thiếu.
-                if it['conf'] < self.PART_MIN_CONF.get(base, self.OTHER_MIN_CONF):
-                    continue
-
-                # PPE khác (áo/găng/giày...): xét theo toàn thân (tâm trong khung người)
-                if self._center_inside(it['box'], p['box']):
-                    if is_no:
-                        explicit_missing.add(base)
-                    else:
-                        present.add(base)
-
-            # BẰNG CHỨNG THEO THỜI GIAN — chống báo oan.
-            # Trước: mất DẤU món đồ đúng 1 khung là kết luận thiếu ngay. Đo trên 283
-            # ảnh có nhãn: 11.3% người ĐANG đeo găng bị bảo thiếu, giày 9.1%.
-            # Giờ: đã nhìn thấy món đồ trên người này trong EVIDENCE_WINDOW giây gần
-            # nhất thì vẫn tính là CÓ. Người đeo găng chỉ bị kết luận thiếu khi suốt
-            # cả cửa sổ đó không khung nào thấy găng.
-            # Đánh đổi: ai tháo đồ ra thì chậm bị phát hiện đúng bằng EVIDENCE_WINDOW.
-            tid = p['id']
-            now = time.time()
-            if tid is not None:
-                seen = self._ppe_last_seen.setdefault(tid, {})
-                for base in present:
-                    seen[base] = now
-                present = present | {k for k, ts in seen.items()
-                                     if now - ts <= self.EVIDENCE_WINDOW}
-
-            missing = [req for req in self.required_ppe
-                       if req in explicit_missing or req not in present]
-            is_violation = len(missing) > 0
-
-            # Chốt vi phạm để GHI DB: cần conf cao hơn (CONFIRM_CONF) VÀ trạng thái
-            # thiếu PPE tồn tại liên tục >= CONFIRM_DELAY giây. isViolation (dưới) vẫn
-            # bật ngay để khung UI phản hồi tức thời — chỉ "confirmed" mới bị delay.
-            confirmed = False
-            if is_violation and p['conf'] >= self.CONFIRM_CONF:
-                since = self._violation_since.setdefault(tid, time.time())
-                confirmed = (time.time() - since) >= self.CONFIRM_DELAY
-            else:
-                self._violation_since.pop(tid, None)
-
-            if is_violation:
-                label = "THIẾU " + ", ".join(self.PPE_VN.get(m, m.upper()) for m in missing)
-            else:
-                label = "ĐỦ ĐỒ BẢO HỘ"
-
-            print(f"[PERSON] present={sorted(present)} missing={missing} "
-                  f"helmet_on_head={helmet_on_head} -> "
-                  f"{'VI PHẠM' if is_violation else 'AN TOÀN'}")
-
-            final_detections.append({
-                "id": f"worker-{p['id'] if p['id'] is not None else int(p['box'][0])}",
-                "trackId": p['id'],
-                "type": "person",
-                "label": label,
-                "confidence": float(p['conf']),
-                "isViolation": is_violation,
-                "confirmed": confirmed,  # đủ conf cao + đủ 3s liên tục -> mới nên ghi DB
-                "missingPpe": missing,  # raw ('helmet'/'vest') để ghi DB, khỏi parse label tiếng Việt
-                "bbox": self._bbox_pct(p['box'], frame),
-            })
-
-            # Khung ĐẦU (LUÔN hiện, bám theo người/mũ khi di chuyển):
-            #  - Đội mũ bảo hộ đúng đầu  -> XANH, dùng CHÍNH khung mũ (bám sát cử động).
-            #  - Không có mũ trên đầu    -> ĐỎ "THIẾU MŨ" + vi phạm (dù mũ có treo đâu đó).
-            if helmet_on_head:
-                final_detections.append({
-                    "id": f"head-{p['id'] if p['id'] is not None else int(px1)}",
-                    "type": "ppe",
-                    "label": "MŨ BẢO HỘ",
-                    "confidence": float(p['conf']),
-                    "isViolation": False,
-                    "bbox": self._bbox_pct(head_helmet_box, frame),
-                })
-            else:
-                final_detections.append({
-                    "id": f"head-{p['id'] if p['id'] is not None else int(px1)}",
-                    "type": "ppe",
-                    "label": "THIẾU MŨ",
-                    "confidence": float(p['conf']),
-                    "isViolation": True,
-                    "bbox": self._bbox_pct(head_region, frame),
-                })
-
-            # THIẾU GĂNG / THIẾU GIÀY: vẽ khung theo VÙNG CƠ THỂ suy từ khung người,
-            # giống hệt cách đang làm cho mũ (head_region) ở ngay trên.
-            # Lý do: kết luận "thiếu" là THẬT (suy từ việc không thấy găng/giày trên
-            # người này — đường tin cậy). Chỉ VỊ TRÍ khung là suy ra. Dựa vào lớp
-            # no_gloves/no_boots để đặt khung thì hỏng: mAP 0.003/0.005, hộp lệch
-            # lung tung (đã thấy 2 khung "THIẾU GĂNG" 55% và 40% chồng nhau lệch
-            # khỏi bàn tay), và no_boots gần như không bao giờ ra nên chân KHÔNG
-            # BAO GIỜ có khung. Suy từ hình người thì luôn đúng chỗ và luôn có.
-            # Khung THIẾU GĂNG/GIÀY đặt theo ĐIỂM KHỚP THẬT (cổ tay, cổ chân).
-            # Bộ phận nào không nhìn thấy (điểm khớp conf thấp, vd anh ngồi sát cam
-            # nên tay/chân ngoài khung) thì KHÔNG VẼ — thà không có khung còn hơn
-            # vẽ một ô vào chỗ trống rồi bảo "thiếu găng" ở đó.
+            # Ghép người này với bộ điểm khớp tương ứng (làm TRƯỚC khi xét mũ).
             _kp = None
             _best = 0.4
-            for _pb, _k, _kc in zip(_pose_boxes, _pose_kp,
-                                    _pose_kc or [[1.0] * 17] * len(_pose_kp)):
+            for _pb, _k_, _kc_ in zip(_pose_boxes, _pose_kp,
+                                      _pose_kc or [[1.0] * 17] * len(_pose_kp)):
                 _x1, _y1 = max(_pb[0], px1), max(_pb[1], py1)
                 _x2, _y2 = min(_pb[2], px2), min(_pb[3], py2)
                 if _x2 <= _x1 or _y2 <= _y1:
                     continue
                 _inter = (_x2 - _x1) * (_y2 - _y1)
-                _u = (_pb[2]-_pb[0])*(_pb[3]-_pb[1]) + pw*ph - _inter
+                _u = (_pb[2] - _pb[0]) * (_pb[3] - _pb[1]) + pw * ph - _inter
                 if _u > 0 and _inter / _u > _best:
-                    _best, _kp = _inter / _u, (_k, _kc)
+                    _best, _kp = _inter / _u, (_k_, _kc_)
+            _k, _kc = _kp if _kp else (None, None)
 
-            if _kp is not None:
-                _k, _kc = _kp
-                _r = max(ph * 0.06, 12)          # nửa cạnh khung, theo cỡ người
-                _can = {'gloves': ('THIẾU GĂNG', (9, 10)),
-                        'boots': ('THIẾU GIÀY', (15, 16))}
-                for _mon, (_nhan, _idx) in _can.items():
-                    if _mon not in missing:
-                        continue
-                    for _i in _idx:
-                        if _i >= len(_k) or (_i < len(_kc) and _kc[_i] < 0.5):
-                            continue                      # khớp không thấy -> bỏ
-                        _cx, _cy = _k[_i]
-                        if not (0 <= _cx <= frame.shape[1] and 0 <= _cy <= frame.shape[0]):
-                            continue                      # ngoài khung hình -> bỏ
-                        final_detections.append({
-                            "id": f"kp-{_nhan}-{p['id'] if p['id'] is not None else int(px1)}-{_i}",
-                            "type": "ppe",
-                            "label": _nhan,
-                            "confidence": float(_kc[_i]) if _i < len(_kc) else float(p['conf']),
-                            "isViolation": True,
-                            "bbox": self._bbox_pct([_cx - _r, _cy - _r, _cx + _r, _cy + _r], frame),
-                        })
-
-        return final_detections
-
-        boxes = results.boxes.xyxy.cpu().tolist()
-        ids = results.boxes.id.int().cpu().tolist() if results.boxes.id is not None else [None] * len(boxes)
-        classes = results.boxes.cls.int().cpu().tolist()
-        confs = results.boxes.conf.cpu().tolist()
-
-        # Điểm khớp cho cả khung hình, khớp với người sau bằng IoU
-        _pose_boxes, _pose_kp, _pose_kc = [], [], []
-        if self.pose_model is not None:
-            _pose = self.pose_model.predict(frame, conf=0.3, verbose=False)[0]
-            _pose_boxes = _pose.boxes.xyxy.cpu().tolist() if _pose.boxes is not None else []
-            _pose_kp = _pose.keypoints.xy.cpu().tolist() if _pose.keypoints is not None else []
-            _pose_kc = (_pose.keypoints.conf.cpu().tolist()
-                        if (_pose.keypoints is not None and _pose.keypoints.conf is not None) else [])
-
-        persons = []   # {'box','id','conf'}
-        items = []     # {'name','box','conf'}  (mọi PPE trừ person)
-
-        for box, track_id, cls_id, conf in zip(boxes, ids, classes, confs):
-            if cls_id >= len(self.class_names):
-                continue
-            cls_name = self.class_names[cls_id]
-            low = cls_name.lower()
-            if low in ('none', 'null'):
-                continue
-            if (box[3] - box[1]) / frame.shape[0] < self.min_height_ratio:
-                continue
-
-            if low == 'person':
-                persons.append({'box': box, 'id': track_id, 'conf': conf})
-            else:
-                items.append({'name': low, 'box': box, 'conf': conf})
-
-            status = "VIOLATION" if low.startswith('no_') else "SAFE"
-            print(f"[DETECT] {cls_name:10} | Conf: {conf:.2f} | Status: {status}")
-
-        # Thay khung GĂNG/GIÀY bằng kết quả model phụ (nếu có). Chỉ đụng đúng
-        # những lớp trong parts_classes — người/mũ/áo giữ nguyên của model chính.
-        if self.parts_model is not None:
-            def _base(n):
-                return n[3:] if n.startswith('no_') else n
-            items = [it for it in items if _base(it['name']) not in self.parts_classes]
-            pr = self.parts_model.predict(frame, conf=self.confidence, imgsz=self.imgsz,
-                                          augment=True, iou=0.5, verbose=False)[0]
-            for box, cid, cf in zip(pr.boxes.xyxy.cpu().tolist(),
-                                    pr.boxes.cls.int().cpu().tolist(),
-                                    pr.boxes.conf.cpu().tolist()):
-                nm = self.parts_model.names[cid].lower()
-                base = nm[3:] if nm.startswith('no_') else nm
-                if base not in self.parts_classes:
-                    continue
-                if (box[3] - box[1]) / frame.shape[0] < self.min_height_ratio:
-                    continue
-                items.append({'name': nm, 'box': box, 'conf': cf})
-
-        # --- GIỮ KHUNG găng/giày qua các khung hình model trượt ---
-        # Với mỗi người đang được bám vết: món nào THẤY ở khung này thì ghi nhớ vị
-        # trí (theo tỉ lệ trong khung người); món nào KHÔNG thấy mà mới thấy trong
-        # HOLD_SECONDS giây thì dựng lại hộp đó theo khung người HIỆN TẠI -> khung
-        # bám theo người thay vì nhấp nháy hoặc đứng ì tại chỗ cũ.
-        _now = time.time()
-        _giu = {'gloves', 'boots'}
-        for _p in persons:
-            _tid = _p['id']
-            if _tid is None:
-                continue
-            _mem = self._part_memory.setdefault(_tid, {})
-            _thay = set()
-            for _it in items:
-                _b = _it['name'][3:] if _it['name'].startswith('no_') else _it['name']
-                if _b in _giu and self._center_inside(_it['box'], _p['box']):
-                    _mem[_it['name']] = (self._to_rel(_it['box'], _p['box']), _now, _it['conf'])
-                    _thay.add(_it['name'])
-            for _nm, (_rel, _ts, _cf) in list(_mem.items()):
-                if _nm in _thay:
-                    continue
-                if _now - _ts > self.HOLD_SECONDS:
-                    del _mem[_nm]
-                    continue
-                items.append({'name': _nm, 'box': self._to_abs(_rel, _p['box']),
-                              'conf': _cf, 'giu': True})
-
-        # --- GỌN KHUNG THIẾU: mỗi người, mỗi món chỉ MỘT khung ---
-        # Lớp no_* tin cậy thấp nên hay đẻ nhiều hộp chồng nhau trên cùng bàn tay
-        # (đã thấy trên màn hình: "THIẾU GĂNG 55%" và "THIẾU GĂNG 40%" cùng lúc,
-        # kèm mấy hộp mảnh xếp lớp). Giữ hộp tin cậy nhất cho mỗi (người, món),
-        # và bỏ hộp không dính vào người nào — nhãn của từng người ở Tầng 2 đã
-        # liệt kê đủ rồi, khung nhỏ chỉ để CHỈ CHỖ, một cái là đủ.
-        _viol = [it for it in items if it['name'].startswith('no_')]
-        if _viol:
-            _tot = {}
-            for _it in _viol:
-                _b = _it['name'][3:]
-                for _i, _p in enumerate(persons):
-                    if self._center_inside(_it['box'], _p['box']):
-                        _k = (_i, _b)
-                        if _k not in _tot or _it['conf'] > _tot[_k]['conf']:
-                            _tot[_k] = _it
-                        break
-            _giu_lai = list(_tot.values())
-            items = [it for it in items if not it['name'].startswith('no_')] + _giu_lai
-
-        # --- Tầng 1: khung từng bộ phận ---
-        for it in items:
-            # MŨ xử lý riêng ở Tầng 2 (chỉ tính khi ĐỘI trên đầu). Mũ treo/cầm/để chỗ
-            # khác -> KHÔNG vẽ khung ở đây, tránh nhiễu (đúng ý: không đội thì bắt làm gì).
-            if it['name'] in ('helmet', 'no_helmet'):
-                continue
-            is_viol = it['name'].startswith('no_')
-            base = it['name'][3:] if is_viol else it['name']  # no_helmet -> helmet
-
-            # KHÔNG vẽ khung đỏ buộc tội cho món KHÔNG nằm trong required_ppe.
-            # Đo trên luồng camera thật: no_gloves ra 179 khung / no_helmet-style
-            # nhiều hơn cả gloves (165), conf ngang nhau (p50 0.46 vs 0.52) -> model
-            # lật qua lật lại trên cùng đôi tay, khung xanh/đỏ nhấp nháy. Mà lớp
-            # no_gloves có mAP 0.003, no_goggle 0.041 — buộc tội bằng thứ đó là vô
-            # căn cứ. Món không phạt thì chỉ hiện khung dương (xanh) cho anh xem.
-            # KHÔNG vẽ khung đỏ từ lớp phủ định — nhưng VẪN để chúng tham gia quyết
-            # định ở Tầng 2. Hai việc khác nhau: đo thử bỏ chúng khỏi quyết định thì
-            # bỏ lọt vọt lên (găng 0.4%->3.5%, giày 1.6%->2.7%, vượt ngưỡng 2%), tức
-            # dù mAP thấp (0.003-0.04) chúng vẫn góp phần bắt vi phạm thật.
-            # Còn trên MÀN HÌNH thì chúng chỉ là nhiễu: 93 khung "THIẾU GĂNG" so với
-            # 196 khung "GĂNG" trên cùng đoạn video. Nhãn của TỪNG NGƯỜI ở Tầng 2 đã
-            # nói rõ ai thiếu gì rồi, không cần khung đỏ rời rạc chồng lên.
-            # Vẽ khung đỏ cho món BẮT BUỘC bị thiếu (THIẾU GĂNG / THIẾU GIÀY...),
-            # để anh nhìn thấy ngay chỗ nào trên người đang thiếu đồ — không chỉ có
-            # một khung to bao cả người. Món KHÔNG bắt buộc thì bỏ qua, tránh khung
-            # đỏ vô nghĩa (vd THIẾU KÍNH khi hệ thống không hề phạt kính).
-            # Không vẽ khung từ lớp no_* nữa — găng/giày đã có khung theo vùng cơ
-            # thể ở Tầng 2 (đúng chỗ, luôn có). Giữ lại chỉ gây khung lệch chồng lên.
-            if is_viol:
-                continue
-
-            # GĂNG/GIÀY: box nhỏ dễ nhiễu -> chỉ vẽ khi đủ tin cậy (PART_MIN_CONF).
-            # KHÔNG ép tâm khung phải nằm trong khung người: tay giơ lên/ra ngoài
-            # thân (test cận cam, thao tác...) làm khung tay thò ra ngoài khung
-            # người -> ép điều kiện này sẽ lọc mất tay/chân thật (đã gặp lỗi này).
-            if it['conf'] < self.PART_MIN_CONF.get(base, self.OTHER_MIN_CONF):
-                continue
-            vn = self.PPE_VN.get(base, base.upper())
-            label = f"THIẾU {vn}" if is_viol else vn
-            final_detections.append({
-                "id": f"item-{it['name']}-{int(it['box'][0])}-{int(it['box'][1])}",
-                "type": "ppe",
-                "label": label,
-                "confidence": float(it['conf']),
-                "isViolation": is_viol,
-                "bbox": self._bbox_pct(it['box'], frame),
-            })
-
-        # --- Tầng 2: khung từng người + xét đủ/thiếu PPE ---
-        for p in persons:
-            px1, py1, px2, py2 = p['box']
-            pw, ph = px2 - px1, py2 - py1
-            # Vùng ĐẦU = phần trên của khung người (tự dịch theo người khi di chuyển).
-            # MŨ chỉ HỢP LỆ khi TÂM mũ nằm trong vùng đầu này. Mũ cầm tay / treo / để
-            # dưới đất -> KHÔNG tính là đội -> người này bị coi là THIẾU MŨ (vi phạm).
-            # Nới rộng 2 bên + cao hơn đỉnh đầu 1 chút để ôm trọn mũ (mũ hay cao/lệch
-            # hơn khung người -> nếu bó hẹp sẽ trượt mất mũ thật -> báo thiếu mũ oan).
-            head_region = [px1 + pw * 0.05, py1 - ph * 0.08,
-                           px2 - pw * 0.05, py1 + ph * 0.35]
+            # VÙNG ĐẦU lấy từ ĐIỂM KHỚP (mũi/mắt/tai), không suy từ khung người.
+            # Cách cũ lấy "35% phía trên khung người" -> người CÚI XUỐNG (đào đất,
+            # khiêng vật) có đầu tụt xuống giữa khung, mũ thật rơi ra ngoài vùng đó
+            # -> model thấy mũ nhưng logic bảo "không đội" -> báo THIẾU MŨ oan.
+            _dau_kp = None
+            if _k is not None:
+                _pts = [_k[i] for i in (0, 1, 2, 3, 4)
+                        if i < len(_k) and not (_kc is not None and i < len(_kc)
+                                                and _kc[i] < 0.5)]
+                if _pts:
+                    _xs = [q[0] for q in _pts]; _ys = [q[1] for q in _pts]
+                    _w = max(max(_xs) - min(_xs), pw * 0.12)
+                    _h = max(max(_ys) - min(_ys), ph * 0.06)
+                    _dau_kp = [min(_xs) - _w * 0.6, min(_ys) - _h * 1.2,
+                               max(_xs) + _w * 0.6, max(_ys) + _h * 0.6]
+            head_region = _dau_kp or [px1 + pw * 0.05, py1 - ph * 0.08,
+                                      px2 - pw * 0.05, py1 + ph * 0.35]
 
             present, explicit_missing = set(), set()
             helmet_on_head = False
@@ -766,7 +490,12 @@ class PPEViolationTracker:
                     continue
 
                 # PPE khác (áo/găng/giày...): xét theo toàn thân (tâm trong khung người)
-                if self._center_inside(it['box'], p['box']):
+                # Nới rộng khung người khi gán bộ phận: bàn tay giơ ra, bàn chân
+                # bước tới thường NẰM NGOÀI khung người model vẽ. Dùng khung chặt
+                # thì món đồ bị coi là "của người khác" -> người này bị tính THIẾU,
+                # trong khi Tầng 1 vẫn vẽ khung xanh cho chính món đó -> màn hình
+                # vừa xanh vừa đỏ trên cùng bàn chân. Đó là mâu thuẫn anh nhìn thấy.
+                if self._center_inside(it['box'], self._noi_rong(p['box'], 0.12)):
                     if is_no:
                         explicit_missing.add(base)
                     else:
@@ -788,8 +517,28 @@ class PPEViolationTracker:
                 present = present | {k for k, ts in seen.items()
                                      if now - ts <= self.EVIDENCE_WINDOW}
 
+            # ĐÃ NHÌN THẤY MÓN ĐỒ THÌ THẮNG. Model có thể vừa nhận ra `boots` vừa
+            # nhận ra `no_boots` trên CÙNG bàn chân (model chuyên giày càng hay gặp
+            # vì nó nhận `no_boots` tốt hơn hẳn). Trước đây explicit_missing thắng
+            # -> màn hình vẽ khung xanh GIÀY rồi lại đè khung đỏ THIẾU GIÀY lên
+            # đúng bàn chân đó. Nhìn thấy đồ bảo hộ là bằng chứng chắc hơn hẳn
+            # "nhìn thấy chỗ trống", nên cho present thắng.
+            # Chưa quan sát đủ lâu -> CHƯA kết luận thiếu món nào (trừ món đã thấy rõ
+            # là thiếu qua lớp phủ định). Tránh buộc tội người vừa mới vào khung.
+            _lan_dau = self._lan_dau_thay.setdefault(tid, time.time()) if tid is not None else 0
+            _du_quan_sat = tid is None or (time.time() - _lan_dau) >= self.THOI_GIAN_QUAN_SAT
+
             missing = [req for req in self.required_ppe
-                       if req in explicit_missing or req not in present]
+                       if req not in present and req in (explicit_missing | set(self.required_ppe))]
+            chua_ket_luan = set()
+            if not _du_quan_sat:
+                # CHỈ hoãn kết luận với găng/giày — hai món model hay bỏ sót lúc đầu.
+                # Mũ/áo model nhận ra ngay và đang đúng 100%, hoãn chúng lại làm
+                # THIẾU MŨ tụt từ 100% xuống 60% (đo trên chính video của anh).
+                hoan = [m for m in missing
+                        if m not in explicit_missing and m in ('gloves', 'boots')]
+                chua_ket_luan = set(hoan)
+                missing = [m for m in missing if m not in chua_ket_luan]
             is_violation = len(missing) > 0
 
             # Chốt vi phạm để GHI DB: cần conf cao hơn (CONFIRM_CONF) VÀ trạng thái
@@ -802,10 +551,9 @@ class PPEViolationTracker:
             else:
                 self._violation_since.pop(tid, None)
 
-            if is_violation:
-                label = "THIẾU " + ", ".join(self.PPE_VN.get(m, m.upper()) for m in missing)
-            else:
-                label = "ĐỦ ĐỒ BẢO HỘ"
+            # Khung tổng KHÔNG có chữ — anh yêu cầu. Thiếu món nào đã thấy ngay ở
+            # khung đỏ của đúng món đó trên người, không cần liệt kê lại.
+            label = ""
 
             print(f"[PERSON] present={sorted(present)} missing={missing} "
                   f"helmet_on_head={helmet_on_head} -> "
@@ -823,54 +571,110 @@ class PPEViolationTracker:
                 "bbox": self._bbox_pct(p['box'], frame),
             })
 
-            # Khung ĐẦU (LUÔN hiện, bám theo người/mũ khi di chuyển):
-            #  - Đội mũ bảo hộ đúng đầu  -> XANH, dùng CHÍNH khung mũ (bám sát cử động).
-            #  - Không có mũ trên đầu    -> ĐỎ "THIẾU MŨ" + vi phạm (dù mũ có treo đâu đó).
-            if helmet_on_head:
-                final_detections.append({
-                    "id": f"head-{p['id'] if p['id'] is not None else int(px1)}",
-                    "type": "ppe",
-                    "label": "MŨ BẢO HỘ",
-                    "confidence": float(p['conf']),
-                    "isViolation": False,
-                    "bbox": self._bbox_pct(head_helmet_box, frame),
-                })
-            else:
-                final_detections.append({
-                    "id": f"head-{p['id'] if p['id'] is not None else int(px1)}",
-                    "type": "ppe",
-                    "label": "THIẾU MŨ",
-                    "confidence": float(p['conf']),
-                    "isViolation": True,
-                    "bbox": self._bbox_pct(head_region, frame),
-                })
+            # --- MỖI MÓN ĐÚNG MỘT KHUNG: xanh = CÓ, đỏ = THIẾU ---
+            # Không còn khung thô của model, không còn hai trạng thái chồng nhau.
+            # Vị trí khung lấy từ ĐIỂM KHỚP thật (cổ tay/cổ chân) nếu thấy, không
+            # thấy thì suy từ khung người. Khớp nào ngoài khung hình -> bỏ, thà
+            # thiếu khung còn hơn vẽ vào chỗ trống.
+            def _kc_ok(i):
+                return _k is not None and i < len(_k) and not (
+                    _kc is not None and i < len(_kc) and _kc[i] < 0.5)
 
-            # THIẾU GĂNG / THIẾU GIÀY: vẽ khung theo VÙNG CƠ THỂ suy từ khung người,
-            # giống hệt cách đang làm cho mũ (head_region) ở ngay trên.
-            # Lý do: kết luận "thiếu" là THẬT (suy từ việc không thấy găng/giày trên
-            # người này — đường tin cậy). Chỉ VỊ TRÍ khung là suy ra. Dựa vào lớp
-            # no_gloves/no_boots để đặt khung thì hỏng: mAP 0.003/0.005, hộp lệch
-            # lung tung (đã thấy 2 khung "THIẾU GĂNG" 55% và 40% chồng nhau lệch
-            # khỏi bàn tay), và no_boots gần như không bao giờ ra nên chân KHÔNG
-            # BAO GIỜ có khung. Suy từ hình người thì luôn đúng chỗ và luôn có.
-            _vung = {}
-            if 'gloves' in missing:
-                # hai bàn tay: hai mép ngoài khung người, tầm 35-70% chiều cao
-                _vung['THIẾU GĂNG'] = [
-                    [px1, py1 + ph * 0.35, px1 + pw * 0.28, py1 + ph * 0.70],
-                    [px2 - pw * 0.28, py1 + ph * 0.35, px2, py1 + ph * 0.70],
-                ]
-            if 'boots' in missing:
-                # bàn chân: dải đáy khung người
-                _vung['THIẾU GIÀY'] = [[px1, py2 - ph * 0.16, px2, py2]]
-            for _nhan, _hop_list in _vung.items():
-                for _j, _hop in enumerate(_hop_list):
+            def _dai(i, j):
+                """Khoảng cách giữa hai khớp, dùng làm THƯỚC ĐO cho bộ phận đó."""
+                if not (_kc_ok(i) and _kc_ok(j)):
+                    return None
+                return ((_k[i][0]-_k[j][0])**2 + (_k[i][1]-_k[j][1])**2) ** 0.5
+
+            def _tu_khop(idx, khop_do=None, ti_le=0.20):
+                """Khung ôm sát bộ phận tại điểm khớp `idx`.
+
+                Cỡ khung lấy theo CHÍNH BỘ PHẬN đó (bàn tay đo theo cẳng tay, bàn
+                chân đo theo cẳng chân), KHÔNG lấy theo chiều cao cả người. Lấy theo
+                chiều cao người thì mọi khung bằng nhau và không co theo phối cảnh:
+                người cúi xuống, tay đưa ra xa -> khung vẫn nguyên cỡ, dồn thành một
+                cụm thay vì ôm sát từng bộ phận.
+                """
+                if not _kc_ok(idx):
+                    return None
+                cx, cy = _k[idx]
+                if not (0 <= cx <= frame.shape[1] and 0 <= cy <= frame.shape[0]):
+                    return None
+                d = _dai(idx, khop_do) if khop_do is not None else None
+                r = (d * ti_le) if d else ph * 0.030      # không đo được -> theo người
+                r = max(min(r, ph * 0.05), 6)             # chặn quá to / quá nhỏ
+                return [cx - r, cy - r, cx + r, cy + r]
+
+            def _gop(a, b):
+                """Gộp hai khung thành một khung ôm cả hai (bỏ qua khung None)."""
+                cac = [q for q in (a, b) if q]
+                if not cac:
+                    return None
+                return [min(q[0] for q in cac), min(q[1] for q in cac),
+                        max(q[2] for q in cac), max(q[3] for q in cac)]
+
+            def _bao_khop(idx_list, no_ngang, no_doc):
+                """Khung ôm các điểm khớp cho trước, nới thêm cho vừa vật thật.
+
+                Mũ và áo trước đây suy từ khung NGƯỜI nên ô to gấp mấy lần vật thật
+                (khung mũ rộng 40% khung hình, gấp mấy lần cái đầu). Điểm khớp
+                (mũi/mắt/tai cho đầu, vai/hông cho thân) bám sát hơn hẳn.
+                """
+                if _k is None:
+                    return None
+                pts = []
+                for i in idx_list:
+                    if i >= len(_k):
+                        continue
+                    if _kc is not None and i < len(_kc) and _kc[i] < 0.5:
+                        continue
+                    pts.append(_k[i])
+                if not pts:
+                    return None
+                xs = [q[0] for q in pts]; ys = [q[1] for q in pts]
+                w = max(max(xs) - min(xs), pw * 0.10)
+                h = max(max(ys) - min(ys), ph * 0.06)
+                return [min(xs) - w * no_ngang, min(ys) - h * no_doc,
+                        max(xs) + w * no_ngang, max(ys) + h * no_doc]
+
+            # ĐẦU: mũi + hai mắt + hai tai, nới lên trên để ôm cả phần sọ/mũ.
+            _dau = head_region
+            # THÂN: hai vai + hai hông — đúng vùng mặc áo phản quang.
+            _than = _bao_khop([5, 6, 11, 12], 0.15, 0.10) or \
+                    [px1 + pw * 0.18, py1 + ph * 0.22, px2 - pw * 0.18, py1 + ph * 0.62]
+
+            # món -> (tên hiển thị, các khung để vẽ)
+            _mon_khung = {
+                'helmet': ('MŨ', [head_helmet_box if helmet_on_head else _dau]),
+                'vest':   ('ÁO', [_than]),
+                # MỖI BÀN TAY / BÀN CHÂN một khung RIÊNG. Gộp hai bên vào một khung
+                # thì khi dang tay ra, khung phải bao cả khoảng giữa -> to đùng,
+                # che kín người. Khung riêng thì nhỏ và bám đúng từng bàn tay.
+                # bàn tay đo theo cẳng tay (khuỷu 7/8 -> cổ tay 9/10)
+                # bàn chân đo theo cẳng chân (gối 13/14 -> cổ chân 15/16)
+                'gloves': ('GĂNG', [b for b in (_tu_khop(9, 7), _tu_khop(10, 8)) if b]),
+                'boots':  ('GIÀY', [b for b in (_tu_khop(15, 13, 0.22),
+                                                _tu_khop(16, 14, 0.22)) if b]),
+            }
+            for _mon, (_ten, _khung_list) in _mon_khung.items():
+                if _mon not in self.required_ppe:
+                    continue
+                # CHƯA KẾT LUẬN ĐƯỢC (còn trong thời gian quan sát, chưa thấy món
+                # đó lần nào) -> KHÔNG VẼ GÌ. Trước đây rơi vào nhánh "không thiếu"
+                # nên vẽ XANH, thành ra tay trần của anh vẫn hiện "GĂNG" màu xanh.
+                # Chưa biết thì im lặng, không được nói là có.
+                if _mon in chua_ket_luan:
+                    continue
+                _thieu = _mon in missing
+                for _n, _hop in enumerate(_khung_list):
+                    if _hop is None:
+                        continue
                     final_detections.append({
-                        "id": f"vung-{_nhan}-{p['id'] if p['id'] is not None else int(px1)}-{_j}",
+                        "id": f"ppe-{_mon}-{p['id'] if p['id'] is not None else int(px1)}-{_n}",
                         "type": "ppe",
-                        "label": _nhan,
+                        "label": (f"THIẾU {_ten}" if _thieu else _ten),
                         "confidence": float(p['conf']),
-                        "isViolation": True,
+                        "isViolation": _thieu,
                         "bbox": self._bbox_pct(_hop, frame),
                     })
 

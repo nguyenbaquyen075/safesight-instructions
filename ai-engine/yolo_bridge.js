@@ -16,9 +16,9 @@ const io = new Server(server, {
 // quan quét vi phạm mọi camera để bắn notification).
 app.use(express.json());
 app.post('/detections', (req, res) => {
-  const { cameraId, detections } = req.body;
+  const { cameraId, detections, videoPos } = req.body;
   const targets = [`camera-${cameraId}`, 'all-cameras'];
-  io.to(targets).emit('yolo-data', { cameraId, detections });
+  io.to(targets).emit('yolo-data', { cameraId, detections, videoPos });
 
   // Check for violations to trigger UI alerts
   const violation = detections.find(d => d.isViolation);
