@@ -3,6 +3,7 @@ name: Release
 on:
   push:
     tags: ["v*.*.*"]
+  workflow_dispatch: # chạy tay: tạo Release cho mọi tag v*.*.* chưa có Release
 
 permissions:
   contents: write
@@ -16,27 +17,34 @@ jobs:
           ref: main # CHANGELOG.md luôn lấy từ main, kể cả khi tag trỏ vào commit cũ
           fetch-depth: 0
 
-      - name: Extract release notes from CHANGELOG.md
-        id: notes
-        run: |
-          version="${GITHUB_REF_NAME#v}"
-          awk -v v="$version" '
-            $0 ~ "^## \\[" v "\\]" { on = 1; next }
-            on && /^(## \[|\[)/ { exit }
-            on { print }
-          ' CHANGELOG.md > release-notes.md
-          if [ ! -s release-notes.md ]; then
-            echo "Không tìm thấy mục [$version] trong CHANGELOG.md" >&2
-            exit 1
-          fi
-          latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
-          echo "latest=$([ "$latest" = "$GITHUB_REF_NAME" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
-      - name: Create GitHub Release
+      - name: Create GitHub Releases from CHANGELOG.md
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
-            --title "SafeSight $GITHUB_REF_NAME" \
-            --notes-file release-notes.md \
-            --latest=${{ steps.notes.outputs.latest }}
+          set -eu
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            tags=$(git tag --list 'v*.*.*' --sort=v:refname)
+          else
+            tags="$GITHUB_REF_NAME"
+          fi
+          latest=$(git tag --list 'v*.*.*' --sort=-v:refname | head -n 1)
+          for tag in $tags; do
+            if gh release view "$tag" >/dev/null 2>&1; then
+              echo "$tag: Release đã tồn tại, bỏ qua"
+              continue
+            fi
+            version="${tag#v}"
+            awk -v v="$version" '
+              $0 ~ "^## \\[" v "\\]" { on = 1; next }
+              on && /^(## \[|\[)/ { exit }
+              on { print }
+            ' CHANGELOG.md > release-notes.md
+            if [ ! -s release-notes.md ]; then
+              echo "$tag: không tìm thấy mục [$version] trong CHANGELOG.md" >&2
+              exit 1
+            fi
+            if [ "$tag" = "$latest" ]; then flag=--latest; else flag=--latest=false; fi
+            gh release create "$tag" --title "SafeSight $tag" --notes-file release-notes.md "$flag"
+            echo "$tag: đã tạo Release"
+          done

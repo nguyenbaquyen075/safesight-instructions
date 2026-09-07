@@ -8,7 +8,7 @@ Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang, khôn
 
 ## Phiên bản
 
-Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`.
+Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit lên `main`, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`. Với tag trỏ vào commit cũ chưa có workflow, vào Actions → Release → "Run workflow": workflow sẽ tạo Release cho mọi tag còn thiếu.
 
 ## Giấy phép
 
