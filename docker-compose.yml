@@ -1,0 +1,33 @@
+# Dashboard + YOLO Bridge từ image trên GHCR. AI engine (Python, model .pt) và agent chạy ngoài
+# container: xem README mục "Chạy từ mã nguồn". Biến môi trường: chép .env.docker.example thành .env.
+services:
+  dashboard:
+    image: ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard:latest
+    build:
+      context: .
+      target: dashboard
+    ports:
+      - "3000:3000"
+    env_file: .env
+    environment:
+      DATABASE_URL: file:./data/dev.db
+      NEXT_PUBLIC_YOLO_SERVER_URL: ${NEXT_PUBLIC_YOLO_SERVER_URL:-http://localhost:4001}
+      YOLO_BRIDGE_URL: http://bridge:4001
+    volumes:
+      - safesight-data:/app/data
+      - ./public/videos:/app/public/videos:ro
+    depends_on:
+      - bridge
+    restart: unless-stopped
+
+  bridge:
+    image: ghcr.io/nguyenbaquyen075/safesight-instructions/bridge:latest
+    build:
+      context: .
+      target: bridge
+    ports:
+      - "4001:4001"
+    restart: unless-stopped
+
+volumes:
+  safesight-data:

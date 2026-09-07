@@ -73,6 +73,22 @@ Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engi
 
 > 💡 Chỉ phát triển giao diện, không cài Python: chạy `node ai-engine/mock_yolo.js` để phát detection giả qua bridge.
 
+## Chạy bằng Docker (Dashboard + Bridge)
+
+`Dockerfile` ở gốc repo có hai target, CI (`.github/workflows/docker.yml`) build và đẩy lên GHCR mỗi khi `main` đổi hoặc có tag `vX.Y.Z`:
+
+| Target | Image | Cổng | Ghi chú |
+|---|---|---|---|
+| `dashboard` | `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | 3000 | Next.js standalone; SQLite tại volume `/app/data/dev.db`, lần đầu chạy tự chép DB đã seed |
+| `bridge` | `ghcr.io/nguyenbaquyen075/safesight-instructions/bridge` | 4001 | `ai-engine/yolo_bridge.js` + express + socket.io |
+
+```bash
+cp .env.docker.example .env   # secret cho dashboard
+docker compose up -d          # hoặc: docker compose up -d --build
+```
+
+AI engine và agent không đóng gói (cần model `.pt`, webcam/GPU, `ANTHROPIC_API_KEY`); chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent` và trỏ về địa chỉ máy Docker. `public/videos` được mount chỉ đọc để dashboard phát video mẫu.
+
 ## Các lệnh npm
 
 | Lệnh | Tác dụng |

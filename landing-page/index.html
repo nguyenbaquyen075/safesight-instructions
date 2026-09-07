@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SafeSight — Giám sát an toàn lao động bằng AI</title>
+<meta name="description" content="SafeSight phát hiện thiếu mũ, áo phản quang, găng, giày bảo hộ theo thời gian thực bằng YOLOv8, cảnh báo Telegram và loa công trường, có agent giám sát tự động.">
+<link rel="icon" type="image/svg+xml" href="assets/safesight-logo.svg">
+<meta property="og:title" content="SafeSight — Giám sát an toàn lao động bằng AI">
+<meta property="og:description" content="YOLOv8 + Next.js: phát hiện vi phạm PPE theo thời gian thực, bằng chứng ảnh, cảnh báo Telegram, agent giám sát tự động.">
+<meta property="og:image" content="assets/safesight-logo.svg">
+<style>
+  :root{--bg:#0F172A;--bg2:#0B1120;--surface:#1E293B;--surface-hover:#273548;--border:#334155;--text:#F8FAFC;--text2:#94A3B8;--muted:#64748B;--primary:#2563EB;--primary-hover:#1D4ED8;--danger:#DC2626;--success:#16A34A;--warning:#F59E0B;--info:#0EA5E9;--radius:16px}
+  *{box-sizing:border-box}
+  html{scroll-behavior:smooth}
+  body{margin:0;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 40%);color:var(--text);font:400 15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
+  a{color:inherit}
+  .wrap{max-width:1100px;margin:0 auto;padding:0 20px}
+  header{position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);background:rgba(11,17,32,.75);border-bottom:1px solid var(--border)}
+  nav{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 0;flex-wrap:wrap}
+  nav .brand{display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none}
+  nav .brand img{width:30px;height:30px}
+  nav .links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  nav .links a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px}
+  nav .links a:hover,nav .links a:focus-visible{color:var(--text);background:var(--surface);outline:none}
+  .hero{padding:72px 0 40px;text-align:center}
+  .hero img.logo{width:120px;height:120px;filter:drop-shadow(0 0 30px rgba(37,99,235,.45))}
+  .hero h1{font-size:clamp(32px,6vw,52px);line-height:1.1;margin:20px 0 12px;font-weight:900;letter-spacing:-.02em}
+  .hero h1 span{color:#60A5FA}
+  .hero p.lead{max-width:720px;margin:0 auto 28px;color:var(--text2);font-size:clamp(15px,2.2vw,18px)}
+  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;font-weight:700;text-decoration:none;border:1px solid var(--border);background:var(--surface);transition:background .15s,transform .15s}
+  .btn:hover,.btn:focus-visible{background:var(--surface-hover);transform:translateY(-1px);outline:none}
+  .btn.primary{background:var(--primary);border-color:var(--primary);box-shadow:0 0 20px rgba(37,99,235,.3)}
+  .btn.primary:hover,.btn.primary:focus-visible{background:var(--primary-hover)}
+  .label{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--muted)}
+  section{padding:48px 0}
+  h2{font-size:clamp(22px,3.2vw,30px);font-weight:800;margin:6px 0 24px;letter-spacing:-.01em}
+  .diagram{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto}
+  .diagram img{display:block;width:100%;min-width:640px;height:auto}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .15s,transform .15s}
+  .card:hover{border-color:#475569;transform:translateY(-2px)}
+  .card .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;margin-bottom:14px}
+  .card h3{margin:0 0 6px;font-size:16px;font-weight:800}
+  .card p{margin:0;color:var(--text2);font-size:14px}
+  .ic.red{background:rgba(220,38,38,.15)}.ic.blue{background:rgba(37,99,235,.15)}.ic.green{background:rgba(22,163,74,.15)}.ic.amber{background:rgba(245,158,11,.15)}.ic.sky{background:rgba(14,165,233,.15)}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
+  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
+  .stat b{display:block;font-size:30px;font-weight:900;color:#60A5FA}
+  .stat span{color:var(--text2);font-size:13px}
+  .chips{display:flex;flex-wrap:wrap;gap:8px}
+  .chip{background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--text2);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  pre{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;overflow-x:auto;font-size:13px;line-height:1.5;margin:0}
+  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
+  .step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
+  .step .n{font-weight:900;color:#60A5FA;font-size:12px;letter-spacing:.15em}
+  footer{border-top:1px solid var(--border);padding:32px 0;color:var(--muted);font-size:13px}
+  footer .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header><div class="wrap"><nav>
+  <a class="brand" href="#"><img src="assets/safesight-logo.svg" alt="">SafeSight</a>
+  <div class="links">
+    <a href="#tinh-nang">Tính năng</a><a href="#kien-truc">Kiến trúc</a><a href="#bat-dau">Bắt đầu</a>
+    <a href="https://github.com/nguyenbaquyen075/safesight-instructions/tree/main/wiki">Tài liệu</a>
+    <a href="https://github.com/nguyenbaquyen075/safesight-instructions">GitHub</a>
+  </div>
+</nav></div></header>
+
+<main class="wrap">
+  <div class="hero">
+    <img class="logo" src="assets/safesight-logo.svg" alt="Logo SafeSight">
+    <div class="label">Mã nguồn mở · MIT</div>
+    <h1>Giám sát an toàn lao động<br><span>bằng AI, theo thời gian thực</span></h1>
+    <p class="lead">SafeSight phát hiện người thiếu mũ bảo hộ, áo phản quang, găng tay, giày bảo hộ trên công trường bằng YOLOv8, lưu bằng chứng ảnh, cảnh báo qua Telegram và loa công trường, có agent tự động trực vận hành và rà soát vi phạm.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/nguyenbaquyen075/safesight-instructions#-cài-đặt-nhanh">🚀 Bắt đầu</a>
+      <a class="btn" href="https://github.com/nguyenbaquyen075/safesight-instructions/releases">📦 Releases</a>
+      <a class="btn" href="https://github.com/nguyenbaquyen075/safesight-instructions">⭐ GitHub</a>
+    </div>
+  </div>
+
+  <section>
+    <div class="stats">
+      <div class="stat"><b>4</b><span>loại PPE bắt buộc</span></div>
+      <div class="stat"><b>&lt;3s</b><span>xác nhận vi phạm</span></div>
+      <div class="stat"><b>3</b><span>model YOLOv8 chuyên biệt</span></div>
+      <div class="stat"><b>4</b><span>tiến trình, 1 lệnh chạy</span></div>
+    </div>
+  </section>
+
+  <section id="tinh-nang">
+    <div class="label">Tính năng</div>
+    <h2>Từ khung hình camera đến hành động</h2>
+    <div class="grid">
+      <div class="card"><div class="ic red">🦺</div><h3>Phát hiện vi phạm PPE</h3><p>YOLOv8 nhận diện mũ, áo, găng, giày trên từng người; theo dõi track ID và chỉ chốt vi phạm khi thấy liên tục, giảm báo động giả.</p></div>
+      <div class="card"><div class="ic blue">📸</div><h3>Bằng chứng ảnh</h3><p>Mỗi vi phạm kèm snapshot đã khoanh khung tại vị trí cổ tay, cổ chân, đầu từ keypoint tư thế, lưu vào cơ sở dữ liệu cùng số lần tái diễn.</p></div>
+      <div class="card"><div class="ic sky">📡</div><h3>Overlay thời gian thực</h3><p>YOLO Bridge phát detection qua Socket.IO theo từng camera, dashboard vẽ khung ngay trên video trực tiếp.</p></div>
+      <div class="card"><div class="ic amber">📣</div><h3>Cảnh báo Telegram và loa</h3><p>Quy tắc cảnh báo theo công trường, ngưỡng và thời gian chờ; nhắc nhở rồi leo thang; nói trực tiếp qua mic tới loa công trường.</p></div>
+      <div class="card"><div class="ic green">🤖</div><h3>Agent giám sát tự động</h3><p>Lane trực vận hành phát hiện camera, engine, bridge đứng và tự khắc phục; lane cán bộ an toàn dùng Claude rà soát vi phạm theo bằng chứng.</p></div>
+      <div class="card"><div class="ic blue">🔬</div><h3>Nghiệm thu bằng số liệu</h3><p>Chấm model theo tỉ lệ báo oan và bỏ sót thay vì mAP; quét ngưỡng từng lớp; đối chiếu với Roboflow trên ảnh tĩnh.</p></div>
+    </div>
+  </section>
+
+  <section id="kien-truc">
+    <div class="label">Kiến trúc</div>
+    <h2>Ba tiến trình lõi, một cơ sở dữ liệu</h2>
+    <div class="diagram"><img src="assets/yolo-architecture-animated-dark.svg" alt="Sơ đồ: YOLOv8 Model → YOLO Bridge → Next.js Dashboard; API POST /api/violations lưu qua Prisma"></div>
+    <p style="color:var(--text2);margin:16px 0 0">AI Engine (Python) chạy model local, gửi detection cho Bridge (Node.js, cổng 4001) và ghi vi phạm đã xác nhận qua API của Dashboard (Next.js, cổng 3000). Agent là tiến trình thứ tư, dùng chung cơ sở dữ liệu Prisma.</p>
+    <div class="chips" style="margin-top:20px">
+      <span class="chip">Next.js 16</span><span class="chip">React 19</span><span class="chip">TypeScript</span><span class="chip">Tailwind 4</span><span class="chip">Prisma 7</span><span class="chip">SQLite / Postgres</span><span class="chip">NextAuth</span><span class="chip">Socket.IO</span><span class="chip">Python</span><span class="chip">Ultralytics YOLOv8</span><span class="chip">OpenCV</span><span class="chip">Anthropic SDK</span><span class="chip">Docker</span>
+    </div>
+  </section>
+
+  <section id="bat-dau">
+    <div class="label">Bắt đầu</div>
+    <h2>Chạy trong vài phút</h2>
+    <div class="steps">
+      <div class="step"><div class="n">01 · DOCKER</div><h3>Dashboard và Bridge</h3><pre><code>docker compose up -d
+# Dashboard: http://localhost:3000
+# Bridge:    http://localhost:4001</code></pre></div>
+      <div class="step"><div class="n">02 · MÃ NGUỒN</div><h3>Toàn bộ hệ thống</h3><pre><code>git clone https://github.com/nguyenbaquyen075/safesight-instructions.git
+cd safesight-instructions
+npm install &amp;&amp; npx prisma db push &amp;&amp; npm run db:seed
+npm run dev</code></pre></div>
+      <div class="step"><div class="n">03 · MODEL</div><h3>File .pt cần có</h3><p style="color:var(--text2);margin:0">Đặt <code>ppe_multiclass.pt</code> ở gốc repo (bắt buộc). <code>ppe_boots.pt</code>, <code>ppe_gang.pt</code>, <code>yolov8n-pose.pt</code> là tuỳ chọn, thiếu thì hệ thống tự lùi về model chính.</p></div>
+    </div>
+  </section>
+</main>
+
+<footer><div class="wrap"><div class="row">
+  <span>© 2026 SafeSight · Giấy phép MIT</span>
+  <span><a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CONTRIBUTORS.md">Contributors</a> · <a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/nguyenbaquyen075/safesight-instructions/issues">Issues</a></span>
+</div></div></footer>
+</body>
+</html>

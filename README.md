@@ -1,20 +1,54 @@
-# SafeSight Instructions
+<div align="center">
 
-[![Release](https://img.shields.io/github/v/release/nguyenbaquyen075/safesight-instructions?display_name=tag&sort=semver)](https://github.com/nguyenbaquyen075/safesight-instructions/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE) [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org) [![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-blue)](https://docs.ultralytics.com)
+  <img src="./wiki/assets/safesight-logo.svg" alt="SafeSight logo" width="140">
 
-Hệ thống giám sát vi phạm trang bị bảo hộ lao động (PPE) theo thời gian thực trên công trường xây dựng, dùng YOLOv8 (Computer Vision) kết hợp Next.js Dashboard.
+  <h1>🦺 SafeSight</h1>
 
-Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang, không đeo găng, không đi giày bảo hộ — ghi nhận bằng chứng (ảnh + bounding box), cảnh báo real-time qua Socket.IO, lưu trữ vi phạm vào cơ sở dữ liệu.
+  <p><strong>Giám sát an toàn lao động bằng AI theo thời gian thực</strong></p>
 
-## Phiên bản
+  <p><em>YOLOv8 nhìn thấy người thiếu mũ, áo, găng, giày bảo hộ trên công trường;<br>dashboard ghi bằng chứng, cảnh báo Telegram và loa, agent tự động trực vận hành.</em></p>
 
-Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit lên `main`, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`. Với tag trỏ vào commit cũ chưa có workflow, vào Actions → Release → "Run workflow": workflow sẽ tạo Release cho mọi tag còn thiếu.
+  <br>
 
-## Giấy phép
+  [![License: MIT](https://img.shields.io/badge/License-MIT-16a34a.svg?style=for-the-badge)](./LICENSE)
+  [![CI](https://img.shields.io/github/actions/workflow/status/nguyenbaquyen075/safesight-instructions/ci.yml?branch=main&style=for-the-badge&logo=githubactions&logoColor=white&label=CI)](https://github.com/nguyenbaquyen075/safesight-instructions/actions/workflows/ci.yml)
+  [![Docker](https://img.shields.io/badge/GHCR-Docker_images-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://github.com/nguyenbaquyen075/safesight-instructions/pkgs/container/safesight-instructions%2Fdashboard)
+  [![Next.js](https://img.shields.io/badge/Frontend-Next.js_16-000000?style=for-the-badge&logo=next.js&logoColor=white)](./src)
+  [![YOLOv8](https://img.shields.io/badge/AI-YOLOv8-7c3aed?style=for-the-badge&logo=python&logoColor=white)](./ai-engine)
+  [![Prisma](https://img.shields.io/badge/DB-Prisma_7-2D3748?style=for-the-badge&logo=prisma&logoColor=white)](./prisma)
 
-Phát hành theo giấy phép **MIT** (OSI-approved) — xem toàn văn tại [`LICENSE`](./LICENSE). Chọn MIT vì đây là giấy phép permissive, cho phép sử dụng/sửa đổi/phân phối tự do kể cả mục đích thương mại, phù hợp mục tiêu phổ biến rộng rãi giải pháp an toàn lao động nguồn mở.
+  <br>
 
-## Kiến trúc hệ thống
+  [![Release](https://img.shields.io/github/v/release/nguyenbaquyen075/safesight-instructions?style=flat-square&display_name=tag&sort=semver&color=2563eb&logo=github)](https://github.com/nguyenbaquyen075/safesight-instructions/releases)
+  [![GitHub Stars](https://img.shields.io/github/stars/nguyenbaquyen075/safesight-instructions?style=flat-square&color=ffd700&logo=github)](https://github.com/nguyenbaquyen075/safesight-instructions/stargazers)
+  [![GitHub Issues](https://img.shields.io/github/issues/nguyenbaquyen075/safesight-instructions?style=flat-square&color=f0455a&logo=github)](https://github.com/nguyenbaquyen075/safesight-instructions/issues)
+  [![Last Commit](https://img.shields.io/github/last-commit/nguyenbaquyen075/safesight-instructions?style=flat-square&color=6c63ff&logo=git&logoColor=white)](https://github.com/nguyenbaquyen075/safesight-instructions/commits/main)
+  [![Landing page](https://img.shields.io/badge/Landing-GitHub_Pages-222?style=flat-square&logo=githubpages)](https://nguyenbaquyen075.github.io/safesight-instructions/)
+
+</div>
+
+---
+
+## 🌟 Giới thiệu
+
+**SafeSight** là hệ thống mã nguồn mở giám sát vi phạm trang bị bảo hộ lao động (PPE) trên công trường xây dựng theo thời gian thực. AI engine chạy **YOLOv8** trên máy tại chỗ, không gửi video lên cloud; dashboard **Next.js** hiển thị camera trực tiếp kèm khung nhận diện, lưu vi phạm với bằng chứng ảnh, cảnh báo qua **Telegram** và **loa công trường**, và một **agent giám sát tự động** trực vận hành 24/7 rồi rà soát từng vi phạm theo bằng chứng.
+
+Phát hiện bốn món PPE bắt buộc: **mũ bảo hộ, áo phản quang, găng tay, giày bảo hộ**. Vi phạm chỉ được chốt khi thấy liên tục ≥3s để giảm báo động giả, và model được nghiệm thu theo tỉ lệ báo oan / bỏ sót thay vì mAP.
+
+## ✨ Tính năng
+
+| | Tính năng | Chi tiết |
+|---|---|---|
+| 🦺 | **Phát hiện PPE theo thời gian thực** | YOLOv8 11 lớp + model phụ găng/giày + pose keypoints; theo dõi track ID, xác nhận vi phạm ≥3s |
+| 📸 | **Bằng chứng ảnh** | Snapshot khoanh khung tại đầu, cổ tay, cổ chân; đếm số lần tái diễn; báo lại mỗi 60s khi kéo dài |
+| 📡 | **Overlay trực tiếp** | Bridge Socket.IO phát detection theo room từng camera, dashboard vẽ khung trên video |
+| 📣 | **Cảnh báo đa kênh** | Quy tắc cảnh báo theo công trường (ngưỡng, thời gian chờ), Telegram nhắc nhở rồi leo thang, mic → loa công trường |
+| 🤖 | **Agent giám sát tự động** | Trực vận hành tất định (camera/engine/bridge đứng, đĩa đầy), cán bộ an toàn dùng Claude rà soát vi phạm, hỏi đáp trên `/agent` |
+| 🔐 | **Đa tổ chức, phân quyền** | Organization → Site → Camera, RBAC theo vai trò, NextAuth |
+| 🔬 | **Nghiệm thu bằng số liệu** | `eval_ppe_decision.py`, `sweep_threshold.py`, đối chiếu Roboflow trên ảnh tĩnh |
+| 🐳 | **Đóng gói** | Image Docker trên GHCR, `docker compose up`, CI lint/types/tests, Release tự động theo tag |
+
+## 🏗️ Kiến trúc hệ thống
 
 <img alt="Sơ đồ kiến trúc: YOLOv8 Model (Python) → YOLO Bridge (Node.js, cổng 4001) → Next.js Dashboard (cổng 3000); AI Engine và Dashboard cùng gọi API POST /api/violations, lưu qua Prisma vào SQLite (dev) / Postgres (production)" src="wiki/assets/yolo-architecture-animated-dark.svg" width="100%">
 
@@ -24,12 +58,14 @@ Sơ đồ là SVG có chuyển động minh họa luồng dữ liệu (tự theo
 - **YOLO Bridge** (`ai-engine/yolo_bridge.js`) — Server Socket.IO trung gian, broadcast detection theo room từng camera (đỡ băng thông cho client chỉ xem 1 camera).
 - **Next.js Dashboard** (`src/`) — Giao diện xem live camera, danh sách vi phạm, thống kê; API routes (`src/app/api/`) + Prisma ORM lưu trữ dữ liệu thật.
 
-## Yêu cầu hệ thống
+## 🚀 Cài đặt nhanh
+
+### Yêu cầu hệ thống
 
 - Node.js >= 18, npm
 - Python >= 3.9 với `torch`, `ultralytics`, `opencv-python`, `requests` (khuyến nghị dùng `.venv`)
 
-## Cài đặt
+### Cài đặt từ mã nguồn
 
 ```bash
 # 1. Dependencies Next.js
@@ -67,13 +103,13 @@ npx prisma db push
 npm run db:seed
 ```
 
-## Chạy dự án
+### Chạy dự án
 
 ```bash
 npm run dev
 ```
 
-Lệnh này chạy `dev-all.sh`, tự khởi động cả 3 tiến trình cùng lúc (Ctrl+C tắt tất cả):
+Lệnh này chạy `dev-all.sh`, tự khởi động cả 4 tiến trình cùng lúc (Ctrl+C tắt tất cả):
 
 | Tiến trình | Lệnh riêng lẻ | Port |
 |---|---|---|
@@ -84,7 +120,27 @@ Lệnh này chạy `dev-all.sh`, tự khởi động cả 3 tiến trình cùng 
 
 Truy cập dashboard tại [http://localhost:3000](http://localhost:3000).
 
-## Agent giám sát tự động
+### Chạy bằng Docker (Dashboard + Bridge)
+
+Hai image được CI build và đẩy lên GitHub Container Registry mỗi khi `main` thay đổi hoặc có tag mới
+(xem [Packages](https://github.com/nguyenbaquyen075/safesight-instructions/pkgs/container/safesight-instructions%2Fdashboard)):
+
+| Image | Nội dung | Cổng |
+|---|---|---|
+| `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | Next.js dashboard + API, SQLite trong volume `/app/data` | 3000 |
+| `ghcr.io/nguyenbaquyen075/safesight-instructions/bridge` | YOLO Bridge Socket.IO | 4001 |
+
+```bash
+cp .env.docker.example .env      # điền NEXTAUTH_SECRET, AI_ENGINE_SECRET, TELEGRAM_ENCRYPT_KEY, AGENT_BRIDGE_SECRET
+docker compose up -d             # kéo image từ GHCR; thêm --build để build tại chỗ
+```
+
+Lần chạy đầu container tự tạo `dev.db` đã seed (Organization/Site/Camera mẫu). AI engine (Python, cần
+model `.pt`, webcam/GPU) và agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`,
+trỏ `NEXT_PUBLIC_YOLO_SERVER_URL` và API về địa chỉ máy chạy Docker. Tag image: `latest` (main),
+`0.6.0` / `0.6` (release), `main`, mã commit ngắn.
+
+## 🤖 Agent giám sát tự động
 
 Tiến trình thứ 4 (`agent/`, port 4002 nội bộ), khởi động cùng `npm run dev`. Ba vai trò:
 
@@ -97,7 +153,9 @@ Tiến trình thứ 4 (`agent/`, port 4002 nội bộ), khởi động cùng `np
 
 Chi tiết đầy đủ (hàng đợi, bằng chứng/band, tool, rào chắn, panel): [`wiki/09-agent.md`](wiki/09-agent.md).
 
-## Cấu hình AI Engine
+## 🧠 AI Engine
+
+### Cấu hình
 
 Model, ngưỡng confidence và các tham số nhận diện nằm ở đầu file `ai-engine/yolo_inference.py` và trong `PPEViolationTracker` (`ai-engine/ppe_tracker.py`):
 
@@ -105,7 +163,7 @@ Model, ngưỡng confidence và các tham số nhận diện nằm ở đầu fi
 - `CONFIRM_CONF` / `CONFIRM_DELAY` — ngưỡng độ tin cậy và thời gian tồn tại liên tục tối thiểu trước khi CHỐT một vi phạm để ghi DB (mặc định 0.6 / 3 giây), giảm báo động giả.
 - Nguồn video/camera map tại `src/data/camera-videos.json`.
 
-## File model cần có (KHÔNG nằm trong repo)
+### File model cần có (KHÔNG nằm trong repo)
 
 Mọi file `.pt` đều bị `.gitignore` chặn. Máy mới clone về phải chép tay:
 
@@ -125,7 +183,7 @@ Nghiệm thu sau khi thay model — chạy cả hai, đừng tin mAP:
 .venv/bin/python ai-engine/sweep_threshold.py <model> boots [model_phụ]  # quét ngưỡng
 ```
 
-## Đối chiếu bằng Roboflow Workflow (ảnh tĩnh)
+### Đối chiếu bằng Roboflow Workflow (ảnh tĩnh)
 
 `ai-engine/roboflow_workflow.py` gọi workflow **"Detech PPE vdetech-ppe-7qydu-vnlwm-1-yolo26n-t2 Logic"**
 trên Roboflow Serverless để nhận diện PPE trên **một ảnh tĩnh** — dùng khi cần đối chiếu
@@ -166,7 +224,7 @@ Smoke test (gọi mạng thật, tốn 1 credit):
 .venv/bin/python ai-engine/test_roboflow_workflow.py
 ```
 
-### Demo đo độ ổn định trên nguồn video
+#### Demo đo độ ổn định trên nguồn video
 
 `ai-engine/demo_roboflow_stream.py` lấy mẫu frame từ một nguồn video, gửi lên Roboflow theo
 nhịp rồi báo cáo tỉ lệ thành công / độ trễ — dùng để **kiểm chứng** trước khi tin dùng.
@@ -185,7 +243,7 @@ nào bắt được gì, khỏi phải render video. Truyền `--save-dir ""` n�
 
 Thoát `0` nếu mọi lần gọi thành công, `1` nếu có lần trượt.
 
-### Xem trực tiếp trên dashboard
+#### Xem trực tiếp trên dashboard
 
 Trang **`/roboflow`** ("Kiểm thử Roboflow" ở thanh bên) cho kéo thả một ảnh rồi hiện luôn
 khung detection kèm class/confidence và độ trễ — dùng khi muốn mắt thường đối chiếu model
@@ -200,7 +258,7 @@ cloud với model local, khỏi chạy script.
 - Chọn model bằng 2 nút ở đầu trang; đổi model sẽ chạy lại đúng ảnh đang xem (tốn thêm
   1 credit). Client chỉ gửi được key trong allowlist của route, không truyền slug tuỳ ý.
 
-## Cấu trúc thư mục chính
+## 📂 Cấu trúc thư mục
 
 ```
 ├── src/                       # Next.js App Router (dashboard + API routes)
@@ -228,7 +286,7 @@ cloud với model local, khỏi chạy script.
 └── wiki/                       # Tài liệu kiến trúc & vận hành chi tiết
 ```
 
-## Các lớp (class) được nhận diện
+## 🏷️ Các lớp (class) được nhận diện
 
 | Class | Trạng thái |
 |-------|-----------|
@@ -238,7 +296,37 @@ cloud với model local, khỏi chạy script.
 
 Model không có lớp `no_vest`; "thiếu áo" suy ra khi không thấy `vest` trên người trong cửa sổ bằng chứng. Xem `wiki/06-tich-hop-yolo.md`.
 
-## Tài liệu tham khảo
+## 📚 Tài liệu
+
+Toàn bộ tài liệu kiến trúc, vận hành và nghiệp vụ nằm trong [`wiki/`](./wiki/README.md) và [`docs/`](./docs):
+
+| | Tài liệu | Nội dung |
+|---|---|---|
+| 📖 | [Giới thiệu & phạm vi](./wiki/01-gioi-thieu.md) | Bài toán, giá trị, phạm vi hệ thống |
+| 🏗️ | [Kiến trúc hệ thống](./wiki/02-kien-truc-he-thong.md) | 4 tiến trình, luồng ghi DB, Telegram |
+| ⚙️ | [Cài đặt & vận hành](./wiki/03-cai-dat-va-van-hanh.md) | Biến môi trường, file model, Docker, lệnh npm |
+| 🗄️ | [Mô hình dữ liệu](./wiki/04-mo-hinh-du-lieu.md) | Domain model Prisma, ánh xạ PPE → ViolationType |
+| 🖥️ | [Giao diện & API](./wiki/05-giao-dien-va-api.md) | Trang, quyền xem, API route, hooks |
+| 🧠 | [Tích hợp YOLO](./wiki/06-tich-hop-yolo.md) | Pipeline nhận diện, lớp phát hiện, Roboflow |
+| 🗺️ | [Lộ trình phát triển](./wiki/07-lo-trinh-phat-trien.md) | Đã xong, ưu tiên tiếp theo |
+| 🎓 | [Train lại model găng/giày](./wiki/08-train-model-them-ppe.md) | Dataset gộp, Colab, nghiệm thu |
+| 🤖 | [Agent giám sát tự động](./wiki/09-agent.md) | Hàng đợi, bằng chứng/band, tool, rào chắn |
+| 📐 | [Spec & plan thiết kế](./docs/superpowers) | Bản thiết kế đã duyệt và kế hoạch triển khai |
+| 🎨 | [DESIGN.md](./DESIGN.md) | Token màu, chữ, khoảng cách của dashboard |
+
+## 🏷️ Phiên bản & Release
+
+Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit lên `main`, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`. Với tag trỏ vào commit cũ chưa có workflow, vào Actions → Release → "Run workflow": workflow sẽ tạo Release cho mọi tag còn thiếu.
+
+## 🤝 Đóng góp
+
+Pull Request và Issue đều được hoan nghênh. Đọc [`CONTRIBUTING.md`](./CONTRIBUTING.md) (quy trình, kiểm tra trước khi gửi) và [`AGENTS.md`](./AGENTS.md) (quy ước code, commit, tài liệu). Danh sách thành viên: [`CONTRIBUTORS.md`](./CONTRIBUTORS.md).
+
+## 📜 Giấy phép
+
+Phát hành theo giấy phép **MIT** (OSI-approved) — xem toàn văn tại [`LICENSE`](./LICENSE). Chọn MIT vì đây là giấy phép permissive, cho phép sử dụng/sửa đổi/phân phối tự do kể cả mục đích thương mại, phù hợp mục tiêu phổ biến rộng rãi giải pháp an toàn lao động nguồn mở.
+
+## 🔗 Tài liệu tham khảo
 
 - [Next.js Documentation](https://nextjs.org/docs)
 - [Ultralytics YOLOv8](https://docs.ultralytics.com/)
