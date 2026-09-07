@@ -74,3 +74,6 @@ __pycache__/
 
 # DB tạm cho test agent (npm run test:agent)
 agent-test.db*
+
+# Sơ đồ BA: chỉ commit PNG
+/docs/ba/diagrams/*.excalidraw

@@ -40,5 +40,5 @@ Bộ tài liệu này bàn giao đủ **15 sản phẩm BA** theo chuẩn nội 
 - Hành động / use case: **Động từ + Đối tượng** ("Xử lý vi phạm", không phải "Vi phạm").
 - Actor / lane: danh từ chỉ nhóm người tham gia; Hệ thống (AI Engine, Agent) có lane riêng khi tự hành động.
 - Mã truy vết: `F-<MODULE>-<số>` cho chức năng, `UC-<số>` cho use case, `US-<số>` cho user story, `NFR-<số>` cho yêu cầu phi chức năng, `SCR-<số>` cho màn hình.
-- Sơ đồ vẽ bằng mermaid, GitHub render trực tiếp.
+- Sơ đồ vẽ bằng Excalidraw, xuất PNG vào `docs/ba/diagrams/`.
 - Tài liệu kỹ thuật (kiến trúc, cài đặt, API, model AI) vẫn ở [`wiki/`](../../wiki/README.md); tài liệu này chỉ mô tả nghiệp vụ và yêu cầu.
