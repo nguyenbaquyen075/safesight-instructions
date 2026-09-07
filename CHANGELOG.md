@@ -10,8 +10,13 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Workflow CI (lint, types, test agent) và workflow deploy landing page lên GitHub Pages (`landing-page/`).
 - `CONTRIBUTING.md`, logo `wiki/assets/safesight-logo.svg`, script `scripts/github-repo-metadata.sh` đặt description/topics cho repo.
 
+- Bộ tài liệu BA `docs/ba/` (15 sản phẩm phân tích nghiệp vụ + SRS, URD, BRD, HDSD, biên bản họp).
+
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
+
+### Loại bỏ
+- `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
 
 ## [0.6.0] - 2026-09-07
 

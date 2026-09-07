@@ -33,7 +33,7 @@ Trang chủ tài liệu nội bộ của dự án `safesight-instructions`. Dùn
 
 - Ngôn ngữ chính: **tiếng Việt**. Thuật ngữ kỹ thuật giữ nguyên tiếng Anh.
 - Mỗi khi đổi kiến trúc / thêm trang / đổi schema / đổi file model → **cập nhật wiki tương ứng** trong cùng commit.
-- Nguồn tham chiếu gốc: `README.md`, `SPEC.md`, `prisma/schema.prisma`, `docs/superpowers/specs/`.
+- Nguồn tham chiếu gốc: `README.md`, `docs/ba/` (SRS, URD, BRD, HDSD, 15 sản phẩm BA), `prisma/schema.prisma`, `docs/superpowers/specs/`.
 
 ---
 *Cập nhật 2026-09-07 theo khảo sát codebase. Nếu thấy sai lệch với thực tế, sửa trực tiếp file tương ứng.*

@@ -70,7 +70,7 @@ Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghi
 
 ## Dev SQLite ↔ Production PostgreSQL
 
-Đầu `schema.prisma` ghi rõ: dev dùng `sqlite`, không enum/mảng native. `package.json` đã cài cả `@prisma/adapter-libsql` (dev) và `@prisma/adapter-pg` (prod). Khi lên Postgres cần đổi provider, khôi phục enum/array, và cập nhật `SPEC.md` + wiki này.
+Đầu `schema.prisma` ghi rõ: dev dùng `sqlite`, không enum/mảng native. `package.json` đã cài cả `@prisma/adapter-libsql` (dev) và `@prisma/adapter-pg` (prod). Khi lên Postgres cần đổi provider, khôi phục enum/array, và cập nhật `docs/ba/SRS.md` + wiki này.
 
 ---
 👉 Tiếp theo: [Giao diện & API](05-giao-dien-va-api.md)

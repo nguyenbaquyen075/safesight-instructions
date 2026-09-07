@@ -1,6 +1,6 @@
 # 07 — Lộ trình phát triển
 
-Cập nhật 2026-09-07 theo hiện trạng code (thay cho bảng cũ trong `SPEC.md`).
+Cập nhật 2026-09-07 theo hiện trạng code (thay cho bảng cũ trong `SPEC.md`, nay đã gộp vào `docs/ba/`).
 
 ## ✅ Đã xong (không còn trong lộ trình)
 
@@ -36,7 +36,6 @@ Cập nhật 2026-09-07 theo hiện trạng code (thay cho bảng cũ trong `SPE
 ## ❓ Câu hỏi mở
 
 - [ ] `DATABASE_URL` production và nơi đặt AI engine (máy GPU tại công trường hay VPS)?
-- [ ] Nhánh `feature/frontend-v2` nêu trong `SPEC.md` cũ — còn tồn tại không, merge hay bỏ? Kiểm tra bằng `git branch -a`.
 - [ ] Có đưa Roboflow vào luồng video (WebRTC) không, hay giữ model local hoàn toàn?
 
 ---

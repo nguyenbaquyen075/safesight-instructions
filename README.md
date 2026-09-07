@@ -29,6 +29,14 @@
 
 ---
 
+## Landing page
+
+`landing-page/index.html` là landing độc lập cho GitHub Pages, không thay route `/` của dashboard. Giao diện responsive sáng/tối theo hệ thống, có nút chuyển lưu lựa chọn; menu mobile và FAQ dùng tương tác native. Không cần cài thêm dependency hay chạy AI/DB để xem.
+
+Mở trực tiếp `landing-page/index.html` trong trình duyệt để preview local. CSS, JavaScript, logo và ảnh minh họa nằm trong `landing-page/`; ảnh được trích từ video mẫu `public/videos/safety-construction-workers-helmets-46753.mp4`. Preview và bounding box là minh họa, không phải inference thực. Thiết kế ghi tại `DESIGN.md`.
+
+Workflow Pages hiện có đóng gói thư mục này thành artifact; chỉ deploy khi được phê duyệt. Landing không yêu cầu đổi cấu hình production.
+
 ## 🌟 Giới thiệu
 
 **SafeSight** là hệ thống mã nguồn mở giám sát vi phạm trang bị bảo hộ lao động (PPE) trên công trường xây dựng theo thời gian thực. AI engine chạy **YOLOv8** trên máy tại chỗ, không gửi video lên cloud; dashboard **Next.js** hiển thị camera trực tiếp kèm khung nhận diện, lưu vi phạm với bằng chứng ảnh, cảnh báo qua **Telegram** và **loa công trường**, và một **agent giám sát tự động** trực vận hành 24/7 rồi rà soát từng vi phạm theo bằng chứng.
@@ -298,7 +306,7 @@ Model không có lớp `no_vest`; "thiếu áo" suy ra khi không thấy `vest` 
 
 ## 📚 Tài liệu
 
-Toàn bộ tài liệu kiến trúc, vận hành và nghiệp vụ nằm trong [`wiki/`](./wiki/README.md) và [`docs/`](./docs):
+Tài liệu kỹ thuật nằm trong [`wiki/`](./wiki/README.md); tài liệu nghiệp vụ (BA) trong [`docs/ba/`](./docs/ba/README.md):
 
 | | Tài liệu | Nội dung |
 |---|---|---|
@@ -311,6 +319,7 @@ Toàn bộ tài liệu kiến trúc, vận hành và nghiệp vụ nằm trong [
 | 🗺️ | [Lộ trình phát triển](./wiki/07-lo-trinh-phat-trien.md) | Đã xong, ưu tiên tiếp theo |
 | 🎓 | [Train lại model găng/giày](./wiki/08-train-model-them-ppe.md) | Dataset gộp, Colab, nghiệm thu |
 | 🤖 | [Agent giám sát tự động](./wiki/09-agent.md) | Hàng đợi, bằng chứng/band, tool, rào chắn |
+| 📋 | [Bộ tài liệu BA](./docs/ba/README.md) | SRS, URD, BRD, HDSD, biên bản họp và 15 sản phẩm phân tích nghiệp vụ (BPMN, use case, user story, NFR…) |
 | 📐 | [Spec & plan thiết kế](./docs/superpowers) | Bản thiết kế đã duyệt và kế hoạch triển khai |
 | 🎨 | [DESIGN.md](./DESIGN.md) | Token màu, chữ, khoảng cách của dashboard |
 
