@@ -59,6 +59,27 @@ motion:
 
 # SafeSight Dashboard — DESIGN.md
 
+## Landing page — Industrial editorial (2026)
+
+Bản nâng cấp theo toàn quyền thiết kế của anh: bỏ hero căn giữa và card bo góc đồng đều. Hero chia hai cột, ảnh công trường phủ khung dọc, typography sans lớn phối serif italic, nhãn kỹ thuật mono và đường kẻ mảnh. Tính năng trình bày theo lưới đánh số; quy trình dạng editorial hai cột; kiến trúc nền bản vẽ kỹ thuật. Không thêm hiệu ứng chỉ để trang trí.
+
+Tokens bản editorial ghi đè phần landing cũ bên dưới: light background `#F3F2ED`, surface `#FAFAF7`, text `#202922`, secondary `#60685F`, border `#CDD1C7`; dark background `#141A17`, surface `#1B231E`, text `#EDF0E6`, secondary `#A8B2A5`, border `#3B473D`. Primary giữ `#2563EB`; accent light `#245CC5`, dark `#93BAFF`. Hero 56–105px, sans weight 500, serif italic 400; section 34–59px. Container 1360px, gutter 48/32/20px, section 110/80/60px. Khối và nút vuông; chỉ theme/menu và nút ảnh dùng hình tròn. Không shadow/glow. Mobile hero xếp dọc ≤600px; các tương tác và giới hạn dữ liệu giữ nguyên.
+
+### Nền tảng và hành vi kế thừa
+
+Phạm vi riêng: `landing-page/`, HTML/CSS/JavaScript tĩnh, giữ nguyên dashboard và các route xác thực.
+
+- **Màu:** kế thừa primary `#2563EB`, hover `#1D4ED8`; light background `#F8FAFC`, surface `#FFFFFF`, text `#12213A`, secondary `#52627A`, border `#DCE4EE`; dark background `#0B1120`, surface `#111D30`, text `#F1F5FC`, secondary `#A5B4CB`, border `#293951`. Accent text light `#1D4ED8`, dark `#82B1FF`.
+- **Typography:** system sans hỗ trợ tiếng Việt, hero 40–68px/1.12/760, section 29–42px/1.23, body 14–17px/1.65–1.8. Mono chỉ dùng cho mã và nhãn kỹ thuật.
+- **Spacing:** lưới 4/8px, container 1184px, section 96px desktop/58px mobile; gutter 32px/18px.
+- **Radius/elevation:** nút 9px, card 13px, khung lớn 15–20px; shadow chỉ nhấn preview, không glow trang trí.
+- **Components:** header sticky, hero, preview có nhãn minh họa, feature cards, quy trình, sơ đồ kiến trúc tĩnh, CTA cài đặt, FAQ native details.
+- **Theme:** mặc định theo hệ thống; lưu lựa chọn trong `safesight-theme`; áp dụng trước paint; vẫn đổi được khi storage bị chặn.
+- **Motion:** hover 180ms; smooth anchor scroll; tắt với reduced-motion. Không autoplay video.
+- **Responsive:** 3/2/1 cột tính năng, mobile menu ≤900px, preview co về một cột ≤600px. Không che overflow để giấu lỗi layout.
+- **Accessibility:** focus ring rõ, icon SVG có aria-hidden, nút icon có nhãn, hit target ≥44px, skip link, trạng thái menu/theme qua ARIA.
+- **Rationale:** màu xanh giữ nhận diện và niềm tin kỹ thuật; khoảng trắng và preview thay cho số liệu quảng cáo. Ảnh trích từ video mẫu local; overlay minh họa được ghi rõ, không mô tả là inference thật. Giữ trung thực trạng thái MVP và các tích hợp cloud tùy chọn.
+
 ## Vì sao trông như vậy
 Dashboard chạy 24/7 trong phòng trực, nền tối để đỡ mỏi mắt và để khung đỏ vi phạm nổi bật.
 Màu ngữ nghĩa cố định: đỏ = vi phạm/nguy hiểm, vàng = cảnh báo/chờ, xanh lá = an toàn/đã xử lý,

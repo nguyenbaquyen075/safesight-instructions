@@ -3,138 +3,78 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>SafeSight — Giám sát an toàn lao động bằng AI</title>
-<meta name="description" content="SafeSight phát hiện thiếu mũ, áo phản quang, găng, giày bảo hộ theo thời gian thực bằng YOLOv8, cảnh báo Telegram và loa công trường, có agent giám sát tự động.">
+<title>SafeSight — Nhìn rõ rủi ro. Chủ động an toàn.</title>
+<meta name="description" content="SafeSight phân tích camera bằng AI tại chỗ, phát hiện vi phạm PPE, lưu bằng chứng và hỗ trợ cảnh báo an toàn công trường. Mã nguồn mở, giấy phép MIT.">
+<meta name="theme-color" content="#f3f2ed">
+<meta property="og:title" content="SafeSight — Nhìn rõ rủi ro. Chủ động an toàn.">
+<meta property="og:description" content="Từ camera đến bằng chứng, từ phát hiện đến hành động. Khám phá nền tảng giám sát PPE mã nguồn mở.">
+<meta property="og:type" content="website">
 <link rel="icon" type="image/svg+xml" href="assets/safesight-logo.svg">
-<meta property="og:title" content="SafeSight — Giám sát an toàn lao động bằng AI">
-<meta property="og:description" content="YOLOv8 + Next.js: phát hiện vi phạm PPE theo thời gian thực, bằng chứng ảnh, cảnh báo Telegram, agent giám sát tự động.">
-<meta property="og:image" content="assets/safesight-logo.svg">
-<style>
-  :root{--bg:#0F172A;--bg2:#0B1120;--surface:#1E293B;--surface-hover:#273548;--border:#334155;--text:#F8FAFC;--text2:#94A3B8;--muted:#64748B;--primary:#2563EB;--primary-hover:#1D4ED8;--danger:#DC2626;--success:#16A34A;--warning:#F59E0B;--info:#0EA5E9;--radius:16px}
-  *{box-sizing:border-box}
-  html{scroll-behavior:smooth}
-  body{margin:0;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 40%);color:var(--text);font:400 15px/1.6 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow-x:hidden}
-  a{color:inherit}
-  .wrap{max-width:1100px;margin:0 auto;padding:0 20px}
-  header{position:sticky;top:0;z-index:10;backdrop-filter:blur(12px);background:rgba(11,17,32,.75);border-bottom:1px solid var(--border)}
-  nav{display:flex;align-items:center;gap:12px;min-height:60px;padding:8px 0;flex-wrap:wrap}
-  nav .brand{display:flex;align-items:center;gap:10px;font-weight:800;text-decoration:none}
-  nav .brand img{width:30px;height:30px}
-  nav .links{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
-  nav .links a{color:var(--text2);text-decoration:none;font-size:13px;padding:6px 10px;border-radius:8px}
-  nav .links a:hover,nav .links a:focus-visible{color:var(--text);background:var(--surface);outline:none}
-  .hero{padding:72px 0 40px;text-align:center}
-  .hero img.logo{width:120px;height:120px;filter:drop-shadow(0 0 30px rgba(37,99,235,.45))}
-  .hero h1{font-size:clamp(32px,6vw,52px);line-height:1.1;margin:20px 0 12px;font-weight:900;letter-spacing:-.02em}
-  .hero h1 span{color:#60A5FA}
-  .hero p.lead{max-width:720px;margin:0 auto 28px;color:var(--text2);font-size:clamp(15px,2.2vw,18px)}
-  .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
-  .btn{display:inline-flex;align-items:center;gap:8px;padding:12px 20px;border-radius:10px;font-weight:700;text-decoration:none;border:1px solid var(--border);background:var(--surface);transition:background .15s,transform .15s}
-  .btn:hover,.btn:focus-visible{background:var(--surface-hover);transform:translateY(-1px);outline:none}
-  .btn.primary{background:var(--primary);border-color:var(--primary);box-shadow:0 0 20px rgba(37,99,235,.3)}
-  .btn.primary:hover,.btn.primary:focus-visible{background:var(--primary-hover)}
-  .label{font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--muted)}
-  section{padding:48px 0}
-  h2{font-size:clamp(22px,3.2vw,30px);font-weight:800;margin:6px 0 24px;letter-spacing:-.01em}
-  .diagram{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;overflow-x:auto}
-  .diagram img{display:block;width:100%;min-width:640px;height:auto}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;transition:border-color .15s,transform .15s}
-  .card:hover{border-color:#475569;transform:translateY(-2px)}
-  .card .ic{width:40px;height:40px;border-radius:10px;display:grid;place-items:center;font-size:20px;margin-bottom:14px}
-  .card h3{margin:0 0 6px;font-size:16px;font-weight:800}
-  .card p{margin:0;color:var(--text2);font-size:14px}
-  .ic.red{background:rgba(220,38,38,.15)}.ic.blue{background:rgba(37,99,235,.15)}.ic.green{background:rgba(22,163,74,.15)}.ic.amber{background:rgba(245,158,11,.15)}.ic.sky{background:rgba(14,165,233,.15)}
-  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:16px}
-  .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px;text-align:center}
-  .stat b{display:block;font-size:30px;font-weight:900;color:#60A5FA}
-  .stat span{color:var(--text2);font-size:13px}
-  .chips{display:flex;flex-wrap:wrap;gap:8px}
-  .chip{background:var(--bg2);border:1px solid var(--border);border-radius:999px;padding:6px 12px;font-size:13px;color:var(--text2);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  pre{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:16px;overflow-x:auto;font-size:13px;line-height:1.5;margin:0}
-  code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
-  .steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}
-  .step{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px}
-  .step .n{font-weight:900;color:#60A5FA;font-size:12px;letter-spacing:.15em}
-  footer{border-top:1px solid var(--border);padding:32px 0;color:var(--muted);font-size:13px}
-  footer .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
-  @media (prefers-reduced-motion:reduce){*{transition:none!important}}
-</style>
+<script src="theme.js"></script>
+<link rel="stylesheet" href="styles.css">
+<script src="main.js" defer></script>
 </head>
 <body>
-<header><div class="wrap"><nav>
-  <a class="brand" href="#"><img src="assets/safesight-logo.svg" alt="">SafeSight</a>
-  <div class="links">
-    <a href="#tinh-nang">Tính năng</a><a href="#kien-truc">Kiến trúc</a><a href="#bat-dau">Bắt đầu</a>
-    <a href="https://github.com/nguyenbaquyen075/safesight-instructions/tree/main/wiki">Tài liệu</a>
-    <a href="https://github.com/nguyenbaquyen075/safesight-instructions">GitHub</a>
-  </div>
-</nav></div></header>
+<svg aria-hidden="true" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg"><defs>
+<symbol id="icon-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
+<symbol id="icon-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+<symbol id="icon-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6z"/><path d="m8 12 3 3 5-6"/></symbol>
+<symbol id="icon-camera" viewBox="0 0 24 24"><rect x="3" y="6" width="13" height="13" rx="3"/><path d="m16 10 5-3v11l-5-3"/></symbol>
+<symbol id="icon-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+<symbol id="icon-bell" viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></symbol>
+<symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1"/><path d="m3 17 5-5 4 4 4-6 5 7"/></symbol>
+<symbol id="icon-bot" viewBox="0 0 24 24"><rect x="4" y="7" width="16" height="13" rx="4"/><path d="M12 3v4M1 12v4m22-4v4M8 12v2m8-2v2m-7 3h6"/></symbol>
+<symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 3v17h17M8 15v-4m5 4V7m5 8v-6"/></symbol>
+<symbol id="icon-server" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="7" rx="2"/><rect x="3" y="14" width="18" height="7" rx="2"/><path d="M7 6.5h.01M7 17.5h.01M12 7h5m-5 10h5"/></symbol>
+<symbol id="icon-code" viewBox="0 0 24 24"><path d="m7 7-5 5 5 5m10-10 5 5-5 5m-3-14-4 18"/></symbol>
+<symbol id="icon-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1 1m12 12 1 1M5 19l1-1M18 6l1-1"/></symbol>
+<symbol id="icon-moon" viewBox="0 0 24 24"><path d="M20 14A9 9 0 0 1 10 3a9 9 0 1 0 10 11Z"/></symbol>
+<symbol id="icon-menu" viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+</defs></svg>
+<a class="skip" href="#main">Đến nội dung chính</a>
+<header class="site-header"><nav class="container nav" aria-label="Điều hướng chính">
+<a class="brand" href="#" aria-label="SafeSight — đầu trang"><img src="assets/safesight-logo.svg" alt="" width="35" height="35"><span>Safe<span>Sight</span></span></a>
+<div class="nav-links" id="navigation" hidden><a href="#tinh-nang">Tính năng</a><a href="#workflow">Cách hoạt động</a><a href="#kien-truc">Kiến trúc</a><a href="https://github.com/nguyenbaquyen075/safesight-instructions/tree/main/wiki">Tài liệu</a></div>
+<div class="nav-actions"><button class="icon-button" id="theme-toggle" aria-label="Chuyển giao diện tối" aria-pressed="false"><svg class="moon-icon" aria-hidden="true"><use href="#icon-moon"/></svg><svg class="sun-icon" aria-hidden="true"><use href="#icon-sun"/></svg></button><a class="button primary small" href="#bat-dau">Bắt đầu ngay <svg aria-hidden="true"><use href="#icon-arrow"/></svg></a><button class="icon-button menu-button" id="menu-toggle" aria-label="Mở menu" aria-expanded="false" aria-controls="navigation"><svg aria-hidden="true"><use href="#icon-menu"/></svg></button></div>
+</nav></header>
+<main id="main">
+<section class="hero"><div class="container"><div class="hero-index"><span>SAFESIGHT / VISUAL INTELLIGENCE</span><span>DESIGNED FOR THE REAL WORLD ↗</span></div><div class="hero-layout"><div class="hero-copy">
+<div class="eyebrow pill"><span class="dot"></span> Công nghệ vì con người</div>
+<h1>Nhìn xa hơn.<br><span>Bảo vệ</span><br>tốt hơn<span class="title-period">.</span></h1>
+<p class="lead">Thêm một góc nhìn AI cho công trường của bạn.<br>Phát hiện vi phạm bảo hộ, lưu bằng chứng và hỗ trợ cảnh báo kịp thời — trên một nền tảng mã nguồn mở.</p>
+<div class="actions"><a class="button primary" href="#bat-dau">Khám phá SafeSight <svg aria-hidden="true"><use href="#icon-arrow"/></svg></a><a class="button" href="https://github.com/nguyenbaquyen075/safesight-instructions"><svg aria-hidden="true"><use href="#icon-code"/></svg> Xem mã nguồn</a></div>
+<div class="hero-note"><span><svg aria-hidden="true"><use href="#icon-check"/></svg> Suy luận AI tại chỗ</span><span><svg aria-hidden="true"><use href="#icon-check"/></svg> 4 nhóm trang bị bảo hộ</span><span><svg aria-hidden="true"><use href="#icon-check"/></svg> Giấy phép MIT</span></div>
+</div><figure class="hero-visual"><img src="assets/site-preview.jpg" alt="Khung hình công trường từ video mẫu SafeSight" width="960" height="540" fetchpriority="high"><div class="visual-topline"><span><i class="dot"></i> FIELD NOTES — 001</span><span>LOCAL VISION</span></div><div class="viewfinder" aria-hidden="true"><span>HUMAN FIRST.</span></div><figcaption><span>Không chỉ thấy công trường.<br><strong>Thấy những người cần được bảo vệ.</strong></span><a href="#tinh-nang" aria-label="Khám phá năng lực SafeSight">↗</a></figcaption><span class="image-credit">HÌNH ẢNH MINH HỌA / VIDEO MẪU</span></figure></div><div class="hero-bottom"><span>01 — NHÌN RÕ ĐỂ HÀNH ĐỘNG</span><p>Biến dữ liệu hình ảnh thành góc nhìn hữu ích<br>cho người phụ trách an toàn.</p><a href="#product-preview">Khám phá nền tảng ↓</a></div>
+<div class="preview" id="product-preview" aria-label="Minh họa giao diện giám sát SafeSight, không phải dữ liệu trực tiếp">
+<div class="preview-bar"><div class="window-dots" aria-hidden="true"><i></i><i></i><i></i></div><span class="preview-title"><svg aria-hidden="true"><use href="#icon-shield"/></svg> SafeSight · Không gian giám sát</span><span>BẢN XEM TRƯỚC</span></div>
+<div class="preview-body"><aside class="preview-sidebar" aria-label="Minh họa thanh bên"><strong>SafeSight<span style="color:var(--accent)"> AI</span></strong><div class="sidebar-item active"><svg aria-hidden="true"><use href="#icon-grid"/></svg>Tổng quan</div><div class="sidebar-item"><svg aria-hidden="true"><use href="#icon-camera"/></svg>Camera</div><div class="sidebar-item"><svg aria-hidden="true"><use href="#icon-shield"/></svg>Vi phạm PPE</div><div class="sidebar-item"><svg aria-hidden="true"><use href="#icon-bell"/></svg>Cảnh báo</div><div class="sidebar-item"><svg aria-hidden="true"><use href="#icon-bot"/></svg>Safety Agent</div><div class="sidebar-foot">AI hỗ trợ quan sát.<br>Con người quyết định.</div></aside>
+<div class="preview-content"><div class="preview-heading"><div><h2>An toàn trong tầm nhìn.</h2><p>Camera, bằng chứng và cảnh báo trong một không gian.</p></div><span class="demo-badge">Dữ liệu minh họa</span></div>
+<div class="monitor-grid"><div class="camera"><img src="assets/site-preview.jpg" alt="Công nhân trang bị mũ và áo bảo hộ tại công trường, hình ảnh minh họa" width="960" height="540" fetchpriority="high"><div class="camera-label"><span class="dot"></span>CAM 01 · Khu vực thi công</div><div class="detection" aria-hidden="true"><span>PERSON · PPE CHECK</span></div><div class="camera-caption">YOLOv8 · Phân tích tại chỗ</div></div><div class="monitor-panel"><div class="mini-card"><span class="metric-label"><svg aria-hidden="true"><use href="#icon-shield"/></svg> Nhóm PPE theo dõi</span><b>04</b><small>Mũ · Áo · Găng · Giày</small></div><div class="mini-card"><span class="metric-label"><svg aria-hidden="true"><use href="#icon-camera"/></svg> Xác nhận liên tục</span><b>≥ 3s</b><small>Ngưỡng mặc định</small></div><div class="mini-card event-card"><strong>Không chỉ là phát hiện.</strong><p>Bằng chứng ảnh giúp cán bộ an toàn rà soát từng sự kiện.</p><span style="color:var(--accent)">Ghi nhận · Đối chiếu · Xử lý</span></div></div></div><p class="preview-disclaimer">Giao diện và khung nhận diện minh họa; không phải kết quả suy luận trên ảnh này.</p></div></div></div>
+</div></section>
+<div class="foundation"><div class="container"><p>Xây trên nền tảng<br>công nghệ mở, quen thuộc.</p><div class="tech-list" aria-label="Công nghệ sử dụng"><span>YOLOv8</span><span>Next.js</span><span>Python</span><span>Socket.IO</span><span>Prisma</span><span>Docker</span></div></div></div>
+<section class="section container" id="tinh-nang"><div class="section-heading center"><span class="eyebrow">02 / NĂNG LỰC NỀN TẢNG</span><h2>An toàn không nên<br>phụ thuộc vào <em>may mắn.</em></h2><p>Một góc nhìn xuyên suốt. Từ điều vừa xuất hiện trong khung hình đến điều đội ngũ cần hành động.</p></div>
+<div class="feature-grid">
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-shield"/></svg></div><h3>Nhận diện trang bị bảo hộ</h3><p>Theo dõi mũ, áo phản quang, găng tay và giày bảo hộ. Xác nhận qua nhiều khung hình liên tục để hạn chế báo động nhất thời.</p><span class="feature-tag">04 NHÓM PPE</span></article>
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-camera"/></svg></div><h3>Camera trong một tầm nhìn</h3><p>Xem camera với khung nhận diện theo thời gian thực. Tổ chức nguồn hình theo công trường, không bỏ lỡ ngữ cảnh cần quan sát.</p><span class="feature-tag">REALTIME OVERLAY</span></article>
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-image"/></svg></div><h3>Bằng chứng để đối chiếu</h3><p>Lưu ảnh sự kiện, thời điểm và lịch sử tái diễn. Cán bộ an toàn có cơ sở rà soát, cập nhật trạng thái và theo dõi xử lý.</p><span class="feature-tag">TỪ PHÁT HIỆN ĐẾN RÀ SOÁT</span></article>
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-bell"/></svg></div><h3>Cảnh báo đúng ngữ cảnh</h3><p>Gửi Telegram theo quy tắc, ngưỡng và thời gian chờ của công trường. Hỗ trợ gửi lời nhắc đã ghi âm đến trang loa công trường.</p><span class="feature-tag">TELEGRAM & LOA CÔNG TRƯỜNG</span></article>
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-bot"/></svg></div><h3>Thêm một trợ lý vận hành</h3><p>Agent kiểm tra sức khỏe hệ thống. Khi cấu hình Claude, hỗ trợ rà soát bằng chứng và trả lời câu hỏi, với nhật ký hành động rõ ràng.</p><span class="feature-tag">HỖ TRỢ, KHÔNG THAY THẾ CON NGƯỜI</span></article>
+<article class="feature"><div class="feature-icon"><svg aria-hidden="true"><use href="#icon-chart"/></svg></div><h3>Đánh giá bằng thực tế</h3><p>Công cụ đánh giá báo oan, bỏ sót và quét ngưỡng từng lớp giúp đội ngũ kiểm chứng model với dữ liệu tại công trường của mình.</p><span class="feature-tag">ĐO LƯỜNG TRƯỚC KHI TIN TƯỞNG</span></article>
+</div></section>
+<section class="section workflow" id="workflow"><div class="container"><div class="section-heading"><span class="eyebrow">Từ quan sát đến hành động</span><h2>Một luồng rõ ràng.<br>Ít điểm mù hơn.</h2></div><div class="steps"><article class="step"><div class="step-number">01 / KẾT NỐI</div><h3>Đưa camera vào hệ thống</h3><p>Sử dụng webcam, nguồn RTSP hoặc video mẫu. Gắn camera với công trường để giữ đúng ngữ cảnh giám sát.</p></article><article class="step"><div class="step-number">02 / PHÂN TÍCH</div><h3>AI quan sát tại chỗ</h3><p>Model YOLOv8 nhận diện PPE, theo dõi đối tượng và xác nhận vi phạm khi điều kiện kéo dài đủ ngưỡng.</p></article><article class="step"><div class="step-number">03 / PHẢN HỒI</div><h3>Có bằng chứng. Có hành động.</h3><p>Dashboard ghi nhận sự kiện. Quy tắc cảnh báo hỗ trợ thông báo để người phụ trách rà soát và xử lý.</p></article></div></div></section>
+<section class="section container" id="kien-truc"><div class="architecture"><div><span class="eyebrow">Local AI. Open architecture.</span><h2>Chủ động hạ tầng.<br>Hiểu rõ dữ liệu.</h2><p>Luồng camera được phân tích bằng model local. Kiến trúc tách biệt AI Engine, Bridge và Dashboard giúp đội ngũ hiểu và tùy chỉnh từng phần.</p><ul class="check-list"><li><svg aria-hidden="true"><use href="#icon-check"/></svg>Model chính: ppe_multiclass.pt</li><li><svg aria-hidden="true"><use href="#icon-check"/></svg>Phân quyền theo vai trò và công trường</li><li><svg aria-hidden="true"><use href="#icon-check"/></svg>Mã nguồn mở, có tài liệu kiến trúc</li></ul><p>Claude, Telegram và Roboflow sử dụng dịch vụ bên ngoài khi được cấu hình. Roboflow chỉ dùng đối chiếu ảnh tĩnh, không chạy trên từng frame camera.</p><a class="button" href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/wiki/02-kien-truc-he-thong.md">Tìm hiểu kiến trúc <svg aria-hidden="true"><use href="#icon-arrow"/></svg></a></div><div class="architecture-visual" aria-label="Luồng camera đến AI Engine, YOLO Bridge và Dashboard"><div class="architecture-node"><svg aria-hidden="true"><use href="#icon-camera"/></svg><div><strong>Camera công trường</strong><small>Webcam / RTSP / Video mẫu</small></div></div><div class="connector">↓ khung hình</div><div class="architecture-node"><svg aria-hidden="true"><use href="#icon-server"/></svg><div><strong>AI Engine · YOLOv8</strong><small>Nhận diện & theo dõi PPE tại chỗ</small></div></div><div class="connector">↓ YOLO Bridge · Socket.IO</div><div class="architecture-node"><svg aria-hidden="true"><use href="#icon-grid"/></svg><div><strong>SafeSight Dashboard</strong><small>Quan sát · Bằng chứng · Cảnh báo</small></div></div><p class="architecture-caption">Vi phạm được lưu qua API · Prisma<br>Agent chạy riêng để hỗ trợ vận hành.</p></div></div></section>
+<section class="container" id="bat-dau"><div class="deployment"><div><span class="eyebrow">Bắt đầu từ một camera</span><h2>Mang SafeSight vào<br>môi trường của bạn.</h2><p>Khám phá mã nguồn, chuẩn bị model và chạy thử với video mẫu trước khi kết nối camera công trường.</p><div class="actions"><a class="button primary" href="https://github.com/nguyenbaquyen075/safesight-instructions#-cài-đặt-nhanh">Hướng dẫn cài đặt <svg aria-hidden="true"><use href="#icon-arrow"/></svg></a><a class="button" href="https://github.com/nguyenbaquyen075/safesight-instructions/releases">Xem releases</a></div><p style="font-size:12px">MVP đang phát triển. Cần nghiệm thu với dữ liệu thực tế trước khi sử dụng trong vận hành.</p></div><div class="terminal"><div class="terminal-bar">~/safesight-instructions · development</div><pre><code><span class="comment"># 1. Lấy mã nguồn</span>
+<span class="command">git clone</span> https://github.com/nguyenbaquyen075/safesight-instructions.git
+<span class="command">cd</span> safesight-instructions
 
-<main class="wrap">
-  <div class="hero">
-    <img class="logo" src="assets/safesight-logo.svg" alt="Logo SafeSight">
-    <div class="label">Mã nguồn mở · MIT</div>
-    <h1>Giám sát an toàn lao động<br><span>bằng AI, theo thời gian thực</span></h1>
-    <p class="lead">SafeSight phát hiện người thiếu mũ bảo hộ, áo phản quang, găng tay, giày bảo hộ trên công trường bằng YOLOv8, lưu bằng chứng ảnh, cảnh báo qua Telegram và loa công trường, có agent tự động trực vận hành và rà soát vi phạm.</p>
-    <div class="cta">
-      <a class="btn primary" href="https://github.com/nguyenbaquyen075/safesight-instructions#-cài-đặt-nhanh">🚀 Bắt đầu</a>
-      <a class="btn" href="https://github.com/nguyenbaquyen075/safesight-instructions/releases">📦 Releases</a>
-      <a class="btn" href="https://github.com/nguyenbaquyen075/safesight-instructions">⭐ GitHub</a>
-    </div>
-  </div>
+<span class="comment"># 2. Hoàn tất các bước trong README:
+# dependencies, .env, database, model
 
-  <section>
-    <div class="stats">
-      <div class="stat"><b>4</b><span>loại PPE bắt buộc</span></div>
-      <div class="stat"><b>&lt;3s</b><span>xác nhận vi phạm</span></div>
-      <div class="stat"><b>3</b><span>model YOLOv8 chuyên biệt</span></div>
-      <div class="stat"><b>4</b><span>tiến trình, 1 lệnh chạy</span></div>
-    </div>
-  </section>
-
-  <section id="tinh-nang">
-    <div class="label">Tính năng</div>
-    <h2>Từ khung hình camera đến hành động</h2>
-    <div class="grid">
-      <div class="card"><div class="ic red">🦺</div><h3>Phát hiện vi phạm PPE</h3><p>YOLOv8 nhận diện mũ, áo, găng, giày trên từng người; theo dõi track ID và chỉ chốt vi phạm khi thấy liên tục, giảm báo động giả.</p></div>
-      <div class="card"><div class="ic blue">📸</div><h3>Bằng chứng ảnh</h3><p>Mỗi vi phạm kèm snapshot đã khoanh khung tại vị trí cổ tay, cổ chân, đầu từ keypoint tư thế, lưu vào cơ sở dữ liệu cùng số lần tái diễn.</p></div>
-      <div class="card"><div class="ic sky">📡</div><h3>Overlay thời gian thực</h3><p>YOLO Bridge phát detection qua Socket.IO theo từng camera, dashboard vẽ khung ngay trên video trực tiếp.</p></div>
-      <div class="card"><div class="ic amber">📣</div><h3>Cảnh báo Telegram và loa</h3><p>Quy tắc cảnh báo theo công trường, ngưỡng và thời gian chờ; nhắc nhở rồi leo thang; nói trực tiếp qua mic tới loa công trường.</p></div>
-      <div class="card"><div class="ic green">🤖</div><h3>Agent giám sát tự động</h3><p>Lane trực vận hành phát hiện camera, engine, bridge đứng và tự khắc phục; lane cán bộ an toàn dùng Claude rà soát vi phạm theo bằng chứng.</p></div>
-      <div class="card"><div class="ic blue">🔬</div><h3>Nghiệm thu bằng số liệu</h3><p>Chấm model theo tỉ lệ báo oan và bỏ sót thay vì mAP; quét ngưỡng từng lớp; đối chiếu với Roboflow trên ảnh tĩnh.</p></div>
-    </div>
-  </section>
-
-  <section id="kien-truc">
-    <div class="label">Kiến trúc</div>
-    <h2>Ba tiến trình lõi, một cơ sở dữ liệu</h2>
-    <div class="diagram"><img src="assets/yolo-architecture-animated-dark.svg" alt="Sơ đồ: YOLOv8 Model → YOLO Bridge → Next.js Dashboard; API POST /api/violations lưu qua Prisma"></div>
-    <p style="color:var(--text2);margin:16px 0 0">AI Engine (Python) chạy model local, gửi detection cho Bridge (Node.js, cổng 4001) và ghi vi phạm đã xác nhận qua API của Dashboard (Next.js, cổng 3000). Agent là tiến trình thứ tư, dùng chung cơ sở dữ liệu Prisma.</p>
-    <div class="chips" style="margin-top:20px">
-      <span class="chip">Next.js 16</span><span class="chip">React 19</span><span class="chip">TypeScript</span><span class="chip">Tailwind 4</span><span class="chip">Prisma 7</span><span class="chip">SQLite / Postgres</span><span class="chip">NextAuth</span><span class="chip">Socket.IO</span><span class="chip">Python</span><span class="chip">Ultralytics YOLOv8</span><span class="chip">OpenCV</span><span class="chip">Anthropic SDK</span><span class="chip">Docker</span>
-    </div>
-  </section>
-
-  <section id="bat-dau">
-    <div class="label">Bắt đầu</div>
-    <h2>Chạy trong vài phút</h2>
-    <div class="steps">
-      <div class="step"><div class="n">01 · DOCKER</div><h3>Dashboard và Bridge</h3><pre><code>docker compose up -d
-# Dashboard: http://localhost:3000
-# Bridge:    http://localhost:4001</code></pre></div>
-      <div class="step"><div class="n">02 · MÃ NGUỒN</div><h3>Toàn bộ hệ thống</h3><pre><code>git clone https://github.com/nguyenbaquyen075/safesight-instructions.git
-cd safesight-instructions
-npm install &amp;&amp; npx prisma db push &amp;&amp; npm run db:seed
-npm run dev</code></pre></div>
-      <div class="step"><div class="n">03 · MODEL</div><h3>File .pt cần có</h3><p style="color:var(--text2);margin:0">Đặt <code>ppe_multiclass.pt</code> ở gốc repo (bắt buộc). <code>ppe_boots.pt</code>, <code>ppe_gang.pt</code>, <code>yolov8n-pose.pt</code> là tuỳ chọn, thiếu thì hệ thống tự lùi về model chính.</p></div>
-    </div>
-  </section>
+# 3. Khởi động môi trường dev</span>
+<span class="command">npm run dev</span></code></pre><div class="terminal-note">Docker đóng gói Dashboard + Bridge.<br>Python inference và Agent chạy riêng theo tài liệu.</div></div></div></section>
+<section class="section container"><div class="section-heading center"><span class="eyebrow">Trước khi bắt đầu</span><h2>Một vài điều cần biết.</h2></div><div class="faq"><details><summary>SafeSight phát hiện những trang bị nào?</summary><p>Bốn nhóm PPE: mũ bảo hộ, áo phản quang, găng tay và giày bảo hộ. Kết quả phụ thuộc góc camera, ánh sáng, độ che khuất và model. AI hỗ trợ người giám sát, không bảo đảm phát hiện mọi vi phạm.</p></details><details><summary>Có cần gửi video lên cloud không?</summary><p>Không đối với luồng suy luận YOLOv8 local. Tuy nhiên, các tính năng tùy chọn như Claude rà soát ảnh, Telegram gửi bằng chứng và Roboflow đối chiếu ảnh tĩnh có sử dụng dịch vụ bên ngoài. Hãy đánh giá chính sách dữ liệu trước khi bật.</p></details><details><summary>Cần chuẩn bị gì để chạy thử?</summary><p>Chuẩn bị Node.js tương thích Next.js 16, môi trường Python với dependencies, cấu hình môi trường và cơ sở dữ liệu theo README. File ppe_multiclass.pt là bắt buộc; model găng, giày và pose là tùy chọn. Có thể dùng video mẫu thay camera thật.</p></details><details><summary>SafeSight đã sẵn sàng thay thế quy trình an toàn chưa?</summary><p>Chưa. Đây là MVP đang phát triển, không phải hệ thống được chứng nhận an toàn. Cần kiểm thử báo oan, bỏ sót và cảnh báo tại công trường; giữ cán bộ an toàn trong vòng rà soát và quyết định.</p></details></div></section>
+<section class="closing"><span class="eyebrow">Công nghệ quan sát. Con người được bảo vệ.</span><h2>Thêm một góc nhìn.<br>Cho một công trường an toàn hơn.</h2><p>Bắt đầu nhỏ. Kiểm chứng thực tế. Cải thiện từng ngày.</p><div class="actions"><a class="button primary" href="#bat-dau">Bắt đầu với SafeSight <svg aria-hidden="true"><use href="#icon-arrow"/></svg><span hidden> </span></a><a class="button" href="https://github.com/nguyenbaquyen075/safesight-instructions/tree/main/wiki">Đọc tài liệu</a></div></section>
 </main>
-
-<footer><div class="wrap"><div class="row">
-  <span>© 2026 SafeSight · Giấy phép MIT</span>
-  <span><a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CONTRIBUTORS.md">Contributors</a> · <a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CHANGELOG.md">Changelog</a> · <a href="https://github.com/nguyenbaquyen075/safesight-instructions/issues">Issues</a></span>
-</div></div></footer>
+<footer class="site-footer"><div class="container"><div class="footer-row"><a class="brand" href="#"><img src="assets/safesight-logo.svg" alt="" width="35" height="35"><span>Safe<span>Sight</span></span></a><div class="footer-links"><a href="https://github.com/nguyenbaquyen075/safesight-instructions">GitHub</a><a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CONTRIBUTORS.md">Contributors</a><a href="https://github.com/nguyenbaquyen075/safesight-instructions/blob/main/CHANGELOG.md">Changelog</a><a href="https://github.com/nguyenbaquyen075/safesight-instructions/issues">Issues</a></div></div><p class="footer-note">© 2026 SafeSight · Mã nguồn mở theo giấy phép MIT. Được xây dựng để hỗ trợ con người, không thay thế quy trình an toàn.</p></div></footer>
 </body>
 </html>

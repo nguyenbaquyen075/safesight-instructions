@@ -1,5 +1,11 @@
 # 05 — Giao diện & API
 
+## Landing page công khai
+
+Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng tại `#product-preview`, tính năng đánh số và quy trình hai cột. Mobile hero xếp dọc; giữ các anchor cũ. Hai theme ivory/charcoal-green được định nghĩa riêng trong `landing-page/styles.css`.
+
+`landing-page/index.html` chạy độc lập trên GitHub Pages, không phải route Next.js, không thay `/` hoặc `/login`. Theme sáng/tối chỉ áp dụng landing, lưu bằng `safesight-theme`, mặc định theo hệ thống. Menu mobile hỗ trợ Escape; FAQ dùng `details/summary`; CTA dẫn tài liệu và mã nguồn thật, không gọi API. Ảnh và khung PPE ở hero được ghi rõ là minh họa. Xem local bằng cách mở file HTML; không cần khởi động DB, AI hoặc Agent.
+
 ## Danh mục trang (route)
 
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.

@@ -31,6 +31,8 @@
 
 ## Landing page
 
+Art direction **industrial editorial**: hero bất đối xứng, ảnh công trường khổ lớn, typography sans/serif, lưới tính năng đánh số; light ivory và dark charcoal-green, giữ xanh thương hiệu cho CTA.
+
 `landing-page/index.html` là landing độc lập cho GitHub Pages, không thay route `/` của dashboard. Giao diện responsive sáng/tối theo hệ thống, có nút chuyển lưu lựa chọn; menu mobile và FAQ dùng tương tác native. Không cần cài thêm dependency hay chạy AI/DB để xem.
 
 Mở trực tiếp `landing-page/index.html` trong trình duyệt để preview local. CSS, JavaScript, logo và ảnh minh họa nằm trong `landing-page/`; ảnh được trích từ video mẫu `public/videos/safety-construction-workers-helmets-46753.mp4`. Preview và bounding box là minh họa, không phải inference thực. Thiết kế ghi tại `DESIGN.md`.
