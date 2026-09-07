@@ -68,14 +68,14 @@ async function isInCooldown(rule: MatchedRule): Promise<boolean> {
   return elapsedSec < rule.cooldownSec;
 }
 
-async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, botToken: string): Promise<void> {
+async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, botToken: string, captionOverride?: string): Promise<void> {
   const client = new TelegramClient(botToken);
   // Lần đầu chỉ là nhắc nhở; còn tái phạm (occurrenceCount >= 2) mới tính là vi phạm chính thức.
   const title =
     violation.occurrenceCount <= 1
       ? '⚠️ Nhắc nhở vi phạm ATLĐ'
       : `🚨 Vi phạm ATLĐ (lần ${violation.occurrenceCount})`;
-  const caption =
+  const caption = captionOverride ??
     `<b>${title}</b>\n` +
     `Loại vi phạm: ${getViolationTypeLabel(violation.type)}\n` +
     `Camera: ${camera.name}\n` +
@@ -101,7 +101,7 @@ async function sendToRecipients(rule: MatchedRule, violation: Violation, camera:
   }
 }
 
-export async function notifyViolation(violation: Violation, camera: Camera): Promise<void> {
+export async function notifyViolation(violation: Violation, camera: Camera, opts: { caption?: string } = {}): Promise<void> {
   const settings = await prisma.telegramSettings.findFirst();
   if (!settings || !settings.isEnabled || !settings.botTokenEncrypted) return;
 
@@ -113,6 +113,6 @@ export async function notifyViolation(violation: Violation, camera: Camera): Pro
   for (const rule of rules) {
     if (await isBelowThreshold(rule, violation, camera)) continue;
     if (await isInCooldown(rule)) continue;
-    await sendToRecipients(rule, violation, camera, botToken);
+    await sendToRecipients(rule, violation, camera, botToken, opts.caption);
   }
 }

@@ -36,6 +36,7 @@ export default function DashboardLayout({
     if (pathname.startsWith('/alerts')) return { title: 'Trung tâm Thông báo', subtitle: 'Xem và xác nhận thông báo' };
     if (pathname.startsWith('/violations')) return { title: 'Nhật ký Vi phạm', subtitle: 'Kiểm tra và giải quyết vi phạm an toàn' };
     if (pathname.startsWith('/analytics')) return { title: 'Phân tích An toàn', subtitle: 'Xu hướng tuân thủ và báo cáo' };
+    if (pathname.startsWith('/agent')) return { title: 'Agent giám sát', subtitle: 'Trực vận hành và cán bộ an toàn tự động' };
     if (pathname.startsWith('/users')) return { title: 'Quản lý Người dùng', subtitle: 'Phân quyền và kiểm soát truy cập' };
     if (pathname.startsWith('/settings')) return { title: 'Cài đặt', subtitle: 'Cấu hình cá nhân và hệ thống' };
     return { title: 'SafeSight AI', subtitle: 'Nền tảng An toàn Xây dựng' };

@@ -5,6 +5,7 @@ import { X, ShieldAlert, Wifi, WifiOff } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { mockCameras } from '@/data/mock-cameras';
 import { CameraStatus, SiteStatus } from '@/types/enums';
+import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 import type { SiteStatusSummary, Violation } from '@/types/models';
 
 interface SiteDetailModalProps {
@@ -95,6 +96,11 @@ export function SiteDetailModal({ site, violations, onClose }: SiteDetailModalPr
                 ))}
               </div>
             )}
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10">
+            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Agent</h4>
+            <SubjectAgentPanel subjectType="site" subjectId={site.id} />
           </div>
         </div>
       </div>

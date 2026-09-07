@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 
-import { Building2, Camera, ShieldAlert } from 'lucide-react';
+import { Camera, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { SiteStatusSummary } from '@/types/models';
 import { SiteStatus } from '@/types/enums';

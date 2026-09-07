@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: MIT
 
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
 import { toast } from '@/lib/toast';
 import {
   ShieldAlert,
-  Search,
   Filter,
   Play,
   Download,
@@ -20,14 +19,13 @@ import {
   Share2,
   History,
   AlertCircle,
-  X,
-  PlayCircle,
   CheckCircle2,
   Ban
 } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { useViolations, useDeleteViolation, useUpdateViolationStatus } from '@/hooks/use-violations';
 import { useDashboardKPIs } from '@/hooks/use-dashboard';
+import { useMounted } from '@/hooks/use-mounted';
 import { Severity, ViolationStatus } from '@/types/enums';
 import { ViolationDetailModal } from '@/components/violations/ViolationDetailModal';
 import type { Violation } from '@/types/models';
@@ -51,18 +49,14 @@ function exportViolationsCsv(rows: Violation[]) {
 }
 
 export default function ViolationsPage() {
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   type SeverityFilter = 'TẤT CẢ' | 'NGHIÊM TRỌNG' | 'CAO';
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
-  const [selectedViolation, setSelectedViolation] = useState<any>(null);
+  const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
   const { data: violations = [] } = useViolations();
   const { data: kpis } = useDashboardKPIs();
   const deleteViolation = useDeleteViolation();
   const updateViolationStatus = useUpdateViolationStatus();
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted) return null;
 
@@ -125,7 +119,7 @@ export default function ViolationsPage() {
              {['ALL', Severity.CRITICAL, Severity.HIGH].map(s => (
                <button
                  key={s}
-                 onClick={() => setFilter(getFilterLabel(s) as any)}
+                 onClick={() => setFilter(getFilterLabel(s) as SeverityFilter)}
                  className={cn(
                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                    (filter === getFilterLabel(s)) ? "bg-[var(--primary)] text-white shadow-lg" : "text-[var(--text-muted)] hover:text-white"

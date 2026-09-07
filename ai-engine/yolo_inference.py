@@ -376,6 +376,11 @@ def run_inference():
     last_reported = {}    # (cameraId, trackId) -> lúc ghi DB gần nhất, để biết khi nào báo lại
     violation_count = {}  # (cameraId, trackId) -> số lần đã báo liên tục (hiện "vi phạm lần N")
 
+    # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
+    HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
+    _hb_last = time.time()
+    _hb_frames = 0
+
     while True:
         for st in streams:
             cap = st["cap"]
@@ -451,6 +456,17 @@ def run_inference():
                     d['occurrenceCount'] = violation_count[key]
                     report_violation(cam_id, d)
                     last_reported[key] = now
+
+        _hb_frames += 1
+        if time.time() - _hb_last >= 5.0:
+            try:
+                os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+                with open(HEARTBEAT_PATH, "w", encoding="utf-8") as f:
+                    json.dump({"pid": os.getpid(), "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                               "streams": len(streams), "fps": round(_hb_frames / max(time.time() - _hb_last, 1e-6), 1)}, f)
+            except OSError:
+                pass
+            _hb_last, _hb_frames = time.time(), 0
 
         # Small delay to throttle CPU
         time.sleep(0.01)

@@ -14,9 +14,13 @@ const io = new Server(server, {
 // trước đây) -> client chỉ xem 1 camera không còn nhận data của mọi camera khác.
 // Vẫn giữ room 'all-cameras' cho client cần theo dõi TẤT CẢ cùng lúc (vd trang tổng
 // quan quét vi phạm mọi camera để bắn notification).
+const lastDetectionAt = {};   // cameraId -> thời điểm nhận detection gần nhất (cho agent/health)
+const startedAt = Date.now();
+
 app.use(express.json());
 app.post('/detections', (req, res) => {
   const { cameraId, detections, videoPos } = req.body;
+  lastDetectionAt[cameraId] = new Date().toISOString();
   const targets = [`camera-${cameraId}`, 'all-cameras'];
   io.to(targets).emit('yolo-data', { cameraId, detections, videoPos });
 
@@ -26,6 +30,11 @@ app.post('/detections', (req, res) => {
     io.to(targets).emit('new-violation', { cameraId, ...violation });
   }
   res.sendStatus(200);
+});
+
+// Sức khoẻ cho agent/direct/health.ts: camera nào còn gửi detection, bao nhiêu client đang xem
+app.get('/health', (_req, res) => {
+  res.json({ ok: true, lastDetectionAt, clients: io.engine.clientsCount, uptimeSec: Math.round((Date.now() - startedAt) / 1000) });
 });
 
 io.on('connection', (socket) => {

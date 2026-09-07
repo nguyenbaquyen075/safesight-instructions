@@ -33,6 +33,7 @@ export async function GET(
     snapshotUrl: violation.snapshotUrl,
     clipUrl: violation.clipUrl ?? undefined,
     status: violation.status.toLowerCase(),
+    agentReview: violation.agentReview ? JSON.parse(violation.agentReview) : null,
     detectedAt: violation.detectedAt.toISOString(),
     createdAt: violation.createdAt.toISOString(),
   });
@@ -58,9 +59,10 @@ export async function PATCH(
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  // DB lưu chữ HOA (khớp default trong schema.prisma), API nhận và trả chữ thường — giống cameras/[id]/route.ts.
   const updated = await prisma.violation.update({
     where: { id },
-    data: { status: parsed.data.status },
+    data: { status: parsed.data.status.toUpperCase() },
   });
   return NextResponse.json({ id: updated.id, status: updated.status.toLowerCase() });
 }

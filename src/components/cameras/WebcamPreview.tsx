@@ -28,12 +28,18 @@ export function WebcamPreview({ deviceIndex, className }: WebcamPreviewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [status, setStatus] = useState<'connecting' | 'ready' | 'error'>('connecting');
   const [error, setError] = useState<string | null>(null);
+  // Đổi thiết bị -> về trạng thái "đang kết nối" ngay trong render (mẫu "adjust state
+  // on prop change" của React) thay vì setState trong effect.
+  const [prevDeviceIndex, setPrevDeviceIndex] = useState(deviceIndex);
+  if (prevDeviceIndex !== deviceIndex) {
+    setPrevDeviceIndex(deviceIndex);
+    setStatus('connecting');
+    setError(null);
+  }
 
   useEffect(() => {
     let stream: MediaStream | null = null;
     let cancelled = false;
-    setStatus('connecting');
-    setError(null);
 
     async function start() {
       if (!navigator.mediaDevices?.getUserMedia) {

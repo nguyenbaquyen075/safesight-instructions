@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma';
 import { toCameraDTO, DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { isValidCameraSource } from '@/lib/camera-source';
 import { assertSiteAccess } from '@/lib/auth/site-access';
+import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
 
 export async function GET(
   request: NextRequest,
@@ -71,6 +72,11 @@ export async function PATCH(
     data: { ...rest, ...(source ? { rtspUrl: source } : {}), ...(status ? { status: status.toUpperCase() } : {}) },
     include: { site: true },
   });
+
+  // Fire-and-forget như route violations: xếp lịch cho agent hỏng thì cũng không được làm hỏng một PATCH đã thành công.
+  enqueueAgentTask({ kind: 'health.probe', subjectType: 'camera', subjectId: id, reason: 'Camera vừa được sửa trong Cài đặt', priority: 800 })
+    .catch(err => console.warn('[cameras] không xếp được health.probe', err instanceof Error ? err.message : String(err)));
+  pokeAgent('/internal/dispatch');
 
   return NextResponse.json(toCameraDTO(camera, camera.site.name));
 }

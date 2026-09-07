@@ -1,18 +1,20 @@
 # 04 — Mô hình dữ liệu
 
-Nguồn: `prisma/schema.prisma`.
+Nguồn: `prisma/schema.prisma` (provider **SQLite** cho dev). Kiểu TypeScript tương ứng ở `src/types/models.ts`, enum ở `src/types/enums.ts`.
 
 ## Sơ đồ quan hệ
 
 ```
 Organization (tổ chức / tenant)
-  ├── User (người dùng)
+  ├── User (người dùng, RBAC)
   └── Site (công trường)
+        ├── AlertRule (quy tắc cảnh báo theo site)
         └── Camera (camera giám sát)
               └── Zone (vùng nhận diện)
                     └── Violation (vi phạm)
-                          └── Alert (cảnh báo)
-AlertRule (quy tắc cảnh báo)   ·   AuditLog (nhật ký thao tác)
+                          └── Alert (cảnh báo đã gửi)
+AuditLog (nhật ký thao tác)   ·   TelegramSettings (1 dòng: bot token đã mã hoá)
+AgentTask (hàng đợi)   ·   AgentEvent (audit + chat)   ·   AgentSettings (1 dòng: kill switch, model, trần token)
 ```
 
 ## Các model chính
@@ -20,56 +22,55 @@ AlertRule (quy tắc cảnh báo)   ·   AuditLog (nhật ký thao tác)
 | Model | Ý nghĩa | Ghi chú |
 |---|---|---|
 | `Organization` | Tổ chức/doanh nghiệp (đa tenant) | có `plan`, `logoUrl` |
-| `Site` | Công trường | toạ độ (`lat`/`lng`), số camera, tỉ lệ tuân thủ, số cảnh báo |
-| `Camera` | Camera giám sát | trạng thái ONLINE/OFFLINE… |
-| `Zone` | Vùng nhận diện trong khung hình | loại vùng (RESTRICTED, WARNING…) |
-| `Violation` | Vi phạm phát hiện được | loại vi phạm + mức độ nghiêm trọng |
-| `Alert` | Cảnh báo sinh ra từ vi phạm | trạng thái xử lý, kênh gửi |
-| `AlertRule` | Quy tắc phát cảnh báo | điều kiện → hành động |
-| `User` | Người dùng | vai trò (RBAC) |
-| `AuditLog` | Nhật ký thao tác | phục vụ truy vết |
+| `Site` | Công trường | toạ độ `lat`/`lng`, các số đếm camera/tuân thủ/cảnh báo |
+| `Camera` | Camera giám sát | `rtspUrl` lưu nguồn theo quy ước `webcam:0` / `rtsp://...` / `video:ten.mp4`; `status` khác `ONLINE` thì AI bỏ qua |
+| `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string; chưa dùng trong pipeline AI |
+| `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
+| `Alert` | Cảnh báo sinh từ vi phạm | `channel`, `recipient`, `errorMessage` (null = gửi thành công, dùng tính cooldown) |
+| `AlertRule` | Quy tắc cảnh báo | `violationTypes`/`channels`/`recipients` JSON array, `threshold`, `cooldownSec` |
+| `User` | Người dùng | `role`, `assignedSites` JSON array, `passwordHash` (Credentials login) |
+| `AuditLog` | Nhật ký thao tác | chưa có UI đọc |
+| `TelegramSettings` | Cấu hình bot Telegram dùng chung | `botTokenEncrypted` (AES-256-GCM, khoá `TELEGRAM_ENCRYPT_KEY`), `isEnabled` |
+| `AgentTask` | Hàng đợi việc của agent | `kind`, lane suy từ kind, `priority`, `budget` (số tool call tối đa/phiên), `attempts`, `dueAt`/`leasedUntil` (lease), `sessionId`, `outcome`; xem [Agent giám sát tự động](09-agent.md) |
+| `AgentEvent` | Audit + lịch sử hội thoại agent | `sessionId`, `taskId?`, `subjectType?/subjectId?`, `type` (`tool.call`/`tool.result`/`verdict`/`action`/`message.user`/`message.assistant`/`health`/`error`/`report`/`session.ended`), `data` (JSON string) |
+| `AgentSettings` | Cấu hình agent (1 dòng) | `isEnabled` (kill switch), `model`, `reviewEffort`, `dailyTokenCap`, `shiftReportAt` |
 
 ## Bộ giá trị (enum nghiệp vụ)
 
-> Ở bản SQLite dev, các enum này được lưu dạng **chuỗi (String)** thay vì kiểu enum gốc (xem lưu ý bên dưới). Danh sách giá trị theo `SPEC.md`:
+SQLite không có enum nên DB lưu **String**; giá trị hợp lệ định nghĩa ở `src/types/enums.ts`:
 
-- **`ViolationType`** (16 loại): `HARD_HAT`, `SAFETY_VEST`, `SAFETY_HARNESS`, `ZONE_INTRUSION`, `FALL_DETECTED`, `FIRE_SMOKE`, `VEHICLE_PROXIMITY`, `PHONE_USE`, `RUNNING`, …
-- **`Severity`**: `CRITICAL` / `HIGH` / `MEDIUM` / `LOW`
-- **`CameraStatus`**: `ONLINE` / `OFFLINE` / `DEGRADED` / `MAINTENANCE`
-- **`AlertStatus`**: `NEW` / `ACKNOWLEDGED` / `ESCALATED` / `RESOLVED` / `SUPPRESSED`
-- **`AlertChannel`**: `IN_APP` / `SMS` / `EMAIL` / `SIREN` / `PA_SYSTEM` / `WEBHOOK`
-- **`UserRole`**: `SUPER_ADMIN` / `ORG_ADMIN` / `SITE_MANAGER` / `SAFETY_OFFICER` / `SUPERVISOR`
-- **`SiteStatus`**: `ACTIVE` / `INACTIVE` / `SETUP`
-- **`ZoneType`**: `RESTRICTED` / `WARNING` / `MONITORING` / `SUSPENDED_LOAD`
+- **`ViolationType`** (16 loại): `hard_hat`, `safety_vest`, `safety_gloves`, `safety_footwear`, `protective_eyewear`, `safety_harness`, `respiratory`, `zone_intrusion`, `vehicle_proximity`, `suspended_load`, `fall_detected`, `fire_smoke`, `phone_use`, `running`, `unauthorized_climbing`, `crowd_density`
+- **`Severity`**: `critical` / `high` / `medium` / `low`
+- **`ViolationStatus`**: `open` / `under_review` / `resolved` / `false_positive`
+- **`CameraStatus`**: `online` / `offline` / `degraded` / `maintenance`
+- **`AlertStatus`**: `new` / `acknowledged` / `escalated` / `resolved` / `suppressed`
+- **`AlertChannel`**: `in_app` / `sms` / `email` / `siren` / `pa_system` / `webhook` / `telegram` (chỉ **telegram** đã nối thật)
+- **`UserRole`**: `super_admin` / `org_admin` / `site_manager` / `safety_officer` / `supervisor`
+- **`SiteStatus`**: `active` / `inactive` / `setup`
+- **`ZoneType`**: `restricted` / `warning` / `monitoring` / `suspended_load`
+
+> Lưu ý chữ hoa/thường: schema Prisma đặt default chữ HOA (`"ONLINE"`, `"OPEN"`), API chuyển về chữ thường khi trả DTO (xem `toCameraDTO()` trong `src/lib/camera-shape.ts` và route violations).
 
 ## Liên hệ với AI
 
-Model YOLO hiện chỉ train 4 lớp PPE, tương ứng nhóm `ViolationType` mũ/áo:
+`PPE_VIOLATION_MAP` trong `ai-engine/yolo_inference.py` ánh xạ món PPE thiếu → `(type, severity)`:
 
-| Lớp YOLO | Ánh xạ | Trạng thái |
+| PPE thiếu | `ViolationType` | `Severity` |
 |---|---|---|
-| `helmet` | có mũ bảo hộ | ✅ SAFE |
-| `vest` | có áo phản quang | ✅ SAFE |
-| `no_helmet` | thiếu mũ → `HARD_HAT` violation | ❌ VIOLATION |
-| `no_vest` | thiếu áo → `SAFETY_VEST` violation | ❌ VIOLATION |
+| `helmet` | `hard_hat` | `critical` |
+| `vest` | `safety_vest` | `high` |
+| `gloves` | `safety_gloves` | `medium` |
+| `boots` | `safety_footwear` | `medium` |
 
-Các `ViolationType` còn lại (té ngã, khói/lửa, xâm nhập vùng cấm…) **đã định nghĩa trong schema nhưng chưa có model AI** — thuộc lộ trình tương lai.
+Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghiêm trọng nhất (thứ tự trên). Các `ViolationType` còn lại (té ngã, khói/lửa, xâm nhập vùng…) đã có trong enum nhưng **chưa có model AI**.
 
-## ⚠️ Lưu ý lệch cấu hình DB
+## Seed dữ liệu
 
-`prisma/schema.prisma` bắt đầu bằng ghi chú:
+`npm run db:seed` (`prisma/seed.mjs`) tạo 1 Organization, 2 Site, 6 Camera (`cam-001`…`cam-008`) khớp `src/data/camera-videos.json`. Bắt buộc chạy trước khi AI ghi Violation, vì `cameraId` là khoá ngoại.
 
-```
-// SafeSight — SQLite schema (dev)
-// For production with PostgreSQL, revert provider to "postgresql"
-// and restore enum types + array fields
-```
+## Dev SQLite ↔ Production PostgreSQL
 
-Nghĩa là:
-- **Dev hiện tại:** `provider = "sqlite"`, **bỏ enum & mảng native** (lưu dạng String).
-- **Production dự kiến:** đổi lại `postgresql`, khôi phục enum + array — như `SPEC.md` mô tả.
-
-👉 Khi nối DB thật, cần thống nhất lại provider và cập nhật cả `SPEC.md` lẫn wiki này để tránh nhầm lẫn.
+Đầu `schema.prisma` ghi rõ: dev dùng `sqlite`, không enum/mảng native. `package.json` đã cài cả `@prisma/adapter-libsql` (dev) và `@prisma/adapter-pg` (prod). Khi lên Postgres cần đổi provider, khôi phục enum/array, và cập nhật `SPEC.md` + wiki này.
 
 ---
 👉 Tiếp theo: [Giao diện & API](05-giao-dien-va-api.md)

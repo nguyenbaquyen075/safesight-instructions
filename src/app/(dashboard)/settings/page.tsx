@@ -9,13 +9,9 @@ import {
   Building,
   Bell,
   Shield,
-  Key,
   Sliders,
   Save,
   ShieldAlert,
-  Zap,
-  Globe,
-  Database,
   Mail,
   Smartphone,
   Siren,
@@ -33,7 +29,7 @@ import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard
 export default function SettingsPage() {
   const [activeTab, setActiveTab] = useState<'profile' | 'cameras' | 'monitoring' | 'notifications' | 'security'>('profile');
   const [isSaving, setIsSaving] = useState(false);
-  const [notification, setNotification] = useState<any>(null);
+  const [notification, setNotification] = useState<{ id: number; title: string; desc: string; type: 'success' | 'danger' | 'warning' } | null>(null);
 
   const showNotification = (title: string, desc: string, type: 'success' | 'danger' | 'warning' = 'success') => {
     setNotification({ id: Math.random(), title, desc, type });

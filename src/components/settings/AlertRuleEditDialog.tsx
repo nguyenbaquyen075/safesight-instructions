@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import * as Dialog from '@radix-ui/react-dialog';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { X, Plus, Trash2 } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
@@ -34,7 +34,11 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
   const createRule = useCreateAlertRule();
   const updateRule = useUpdateAlertRule();
 
-  useEffect(() => {
+  // Mở dialog / đổi rule -> nạp lại form ngay trong render (mẫu "adjust state on
+  // prop change" của React) thay vì setState trong effect.
+  const [prevProps, setPrevProps] = useState({ isOpen, rule });
+  if (prevProps.isOpen !== isOpen || prevProps.rule !== rule) {
+    setPrevProps({ isOpen, rule });
     if (isOpen) {
       setForm(
         rule
@@ -51,7 +55,7 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
       );
       setChatIdInput('');
     }
-  }, [isOpen, rule]);
+  }
 
   const toggleInArray = (arr: string[], value: string): string[] =>
     arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];

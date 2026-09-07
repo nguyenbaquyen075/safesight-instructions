@@ -10,17 +10,14 @@ import {
   Users, 
   Clock, 
   Calendar,
-  Filter,
   Download,
-  ChevronDown,
-  Activity,
-  PieChart as PieIcon,
   LineChart as LineIcon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useDashboardKPIs, useComplianceTrend, useViolationBreakdown } from '@/hooks/use-dashboard';
 import { useViolations } from '@/hooks/use-violations';
+import { useMounted } from '@/hooks/use-mounted';
 import {
   ComplianceChart
 } from '@/components/dashboard/ComplianceChart';
@@ -29,7 +26,7 @@ import {
 } from '@/components/dashboard/ViolationDonut';
 
 export default function AnalyticsPage() {
-  const [mounted, setMounted] = React.useState(false);
+  const mounted = useMounted();
 
   // Các hook phải gọi TRƯỚC mọi return sớm (Rules of Hooks) — nếu không React vỡ trang
   const { data: kpis } = useDashboardKPIs();
@@ -41,10 +38,6 @@ export default function AnalyticsPage() {
   const camerasWithViolationToday = new Set(
     violations.filter(v => new Date(v.detectedAt).toDateString() === todayKey).map(v => v.cameraId)
   ).size;
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   if (!mounted) return null;
 

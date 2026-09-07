@@ -2,7 +2,6 @@
 
 import NextAuth from 'next-auth';
 import { NextResponse } from 'next/server';
-import { UserRole } from './types/enums';
 
 // We import authConfig but don't use Prisma in middleware as it runs on Edge.
 // We configure a simple NextAuth instance just for session validation.
@@ -36,7 +35,6 @@ export default auth((req) => {
   }
 
   // --- Role-Based Access Control (RBAC) ---
-  const role = req.auth?.user?.role as UserRole;
 
   // Settings page is now accessible to all logged-in users.
   // Role-based visibility is handled within the page component.

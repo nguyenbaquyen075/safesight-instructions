@@ -2,67 +2,83 @@
 
 ## Danh mục trang (route)
 
-Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`).
+Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
-| Route | File | Trạng thái |
+| Route | File | Vai trò được xem | Nội dung |
+|---|---|---|---|
+| `/login` | `src/app/login/page.tsx` | — | NextAuth Credentials |
+| `/` | `(dashboard)/page.tsx` | tất cả | KPI, biểu đồ tuân thủ, dòng thời gian cảnh báo, trạng thái công trường |
+| `/sites` | `(dashboard)/sites/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Quản lý công trường |
+| `/cameras` | `(dashboard)/cameras/page.tsx` | tất cả | Lưới camera live, khung detection từ YOLO, lọc "chỉ vi phạm", nút mic cảnh báo |
+| `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic |
+| `/alerts` | `(dashboard)/alerts/page.tsx` | tất cả | Danh sách cảnh báo từ vi phạm thật |
+| `/violations` | `(dashboard)/violations/page.tsx` | tất cả | Bảng vi phạm + modal chi tiết (ảnh snapshot) |
+| `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm |
+| `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
+| `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
+| `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo |
+| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, ô hỏi toàn hệ thống, capabilities |
+| `/reports`, `/profile` | — | — | ❌ Chưa có |
+
+## Danh mục API route (`src/app/api/`)
+
+Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route theo site kiểm quyền bằng `assertSiteAccess()` (`src/lib/auth/site-access.ts`).
+
+| Route | Method | Ghi chú |
 |---|---|---|
-| `/login` | `src/app/login/page.tsx` | ✅ UI (NextAuth sign-in) |
-| `/` (dashboard) | `src/app/(dashboard)/page.tsx` | ✅ KPI, charts, alerts timeline, site status |
-| `/alerts` | `(dashboard)/alerts/page.tsx` | ✅ Danh sách cảnh báo + filter |
-| `/analytics` | `(dashboard)/analytics/page.tsx` | ✅ Xu hướng tuân thủ + donut vi phạm |
-| `/cameras` | `(dashboard)/cameras/page.tsx` | ✅ Lưới camera + trạng thái |
-| `/violations` | `(dashboard)/violations/page.tsx` | ✅ Bảng vi phạm + modal chi tiết |
-| `/sites` | `(dashboard)/sites/page.tsx` | ✅ Quản lý công trường |
-| `/users` | `(dashboard)/users/page.tsx` | ✅ Quản lý người dùng |
-| `/settings` | `(dashboard)/settings/page.tsx` | ✅ Cài đặt |
-| `/reports` | — | ❌ Chưa có (cần tạo) |
-| `/profile` | — | ❌ Chưa có (cần tạo) |
+| `/api/auth/[...nextauth]` | * | NextAuth handler |
+| `/api/violations` | GET, POST | POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret`; sau khi ghi gọi `notifyViolation()` (Telegram) |
+| `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá |
+| `/api/cameras` | GET, POST | Danh sách + thêm camera thật |
+| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá |
+| `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
+| `/api/sites`, `/api/sites/[id]` | GET | Công trường |
+| `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng |
+| `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site |
+| `/api/alert-rules/[id]` | PATCH, DELETE | |
+| `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt |
+| `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
+| `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
+| `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
+| `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
+| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
+| `/api/agent/ask` | POST | `{ subjectType?, subjectId?, sessionId?, message }` → ghi `AgentEvent`, tạo/nối `AgentTask kind=ask`, poke agent, trả `sessionId` |
 
-**Độ phủ: 9/11 trang.**
-
-## Danh mục API route
-
-> ⚠️ **Tất cả API hiện trả về mock data** — chưa nối Prisma → DB thật.
-
-| Route | Method | File |
-|---|---|---|
-| `/api/auth/[...nextauth]` | * | `api/auth/[...nextauth]/route.ts` |
-| `/api/dashboard/kpis` | GET | `api/dashboard/kpis/route.ts` |
-| `/api/dashboard/compliance-trend` | GET | `api/dashboard/compliance-trend/route.ts` |
-| `/api/dashboard/violation-breakdown` | GET | `api/dashboard/violation-breakdown/route.ts` |
-| `/api/cameras` · `/api/cameras/[id]` | GET | `api/cameras/…` |
-| `/api/violations` · `/api/violations/[id]` | GET | `api/violations/…` |
-| `/api/sites` · `/api/sites/[id]` | GET | `api/sites/…` |
-| `/api/alerts` | GET | `api/alerts/route.ts` |
-| `/api/users` · `/api/users/[id]` | GET | `api/users/…` |
-
-## React Query hooks
+## React Query hooks (`src/hooks/`)
 
 | Hook | File | Nguồn |
 |---|---|---|
-| `useDashboardKPIs` | `use-dashboard.ts` | `/api/dashboard/kpis` |
-| `useComplianceTrend` | `use-dashboard.ts` | `/api/dashboard/compliance-trend` |
-| `useViolationBreakdown` | `use-dashboard.ts` | `/api/dashboard/violation-breakdown` |
-| `useCameras` | `use-cameras.ts` | `/api/cameras` |
 | `useViolations` | `use-violations.ts` | `/api/violations` |
-| `useAlerts` | `use-alerts.ts` | `/api/alerts` |
-| `useSites` | `use-sites.ts` | `/api/sites` |
+| `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera` | `use-cameras.ts` | `/api/cameras` |
+| `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
 | `useUsers` | `use-users.ts` | `/api/users` |
-| `useYolo` | `useYolo.ts` | WebSocket → YOLO Bridge |
+| `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |
+| `useTelegramSettings` + mutation | `use-telegram-settings.ts` | `/api/settings/telegram` |
+| `useDashboardKPIs`, `useComplianceTrend`, `useViolationBreakdown` | `use-dashboard.ts` | Tính từ `useViolations` (không có API riêng); số camera online lấy từ `src/data/mock-cameras.ts` |
+| `useRealSitesFromCameras` | `use-real-sites.ts` | Gom site từ roster camera + vi phạm thật |
+| `useYolo` | `useYolo.ts` | Socket.IO → YOLO Bridge (`NEXT_PUBLIC_YOLO_SERVER_URL`) |
+| `useVoiceRecorder` | `useVoiceRecorder.ts` | `MediaRecorder` cho nút mic |
+| `useAgentTasks`, `useAgentEvents` (poll khi thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent` | `use-agent.ts` | `/api/agent/*` |
 
 ## Component chính (`src/components/`)
 
 - **layout/** — `Sidebar.tsx`, `Header.tsx`
 - **dashboard/** — `AlertTimeline.tsx`, `ComplianceChart.tsx`, `SiteStatusGrid.tsx`, `ViolationDonut.tsx`
+- **cameras/** — `CameraCard.tsx`, `CameraGrid.tsx`, `MicButton.tsx`, `WebcamPreview.tsx`
+- **violations/** — `ViolationsTable.tsx`, `ViolationDetailModal.tsx`
 - **alerts/** — `AlertsTable.tsx`
-- **cameras/** — `CameraCard.tsx`, `CameraGrid.tsx`
-- **violations/** — `ViolationsTable.tsx`
-- **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
-- **Providers.tsx** — React Query + các provider toàn cục
+- **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx`, `ui.tsx`
+- **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
+- **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`)
+- **ui/** — shadcn/Radix primitives, `Toaster.tsx` · **Providers.tsx** — React Query + session
+
+## Dữ liệu mock còn lại
+
+`src/data/mock-cameras.ts` và `mock-violations.ts` vẫn được dùng làm **roster camera demo** (tên/site cho ô camera, KPI camera online) và dữ liệu mẫu cho một vài modal. Vi phạm hiển thị là dữ liệu thật từ DB.
 
 ## Stack UI
 
-Next.js 15 (App Router) · TypeScript strict · Tailwind CSS + design tokens · Radix UI / shadcn/ui · Recharts · Lucide React.
+Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind CSS 4 · Radix UI / shadcn/ui · Tanstack Query 5 · Recharts · Lucide React · Zod.
 
 ---
 👉 Tiếp theo: [Tích hợp YOLO](06-tich-hop-yolo.md)

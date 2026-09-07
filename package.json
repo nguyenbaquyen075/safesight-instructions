@@ -7,12 +7,15 @@
     "dev:web": "next dev",
     "dev:bridge": "node ai-engine/yolo_bridge.js",
     "dev:yolo": ".venv/bin/python ai-engine/yolo_inference.py",
+    "dev:agent": "tsx agent/main.ts",
+    "test:agent": "DATABASE_URL=file:./agent-test.db prisma db push --accept-data-loss && DATABASE_URL=file:./agent-test.db node --import tsx --test --test-concurrency=1 agent/test/*.test.ts",
     "db:seed": "node prisma/seed.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.124.0",
     "@auth/prisma-adapter": "^2.11.2",
     "@libsql/client": "^0.17.3",
     "@prisma/adapter-libsql": "^7.8.0",
@@ -45,9 +48,11 @@
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "recharts": "^3.8.1",
+    "sharp": "^0.34.5",
     "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.3",
     "tailwind-merge": "^3.5.0",
+    "tsx": "^4.23.13",
     "zod": "^4.3.6",
     "zustand": "^5.0.12"
   },

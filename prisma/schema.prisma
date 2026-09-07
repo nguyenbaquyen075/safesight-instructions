@@ -103,6 +103,7 @@ model Violation {
   clipUrl     String?
   status      String   @default("OPEN")
   occurrenceCount Int  @default(1) // lần vi phạm liên tục thứ mấy của người này (reset khi rời khung hình)
+  agentReview String?  // JSON: { verdict, band, observations, note, sessionId, reviewedAt }
   detectedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -189,4 +190,49 @@ model TelegramSettings {
   isEnabled         Boolean  @default(false)
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model AgentTask {
+  id          String    @id @default(cuid())
+  kind        String
+  subjectType String?
+  subjectId   String?
+  reason      String
+  priority    Int       @default(0)
+  budget      Int       @default(6)
+  attempts    Int       @default(0)
+  dueAt       DateTime
+  leasedUntil DateTime?
+  sessionId   String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  outcome     String?
+  createdAt   DateTime  @default(now())
+
+  @@index([dueAt, leasedUntil])
+  @@index([subjectType, subjectId])
+}
+
+model AgentEvent {
+  id          String   @id @default(cuid())
+  sessionId   String
+  taskId      String?
+  subjectType String?
+  subjectId   String?
+  type        String
+  data        String   // JSON string
+  emittedAt   DateTime @default(now())
+
+  @@index([sessionId, emittedAt])
+  @@index([subjectType, subjectId, emittedAt])
+}
+
+model AgentSettings {
+  id            String   @id @default(cuid())
+  isEnabled     Boolean  @default(true)
+  model         String   @default("claude-opus-5")
+  reviewEffort  String   @default("medium")
+  dailyTokenCap Int      @default(2000000)
+  shiftReportAt String   @default("17:30")
+  updatedAt     DateTime @updatedAt
 }

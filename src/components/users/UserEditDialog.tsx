@@ -14,7 +14,7 @@ interface UserEditDialogProps {
   user: User | null;
   isOpen: boolean;
   onClose: () => void;
-  onSave: (data: any) => void;
+  onSave: (data: Partial<User>) => void;
 }
 
 export function UserEditDialog({ user, isOpen, onClose, onSave }: UserEditDialogProps) {

@@ -39,21 +39,17 @@ class Logger {
 
     switch (entry.level) {
       case 'error':
-        // eslint-disable-next-line no-console
         console.error(`${prefix} ${entry.message}${metaStr}`);
         break;
       case 'warn':
-        // eslint-disable-next-line no-console
         console.warn(`${prefix} ${entry.message}${metaStr}`);
         break;
       case 'debug':
         if (process.env.NODE_ENV === 'development') {
-          // eslint-disable-next-line no-console
           console.debug(`${prefix} ${entry.message}${metaStr}`);
         }
         break;
       default:
-        // eslint-disable-next-line no-console
         console.info(`${prefix} ${entry.message}${metaStr}`);
     }
   }

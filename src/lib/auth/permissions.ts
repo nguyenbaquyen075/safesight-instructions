@@ -16,6 +16,7 @@ export const PAGE_ROLES: Record<string, UserRole[]> = {
   '/roboflow': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN],
   '/users': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN],
   '/settings': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN],
+  '/agent': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN, UserRole.SITE_MANAGER],
 };
 
 export function rolesForPath(pathname: string): UserRole[] {

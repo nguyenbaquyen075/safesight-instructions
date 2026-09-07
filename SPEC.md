@@ -1,8 +1,8 @@
-# SPEC.md — SafeSight Instruction Frontend
+# SPEC.md — SafeSight Instructions
 
-> _Cập nhật: 2026-04-27 bởi Orbis_
-> _Source: Phân tích codebase + Prisma schema + mock data_
-> _Git: `main` (c8ce247) — đã merge feat/yolo-integration ✅_
+> _Cập nhật: 2026-09-07 — chuẩn hoá theo hiện trạng codebase (`main` a1087a3)_
+> _Source: Phân tích codebase + `prisma/schema.prisma` + `wiki/`_
+> _Bản 2026-04-27 trước đây mô tả trạng thái "API trả mock, chưa nối DB" — đã lỗi thời._
 
 ---
 
@@ -11,12 +11,10 @@
 | Trường | Giá trị |
 |---|---|
 | **Tên** | SafeSight AI — PPE Violation Detection System |
-| **Tên viết tắt** | SafeSight |
+| **Repo** | `safesight-instructions` (GitHub, MIT) |
 | **Nhóm** | AHV Works / PPP Safety |
-| **Workspace** | `/data/projects/ppp-safety/safesight-instruction-frontend/` |
-| **Git branch** | `main` (c8ce247 — fix build, 2026-04-27) |
 | **Version** | v0.1.0 |
-| **Trạng thái** | 🟡 **MVP — đang phát triển** |
+| **Trạng thái** | 🟡 **MVP — đang phát triển**, pipeline AI + dashboard + DB + Telegram đã chạy end-to-end ở dev |
 
 ---
 
@@ -24,167 +22,106 @@
 
 | Layer | Công nghệ |
 |---|---|
-| Framework | Next.js 15 (App Router) |
-| Language | TypeScript 5 (strict mode) |
-| Styling | Tailwind CSS + CSS Variables (design tokens) |
-| UI Components | Radix UI + shadcn/ui |
-| Auth | NextAuth.js v5 (Prisma Adapter) |
-| ORM | Prisma 7 + `@prisma/adapter-pg` (driver adapter) |
-| Database | PostgreSQL (DATABASE_URL required) |
-| State | Tanstack React Query v5 |
-| Charts | Recharts |
-| Icons | Lucide React |
-| AI Model | YOLO (Python inference server — xem mục 6) |
+| Framework | Next.js 16 (App Router), React 19 |
+| Language | TypeScript 5 (strict) · Python 3.14 (venv) |
+| Styling | Tailwind CSS 4 + CSS variables |
+| UI | Radix UI + shadcn/ui, Lucide, Recharts |
+| Auth | NextAuth.js v5 (Credentials, JWT, role trong session) |
+| ORM / DB | Prisma 7 + `@prisma/adapter-libsql` (SQLite dev); `@prisma/adapter-pg` sẵn cho Postgres prod |
+| State | Tanstack React Query v5, Zustand |
+| Validation | Zod 4 |
+| Realtime | Socket.IO (bridge `ai-engine/yolo_bridge.js`, port 4001) |
+| AI | Ultralytics YOLOv8 (`ppe_multiclass.pt` + `ppe_boots.pt` + `ppe_gang.pt` + `yolov8n-pose.pt`), BoT-SORT, OpenCV |
+| Cảnh báo | Telegram Bot API (token mã hoá AES-256-GCM) |
+| Agent | `@anthropic-ai/sdk` (Claude Tool Runner, `claude-opus-5`) — worker Node riêng `agent/`, hàng đợi `AgentTask` |
 
 ---
 
-## 3. Domain Model (Prisma Schema)
+## 3. Domain Model
 
 ```
-Organization (tenant)
-  └── Site (công trường)
-        └── Camera (camera giám sát)
-              └── Zone (vùng nhận diện)
-                    └── Violation (vi phạm)
-                          └── Alert (cảnh báo)
-                                └── AlertRule (quy tắc cảnh báo)
+Organization
+  ├── User
+  └── Site
+        ├── AlertRule
+        └── Camera
+              └── Zone
+                    └── Violation
+                          └── Alert
+AuditLog · TelegramSettings
 ```
 
-**Enums định nghĩa:**
-- `ViolationType` — 16 loại: HARD_HAT, SAFETY_VEST, SAFETY_HARNESS, ZONE_INTRUSION, FALL_DETECTED, FIRE_SMOKE, VEHICLE_PROXIMITY, PHONE_USE, RUNNING, v.v.
-- `Severity` — CRITICAL / HIGH / MEDIUM / LOW
-- `CameraStatus` — ONLINE / OFFLINE / DEGRADED / MAINTENANCE
-- `AlertStatus` — NEW / ACKNOWLEDGED / ESCALATED / RESOLVED / SUPPRESSED
-- `AlertChannel` — IN_APP / SMS / EMAIL / SIREN / PA_SYSTEM / WEBHOOK
-- `UserRole` — SUPER_ADMIN / ORG_ADMIN / SITE_MANAGER / SAFETY_OFFICER / SUPERVISOR
-- `SiteStatus` — ACTIVE / INACTIVE / SETUP
-- `ZoneType` — RESTRICTED / WARNING / MONITORING / SUSPENDED_LOAD
+Enum nghiệp vụ ở `src/types/enums.ts` (DB SQLite lưu String). Chi tiết: `wiki/04-mo-hinh-du-lieu.md`.
 
 ---
 
 ## 4. Page Inventory
 
-| Route | Status | Ghi chú |
-|---|---|---|
-| `/login` | ✅ UI hoàn chỉnh | NextAuth sign-in |
-| `/dashboard` | ✅ UI + API + hooks | KPI, charts, alerts timeline, site status |
-| `/alerts` | ✅ UI + API + hooks | Alert list với filter severity/search |
-| `/analytics` | ✅ UI + API + hooks | Compliance trend + violation donut (đã fix data wiring) |
-| `/cameras` | ✅ UI + API + hooks | Camera grid + status |
-| `/violations` | ✅ UI + API + hooks | Violations table + detail modal |
-| `/sites` | ✅ UI + API + hooks | Site management + register modal |
-| `/users` | ✅ UI + API + hooks | User management |
-| `/settings` | ✅ UI | Settings page |
-| `/reports` | ❌ Chưa có page | Cần tạo |
-| `/profile` | ❌ Chưa có page | Cần tạo |
-
-**Độ phủ: 9/11 pages ✅**
-
----
-
-## 5. API Routes Inventory
-
-| Route | Method | Status | Ghi chú |
+| Route | Trạng thái | Quyền | Ghi chú |
 |---|---|---|---|
-| `/api/auth/[...nextauth]` | * | ✅ | NextAuth handler |
-| `/api/dashboard/kpis` | GET | ✅ Mock | KPI metrics |
-| `/api/dashboard/compliance-trend` | GET | ✅ Mock | 30-day trend |
-| `/api/dashboard/violation-breakdown` | GET | ✅ Mock | Violation types breakdown |
-| `/api/cameras` | GET | ✅ Mock | Camera list |
-| `/api/cameras/[id]` | GET | ✅ Mock | Camera detail |
-| `/api/violations` | GET | ✅ Mock | Violation list |
-| `/api/violations/[id]` | GET | ✅ Mock | Violation detail |
-| `/api/sites` | GET | ✅ Mock | Site list |
-| `/api/sites/[id]` | GET | ✅ Mock | Site detail |
-| `/api/alerts` | GET | ✅ Mock | Alert list |
-| `/api/users` | GET | ✅ Mock | User list |
-| `/api/users/[id]` | GET | ✅ Mock | User detail |
+| `/login` | ✅ | — | Credentials |
+| `/` | ✅ | tất cả | KPI + charts tính từ vi phạm thật |
+| `/sites` | ✅ | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | |
+| `/cameras` | ✅ | tất cả | Live + khung YOLO, mic cảnh báo |
+| `/site-speaker` | ✅ | tất cả | Loa công trường |
+| `/alerts` | ✅ | tất cả | |
+| `/violations` | ✅ | tất cả | Bảng + modal, đổi trạng thái, xoá |
+| `/analytics` | ✅ | + SAFETY_OFFICER | |
+| `/roboflow` | ✅ | SUPER_ADMIN, ORG_ADMIN | Đối chiếu ảnh tĩnh, tốn credit |
+| `/users` | ✅ | SUPER_ADMIN, ORG_ADMIN | |
+| `/settings` | ✅ | SUPER_ADMIN, ORG_ADMIN | Camera thật/video mẫu, Telegram, alert rules |
+| `/agent` | ✅ | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian, hàng đợi, sweep, cài đặt, hỏi đáp |
+| `/reports`, `/profile` | ❌ | | Chưa có |
 
-**⚠️ Tất cả API routes hiện tại trả về mock data. Cần kết nối Prisma → PostgreSQL để lấy dữ liệu thật.**
+**Độ phủ: 12/14 trang.**
 
 ---
 
-## 6. React Query Hooks
+## 5. API Routes
 
-| Hook | File | Nguồn |
+Tất cả dùng Prisma (DB thật). Xem bảng đầy đủ ở `wiki/05-giao-dien-va-api.md`.
+
+| Route | Method | Ghi chú |
 |---|---|---|
-| `useDashboardKPIs` | `use-dashboard.ts` | `/api/dashboard/kpis` |
-| `useComplianceTrend` | `use-dashboard.ts` | `/api/dashboard/compliance-trend` |
-| `useViolationBreakdown` | `use-dashboard.ts` | `/api/dashboard/violation-breakdown` |
-| `useCameras` | `use-cameras.ts` | `/api/cameras` |
-| `useViolations` | `use-violations.ts` | `/api/violations` |
-| `useAlerts` | `use-alerts.ts` | `/api/alerts` |
-| `useSites` | `use-sites.ts` | `/api/sites` |
-| `useUsers` | `use-users.ts` | `/api/users` |
-| `useYolo` | `useYolo.ts` | WebSocket → YOLO inference server |
+| `/api/auth/[...nextauth]` | * | |
+| `/api/violations` (+`/[id]`) | GET, POST · GET, PATCH, DELETE | POST chỉ cho AI engine (`X-AI-Engine-Secret`), kích hoạt Telegram |
+| `/api/cameras` (+`/[id]`) | GET, POST · GET, PATCH, DELETE | |
+| `/api/videos` | GET, POST | Video mẫu |
+| `/api/sites` (+`/[id]`) | GET | |
+| `/api/users` (+`/[id]`) | GET · GET, PATCH, DELETE | |
+| `/api/alert-rules` (+`/[id]`) | GET, POST · PATCH, DELETE | Site-scoped |
+| `/api/settings/telegram` (+`/test`) | GET, POST · POST | |
+| `/api/roboflow` | POST | Admin |
+| `/api/agent/tasks`, `/api/agent/events` | GET | Hàng đợi + audit |
+| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
+| `/api/agent/ask` | POST | Poke lane nghiên cứu, trả `sessionId` |
 
 ---
 
-## 7. YOLO Integration (Chưa hoàn thiện)
+## 6. AI Pipeline (tóm tắt)
 
-**Files tồn tại:**
-- `src/hooks/useYolo.ts` — WebSocket hook
-- `yolo_bridge.js` — JavaScript bridge
-- `yolo_inference.py` — Python inference script
-- `yolov8n.pt` — YOLOv8 nano weights
-- `public/videos/` — Sample videos
+`yolo_inference.py` mở mỗi camera một luồng (video mẫu / webcam / RTSP), `PPEViolationTracker.process_frame()` trả về khung người + khung từng món PPE (xanh = có, đỏ = thiếu). Vi phạm **chốt** khi conf ≥ 0.6 và thiếu liên tục ≥ 3s → snapshot → `POST /api/violations` → Telegram theo `AlertRule`. Bắt buộc: mũ, áo, găng, giày. Nghiệm thu bằng `eval_ppe_decision.py` (báo oan / bỏ lọt) chứ không dùng mAP. Chi tiết: `wiki/06-tich-hop-yolo.md`.
 
-**⚠️ YOLO inference server cần chạy riêng (Python). Frontend gọi qua WebSocket.**
+Sau khi ghi DB, `POST /api/violations` tạo `AgentTask kind=violation.review` và poke agent (`agent/`, tiến trình riêng). Agent review bằng ảnh + lịch sử theo ledger bằng chứng (`ObservationKind` → band `VERIFIED`/`PROBABLE`/`POSSIBLE`), ghi `Violation.agentReview`, tự đổi trạng thái `false_positive` khi `VERIFIED` báo oan, leo thang Telegram khi `VERIFIED` thật đủ ngưỡng. Chi tiết: `wiki/09-agent.md`.
 
 ---
 
-## 8. Git Branches — Trạng thái
+## 7. Môi trường & vận hành
 
-| Branch | Status |
-|---|---|
-| `main` | ✅ Đã push c8ce247 (2026-04-27) |
-| `develop` | ⚠️ Cần check — chưa merge vào main |
-| `feat/yolo-integration` | ✅ Đã merge vào main |
-| `feature/frontend-v2` | 🔴 Chưa merge — 51K lines thay đổi, cần review |
-| `feature/all-frontend` | ✅ = main |
+- Dev: `npm run dev` (dev-all.sh) — Next 3000 + Bridge 4001 + Python. Env bắt buộc: `DATABASE_URL`, `NEXTAUTH_SECRET`, `NEXT_PUBLIC_YOLO_SERVER_URL`, `AI_ENGINE_SECRET`, `TELEGRAM_ENCRYPT_KEY`.
+- File `.pt` không commit, chép tay vào gốc repo (README "File model cần có").
+- Prod: chưa có pipeline build/deploy; định hướng Postgres + artifact build (`npm run build`).
 
 ---
 
-## 9. Issues đã fix (2026-04-27)
+## 8. Việc còn lại
 
-| # | Lỗi | Fix |
-|---|---|---|
-| 1 | Filter state type mismatch (alerts, sites, violations pages) | Union type đúng: `'TẤT CẢ' \| 'NGHIÊM TRỌNG' \| 'CAO'` |
-| 2 | Chart components không có data props | Import hooks + truyền data |
-| 3 | `res.json()` không infer kiểu | Explicit `Promise<T>` return type |
-| 4 | Prisma v7 yêu cầu driver adapter | Chuyển sang `@prisma/adapter-pg` + lazy init |
-| 5 | `DATABASE_URL` missing khi build | Thêm `.env` placeholder |
-| 6 | `violation.severity === 'CRITICAL'` (string thay vì enum) | Dùng `Severity.CRITICAL` |
+Xem `wiki/07-lo-trinh-phat-trien.md` (đã xong / ưu tiên 1-3 / câu hỏi mở). Tóm tắt: giảm báo oan găng/giày ≤ 1%, lọc theo Zone, trang `/reports` `/profile`, chuyển KPI camera khỏi mock, auth cho bridge, Postgres prod.
 
 ---
 
-## 10. Recommended Next Steps (Priority Order)
+## 9. Lịch sử
 
-```
-Priority 1 — Kết nối Database thật:
-  1. Setup PostgreSQL + chạy migrations
-  2. Kết nối Prisma → API routes (thay mock → real DB queries)
-  3. Setup authentication (NextAuth v5)
-
-Priority 2 — Hoàn thiện Pages còn thiếu:
-  4. Reports page (CSV/PDF export)
-  5. Profile page
-
-Priority 3 — Nâng cao:
-  6. Review `feature/frontend-v2` — 51K lines có thể là version hoàn chỉnh hơn
-  7. YOLO inference server — cần Python FastAPI backend riêng
-  8. Real-time alerts — WebSocket/SSE
-  9. RBAC guards + audit log UI
-  10. Mobile responsive audit
-```
-
----
-
-## 11. Open Questions
-
-- [ ] `DATABASE_URL` — PostgreSQL connection string thực tế là gì?
-- [ ] YOLO inference server — chạy ở đâu? (local? VPS? GPU server?)
-- [ ] `feature/frontend-v2` — merge hay discard?
-- [ ] `develop` branch — cần merge vào `main` không?
-- [ ] NextAuth provider nào? (GitHub, Google, Credentials?)
-- [ ] Ưu tiên tiếp theo: BE API hay pages còn thiếu?
+- 2026-04-27: bản đầu (Orbis) — UI 9/11 trang, API mock, YOLO chưa tích hợp.
+- 2026-09-07: chuẩn hoá theo code — DB thật, AI end-to-end, Telegram, camera thật, voice alert, Roboflow đối chiếu.
+- 2026-09-07: thêm Agent giám sát tự động — trực vận hành + cán bộ an toàn + hỏi đáp (`agent/`, `AgentTask`/`AgentEvent`/`AgentSettings`, trang `/agent`, `wiki/09-agent.md`).

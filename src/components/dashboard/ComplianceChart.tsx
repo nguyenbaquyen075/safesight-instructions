@@ -59,8 +59,8 @@ export function ComplianceChart({ data }: ComplianceChartProps) {
               color: 'var(--text-primary)',
               fontSize: '13px',
             }}
-            formatter={(value: any) => [`${typeof value === 'number' ? value.toFixed(1) : value}%`, 'Compliance']}
-            labelFormatter={(label: any) => {
+            formatter={(value) => [`${typeof value === 'number' ? value.toFixed(1) : value}%`, 'Compliance']}
+            labelFormatter={(label) => {
               const d = new Date(label);
               return d.toLocaleDateString('vi-VN', {
                 day: 'numeric',

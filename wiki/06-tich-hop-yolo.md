@@ -38,13 +38,13 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 |---|---|---|
 | `helmet` / `no_helmet` | Mũ bảo hộ trên đầu | ✅ Bắt buộc — thiếu → VIOLATION |
 | `vest` | Áo phản quang | ✅ Bắt buộc — nhưng model **không có lớp `no_vest`**, nên "thiếu áo" chỉ suy luận gián tiếp (model không thấy `vest` trong khung người → coi là thiếu). Dễ báo sai khi áo bị che/góc xấu. |
-| `gloves` / `no_gloves` | Găng tay | ⚠️ CÓ phát hiện (khung riêng, đủ tin cậy ≥ `PART_MIN_CONF`=0.35), nhưng **CHƯA bắt buộc** trong `required_ppe` — chỉ hiển thị, không tính vi phạm/ghi DB |
-| `boots` / `no_boots` | Giày bảo hộ | ⚠️ Như gloves — có khung hiển thị, chưa bắt buộc |
-| `goggles` / `no_goggle` | Kính bảo hộ | Có lớp trong model nhưng **chưa được xử lý** trong `ppe_tracker.py` (không có `PPE_VN['goggles']`... thực ra có, nhưng không nằm trong `required_ppe` mặc định) |
+| `gloves` / `no_gloves` | Găng tay | ✅ Bắt buộc từ 24/08/2026 — lấy từ model phụ `ppe_gang.pt`, lọc `PART_MIN_CONF['gloves']=0.25`; thiếu → VIOLATION `safety_gloves` |
+| `boots` / `no_boots` | Giày bảo hộ | ✅ Bắt buộc từ 24/08/2026 — lấy từ model phụ `ppe_boots.pt`, lọc `PART_MIN_CONF['boots']=0.15`; thiếu → VIOLATION `safety_footwear` |
+| `goggles` / `no_goggle` | Kính bảo hộ | Có trong model và `PPE_VN`, nhưng **không** nằm trong `required_ppe` — chỉ hiển thị |
 
-**Vì sao gloves/boots chưa bắt buộc:** test thực tế bằng camera cho thấy model **recall thấp** với 2 lớp này (hiếm khi nhận dương tính dù người có mang) — bật `required_ppe` bao gồm chúng khiến gần như mọi người bị báo vi phạm liên tục dù đang mang đủ đồ. Cần train lại model tốt hơn (xem `training/detech_ppe_colab.md`) trước khi bật.
+**Găng/giày bắt buộc với cái giá đo được:** `required_ppe=('helmet','vest','gloves','boots')` được truyền từ `yolo_inference.py` (mặc định trong `PPEViolationTracker.__init__` vẫn là mũ + áo). Báo oan đo bằng `eval_ppe_decision.py`: mũ 4.7%, áo 3.1%, găng 8.7%, giày 6.3%. Để kéo găng/giày về ≤ 1% cần train lại (xem [08](08-train-model-them-ppe.md)). Cơ chế chống báo oan: cửa sổ bằng chứng `EVIDENCE_WINDOW=2.5s`, thời gian quan sát `THOI_GIAN_QUAN_SAT=3s` trước khi kết luận thiếu găng/giày, giữ khung `HOLD_SECONDS=2.5s`, và **thấy đồ thắng lớp phủ định**.
 
-`PPE_VIOLATION_MAP` trong `yolo_inference.py` đã map sẵn `gloves`→`safety_gloves`, `boots`→`safety_footwear` (enum DB đã có) — chỉ cần đổi `required_ppe` trong `ppe_tracker.py:__init__` khi model đủ tốt.
+**Kiến trúc nhiều model trong một tracker:** người/mũ/áo từ model chính; găng/giày từ model phụ chuyên lớp (`parts_models`), chạy mỗi `PPE_MOI_N_KHUNG=3` khung; `yolov8n-pose.pt` chạy mọi khung để đặt khung tại cổ tay/cổ chân và vùng đầu. Thiếu model phụ hay pose thì lùi về model chính, không dừng hệ thống.
 
 Ảnh minh hoạ vi phạm mẫu: `no_helmet.png`, `no_vest.png` (thư mục gốc repo).
 
@@ -133,6 +133,13 @@ Hai điều rút ra:
 
 **Muốn chạy PPE trên video qua Roboflow thật sự** thì phải đi đường **WebRTC**, khác hẳn
 client REST này — hỏi operator trước khi làm.
+
+## Nghiệm thu khi thay model / đổi ngưỡng
+
+```bash
+.venv/bin/python ai-engine/eval_ppe_decision.py [gloves|boots|helmet|vest]   # báo oan / bỏ lọt trên 283 ảnh detech valid+test
+.venv/bin/python ai-engine/sweep_threshold.py <model.pt> <lớp> [model_phụ.pt]  # đường cong ngưỡng, so model bằng cả đường cong
+```
 
 ## Test không cần Python
 

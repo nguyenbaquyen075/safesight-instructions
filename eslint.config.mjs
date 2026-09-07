@@ -14,6 +14,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Script Node CommonJS chạy ngoài Next.js (bridge Socket.IO, mock detection) — không lint theo rule TS/React.
+    "ai-engine/**",
   ]),
 ]);
 
