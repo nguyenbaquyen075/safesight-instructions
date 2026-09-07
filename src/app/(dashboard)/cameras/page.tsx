@@ -29,6 +29,7 @@ import { WebcamPreview } from '@/components/cameras/WebcamPreview';
 import { useCameras } from '@/hooks/use-cameras';
 import { parseCameraSource } from '@/lib/camera-source';
 import { DEMO_CAMERA_IDS } from '@/lib/camera-shape';
+import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 
 // --- Video của từng camera ---
 // Đọc từ NGUỒN DUY NHẤT src/data/camera-videos.json (YOLO cũng đọc chính file này).
@@ -383,6 +384,11 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Cam
                 )}
               </button>
             ))}
+          </div>
+
+          <div className="mt-6 pt-4 border-t border-white/10">
+            <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest mb-3">Agent</h4>
+            <SubjectAgentPanel subjectType="camera" subjectId={camera.id} />
           </div>
         </div>
 

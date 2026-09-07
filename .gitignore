@@ -71,3 +71,6 @@ __pycache__/
 !/data_train/tay_tran/**
 !/data_train/tay_gang/
 !/data_train/tay_gang/**
+
+# DB tạm cho test agent (npm run test:agent)
+agent-test.db*

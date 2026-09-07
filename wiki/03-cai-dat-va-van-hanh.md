@@ -38,6 +38,10 @@ npm run db:seed
 | `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram trong DB (32 byte base64) |
 | `ROBOFLOW_API_KEY` | tuỳ chọn | Chỉ cần cho trang `/roboflow` và script đối chiếu ảnh tĩnh |
 | `NEXT_API_URL` | tuỳ chọn | AI engine gọi Next.js ở đâu (mặc định `http://localhost:3000`) |
+| `AGENT_BRIDGE_SECRET` | bắt buộc để poke/ask agent | Next gọi `POST http://127.0.0.1:4002/internal/*`; thiếu ở Next thì không gọi (task vẫn nằm hàng đợi), thiếu ở agent thì route trả 401 |
+| `ANTHROPIC_API_KEY` | tuỳ chọn | Mở lane nghiên cứu của agent (review vi phạm, báo cáo ca, hỏi đáp); thiếu thì agent chỉ chạy lane trực vận hành |
+| `AGENT_PORT` | tuỳ chọn | Port nội bộ của agent, mặc định `4002` |
+| `SNAPSHOT_MAX_MB` | tuỳ chọn | Ngưỡng dung lượng `public/snapshots` để agent tự dọn ảnh cũ, mặc định `2048` |
 
 ## File model cần có (không nằm trong repo)
 
@@ -56,15 +60,16 @@ Mọi file `.pt` bị `.gitignore` chặn, đặt ở **gốc repo**:
 npm run dev
 ```
 
-`dev-all.sh` dọn cổng 3000/4001 cũ rồi khởi động cả 3 tiến trình, Ctrl+C tắt tất cả:
+`dev-all.sh` dọn cổng 3000/4001/4002 cũ rồi khởi động cả 4 tiến trình, Ctrl+C tắt tất cả:
 
 | Tiến trình | Lệnh riêng lẻ | Port |
 |---|---|---|
 | YOLO Bridge | `npm run dev:bridge` | 4001 |
 | AI Engine (Python) | `npm run dev:yolo` | — |
+| Agent (trực vận hành + cán bộ an toàn) | `npm run dev:agent` | 4002 (nội bộ) |
 | Next.js Dashboard | `npm run dev:web` | 3000 |
 
-Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engine và vẫn chạy web + bridge.
+Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engine và vẫn chạy web + bridge + agent. Chi tiết agent (lane, tool, hàng đợi): [Agent giám sát tự động](09-agent.md).
 
 > 💡 Chỉ phát triển giao diện, không cài Python: chạy `node ai-engine/mock_yolo.js` để phát detection giả qua bridge.
 
@@ -72,8 +77,9 @@ Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engi
 
 | Lệnh | Tác dụng |
 |---|---|
-| `npm run dev` | Chạy cả 3 tiến trình |
-| `npm run dev:web` / `dev:bridge` / `dev:yolo` | Chạy riêng từng tiến trình |
+| `npm run dev` | Chạy cả 4 tiến trình |
+| `npm run dev:web` / `dev:bridge` / `dev:yolo` / `dev:agent` | Chạy riêng từng tiến trình |
+| `npm run test:agent` | Test agent (`node --test agent/test/*.test.ts`) trên SQLite tạm |
 | `npm run db:seed` | Seed org/site/camera (`prisma/seed.mjs`) |
 | `npm run build` / `npm run start` | Build và chạy bản production |
 | `npm run lint` | ESLint |

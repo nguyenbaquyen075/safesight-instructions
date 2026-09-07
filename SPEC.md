@@ -33,6 +33,7 @@
 | Realtime | Socket.IO (bridge `ai-engine/yolo_bridge.js`, port 4001) |
 | AI | Ultralytics YOLOv8 (`ppe_multiclass.pt` + `ppe_boots.pt` + `ppe_gang.pt` + `yolov8n-pose.pt`), BoT-SORT, OpenCV |
 | Cảnh báo | Telegram Bot API (token mã hoá AES-256-GCM) |
+| Agent | `@anthropic-ai/sdk` (Claude Tool Runner, `claude-opus-5`) — worker Node riêng `agent/`, hàng đợi `AgentTask` |
 
 ---
 
@@ -69,9 +70,10 @@ Enum nghiệp vụ ở `src/types/enums.ts` (DB SQLite lưu String). Chi tiết:
 | `/roboflow` | ✅ | SUPER_ADMIN, ORG_ADMIN | Đối chiếu ảnh tĩnh, tốn credit |
 | `/users` | ✅ | SUPER_ADMIN, ORG_ADMIN | |
 | `/settings` | ✅ | SUPER_ADMIN, ORG_ADMIN | Camera thật/video mẫu, Telegram, alert rules |
+| `/agent` | ✅ | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian, hàng đợi, sweep, cài đặt, hỏi đáp |
 | `/reports`, `/profile` | ❌ | | Chưa có |
 
-**Độ phủ: 11/13 trang.**
+**Độ phủ: 12/14 trang.**
 
 ---
 
@@ -90,12 +92,17 @@ Tất cả dùng Prisma (DB thật). Xem bảng đầy đủ ở `wiki/05-giao-d
 | `/api/alert-rules` (+`/[id]`) | GET, POST · PATCH, DELETE | Site-scoped |
 | `/api/settings/telegram` (+`/test`) | GET, POST · POST | |
 | `/api/roboflow` | POST | Admin |
+| `/api/agent/tasks`, `/api/agent/events` | GET | Hàng đợi + audit |
+| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
+| `/api/agent/ask` | POST | Poke lane nghiên cứu, trả `sessionId` |
 
 ---
 
 ## 6. AI Pipeline (tóm tắt)
 
 `yolo_inference.py` mở mỗi camera một luồng (video mẫu / webcam / RTSP), `PPEViolationTracker.process_frame()` trả về khung người + khung từng món PPE (xanh = có, đỏ = thiếu). Vi phạm **chốt** khi conf ≥ 0.6 và thiếu liên tục ≥ 3s → snapshot → `POST /api/violations` → Telegram theo `AlertRule`. Bắt buộc: mũ, áo, găng, giày. Nghiệm thu bằng `eval_ppe_decision.py` (báo oan / bỏ lọt) chứ không dùng mAP. Chi tiết: `wiki/06-tich-hop-yolo.md`.
+
+Sau khi ghi DB, `POST /api/violations` tạo `AgentTask kind=violation.review` và poke agent (`agent/`, tiến trình riêng). Agent review bằng ảnh + lịch sử theo ledger bằng chứng (`ObservationKind` → band `VERIFIED`/`PROBABLE`/`POSSIBLE`), ghi `Violation.agentReview`, tự đổi trạng thái `false_positive` khi `VERIFIED` báo oan, leo thang Telegram khi `VERIFIED` thật đủ ngưỡng. Chi tiết: `wiki/09-agent.md`.
 
 ---
 
@@ -117,3 +124,4 @@ Xem `wiki/07-lo-trinh-phat-trien.md` (đã xong / ưu tiên 1-3 / câu hỏi m�
 
 - 2026-04-27: bản đầu (Orbis) — UI 9/11 trang, API mock, YOLO chưa tích hợp.
 - 2026-09-07: chuẩn hoá theo code — DB thật, AI end-to-end, Telegram, camera thật, voice alert, Roboflow đối chiếu.
+- 2026-09-07: thêm Agent giám sát tự động — trực vận hành + cán bộ an toàn + hỏi đáp (`agent/`, `AgentTask`/`AgentEvent`/`AgentSettings`, trang `/agent`, `wiki/09-agent.md`).

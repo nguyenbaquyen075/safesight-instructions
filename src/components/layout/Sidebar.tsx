@@ -24,6 +24,7 @@ import {
   Shield,
   Bell,
   LogOut,
+  Bot,
 } from 'lucide-react';
 
 interface NavItem {
@@ -41,6 +42,7 @@ const navItems: NavItem[] = [
   { label: 'Thông báo', href: '/alerts', icon: Bell, badge: 11 },
   { label: 'Vi phạm', href: '/violations', icon: ShieldAlert },
   { label: 'Phân tích', href: '/analytics', icon: BarChart3 },
+  { label: 'Agent', href: '/agent', icon: Bot },
   { label: 'Kiểm thử Roboflow', href: '/roboflow', icon: ScanSearch },
   { label: 'Người dùng', href: '/users', icon: Users },
   { label: 'Cài đặt', href: '/settings', icon: Settings },

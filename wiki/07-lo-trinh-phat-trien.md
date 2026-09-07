@@ -11,6 +11,7 @@ Cập nhật 2026-09-07 theo hiện trạng code (thay cho bảng cũ trong `SPE
 - Quản lý camera thật (webcam/RTSP) và gắn video mẫu qua giao diện.
 - Cảnh báo bằng giọng nói: mic trên `/cameras` → `/site-speaker`.
 - Trang `/roboflow` đối chiếu model cloud trên ảnh tĩnh.
+- Agent giám sát tự động (`agent/`, tiến trình thứ 4): trực vận hành (sweep 5 phát hiện + tự khắc phục) + cán bộ an toàn (review vi phạm bằng bằng chứng/band, leo thang Telegram, digest, báo cáo ca) + trợ lý hỏi đáp (trang `/agent`, tab Agent trong modal vi phạm/camera/site). Xem [Agent giám sát tự động](09-agent.md).
 
 ## 🎯 Ưu tiên 1 — Chất lượng nhận diện
 

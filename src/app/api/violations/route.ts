@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { notifyViolation } from '@/lib/alert-notifier';
+import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
 import type { Violation } from '@/types/models';
 
 async function getRealViolations(): Promise<Violation[]> {
@@ -25,6 +26,7 @@ async function getRealViolations(): Promise<Violation[]> {
     snapshotUrl: v.snapshotUrl,
     clipUrl: v.clipUrl ?? undefined,
     status: v.status.toLowerCase() as Violation['status'],
+    agentReview: v.agentReview ? JSON.parse(v.agentReview) : null,
     detectedAt: v.detectedAt.toISOString(),
     createdAt: v.createdAt.toISOString(),
   }));
@@ -119,6 +121,11 @@ export async function POST(request: NextRequest) {
   // KHÔNG await — yolo_inference.py đang chặn frame loop chờ response này.
   // Nếu chuyển sang serverless (Vercel functions) phải đổi sang waitUntil/queue.
   notifyViolation(violation, camera).catch((err) => console.error('[telegram] notify failed', err));
+
+  // Agent review vi phạm này (lane nghiên cứu). Row là thông điệp; poke chỉ đánh thức sớm.
+  enqueueAgentTask({ kind: 'violation.review', subjectType: 'violation', subjectId: violation.id, reason: `Vi phạm mới ${type} tại ${camera.name} (lần ${occurrenceCount ?? 1})`, priority: 300 })
+    .then(() => pokeAgent('/internal/dispatch'))
+    .catch((err) => console.error('[agent] enqueue failed', err));
 
   return NextResponse.json(violation, { status: 201 });
 }

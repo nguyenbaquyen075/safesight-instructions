@@ -17,15 +17,17 @@ Trang chủ tài liệu nội bộ của dự án `safesight-instructions`. Dùn
 | 06 | [Tích hợp YOLO](06-tich-hop-yolo.md) | Pipeline nhận diện PPE, lớp phát hiện, Roboflow đối chiếu |
 | 07 | [Lộ trình phát triển](07-lo-trinh-phat-trien.md) | Đã xong, ưu tiên tiếp theo, câu hỏi mở |
 | 08 | [Train lại model găng/giày](08-train-model-them-ppe.md) | Vì sao và cách train lại, nghiệm thu |
+| 09 | [Agent giám sát tự động](09-agent.md) | Trực vận hành + cán bộ an toàn + hỏi đáp, hàng đợi `AgentTask`, bằng chứng/band, tool, panel `/agent` |
 
 ## ⚡ Tóm tắt nhanh
 
 - **Trạng thái:** 🟡 MVP đang phát triển (v0.1.0).
-- **Chạy:** `npm run dev` khởi động Next.js (3000) + YOLO Bridge (4001) + AI engine Python.
-- **Giao diện:** 10 trang trong dashboard, thiếu `/reports` và `/profile`.
-- **API:** 15 route, tất cả đã nối DB thật (Prisma + SQLite dev).
+- **Chạy:** `npm run dev` khởi động 4 tiến trình — Next.js (3000) + YOLO Bridge (4001) + AI engine Python + Agent (4002 nội bộ).
+- **Giao diện:** 11 trang trong dashboard, thiếu `/reports` và `/profile`.
+- **API:** 19 route, tất cả đã nối DB thật (Prisma + SQLite dev).
 - **AI:** model chính `ppe_multiclass.pt` 11 lớp + model phụ găng/giày + pose; bắt buộc mũ, áo, găng, giày.
 - **Cảnh báo:** Telegram theo `AlertRule`; mic → loa công trường qua Socket.IO.
+- **Agent:** tiến trình thứ 4 (`agent/`, port 4002 nội bộ) — trực vận hành tất định + cán bộ an toàn (Claude Tool Runner) + hỏi đáp trên trang `/agent`; chạy lane trực vận hành cả khi thiếu `ANTHROPIC_API_KEY`.
 
 ## 📌 Quy ước tài liệu
 

@@ -60,6 +60,13 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # ROBOFLOW_API_KEY (tuỳ chọn — chỉ cần nếu dùng Roboflow Workflow để
                       # đối chiếu kết quả trên ảnh tĩnh, xem mục "Đối chiếu bằng Roboflow
                       # Workflow" bên dưới; lấy ở app.roboflow.com/settings/api)
+                      #
+                      # AGENT_BRIDGE_SECRET (bắt buộc để Next đánh thức agent và gửi câu hỏi từ
+                      # panel; thiếu thì agent vẫn chạy theo chu kỳ 20s, sinh bằng
+                      # `openssl rand -base64 24`)
+                      #
+                      # ANTHROPIC_API_KEY (tuỳ chọn — mở lane nghiên cứu của agent: review vi
+                      # phạm bằng ảnh, báo cáo ca, hỏi đáp; thiếu thì chỉ chạy trực vận hành)
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không
 #    Violation write sẽ lỗi 404 vì cameraId chưa tồn tại)
@@ -80,8 +87,22 @@ Lệnh này chạy `dev-all.sh`, tự khởi động cả 3 tiến trình cùng 
 | Next.js Dashboard | `npm run dev:web` | 3000 |
 | YOLO Bridge (Socket.IO) | `npm run dev:bridge` | 4001 |
 | YOLO Inference (Python) | `npm run dev:yolo` | — (POST tới bridge + API) |
+| Agent (trực vận hành + cán bộ an toàn) | `npm run dev:agent` | 4002 (nội bộ) |
 
 Truy cập dashboard tại [http://localhost:3000](http://localhost:3000).
+
+## Agent giám sát tự động
+
+Tiến trình thứ 4 (`agent/`, port 4002 nội bộ), khởi động cùng `npm run dev`. Ba vai trò:
+
+1. **Trực vận hành** — tất định, không cần model: phát hiện camera/AI engine/bridge đứng, đĩa đầy, thiếu model; tự khắc phục trong giới hạn tần suất. Chạy được cả khi thiếu `ANTHROPIC_API_KEY`.
+2. **Cán bộ an toàn** — Claude Tool Runner: review từng vi phạm bằng snapshot + lịch sử, phán quyết theo bằng chứng, leo thang Telegram, digest theo camera, báo cáo ca. Cần `ANTHROPIC_API_KEY`.
+3. **Trợ lý hỏi đáp** — trang `/agent` và tab Agent trong modal vi phạm/camera/site.
+
+- **Bật/tắt:** kill switch trên trang `/agent` (`AgentSettings.isEnabled`), hoặc để trống `ANTHROPIC_API_KEY` để chỉ giữ lane trực vận hành.
+- **Chạy riêng:** `npm run dev:agent`; kiểm tra sức khoẻ: `curl 127.0.0.1:4002/health`.
+
+Chi tiết đầy đủ (hàng đợi, bằng chứng/band, tool, rào chắn, panel): [`wiki/09-agent.md`](wiki/09-agent.md).
 
 ## Cấu hình AI Engine
 
@@ -194,6 +215,12 @@ cloud với model local, khỏi chạy script.
 │   ├── components/             #   UI components
 │   ├── hooks/                  #   useYolo, useCameras, useViolations...
 │   └── data/                   #   mock data + camera-videos.json
+├── agent/                      # Agent giám sát tự động (tiến trình thứ 4, port 4002)
+│   ├── main.ts                 #   Vòng lặp claimDue() 20s cho 2 lane
+│   ├── direct/                 #   Lane trực vận hành (sweep, tất định)
+│   ├── session.ts, research/   #   Lane cán bộ an toàn (Claude Tool Runner)
+│   ├── tools/                  #   10 tool, mỗi file một tool
+│   └── skills/                 #   Skill markdown nạp vào system prompt
 ├── ai-engine/                  # AI/CV engine (Python + bridge Node.js)
 │   ├── yolo_inference.py       #   Vòng lặp inference chính
 │   ├── ppe_tracker.py          #   Logic tracking + xác nhận vi phạm

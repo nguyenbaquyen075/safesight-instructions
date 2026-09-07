@@ -17,6 +17,7 @@ Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/
 | `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo |
+| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, ô hỏi toàn hệ thống, capabilities |
 | `/reports`, `/profile` | — | — | ❌ Chưa có |
 
 ## Danh mục API route (`src/app/api/`)
@@ -38,6 +39,10 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route th
 | `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt |
 | `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
+| `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
+| `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
+| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
+| `/api/agent/ask` | POST | `{ subjectType?, subjectId?, sessionId?, message }` → ghi `AgentEvent`, tạo/nối `AgentTask kind=ask`, poke agent, trả `sessionId` |
 
 ## React Query hooks (`src/hooks/`)
 
@@ -53,6 +58,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route th
 | `useRealSitesFromCameras` | `use-real-sites.ts` | Gom site từ roster camera + vi phạm thật |
 | `useYolo` | `useYolo.ts` | Socket.IO → YOLO Bridge (`NEXT_PUBLIC_YOLO_SERVER_URL`) |
 | `useVoiceRecorder` | `useVoiceRecorder.ts` | `MediaRecorder` cho nút mic |
+| `useAgentTasks`, `useAgentEvents` (poll khi thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent` | `use-agent.ts` | `/api/agent/*` |
 
 ## Component chính (`src/components/`)
 
@@ -63,6 +69,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route th
 - **alerts/** — `AlertsTable.tsx`
 - **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx`, `ui.tsx`
 - **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
+- **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`)
 - **ui/** — shadcn/Radix primitives, `Toaster.tsx` · **Providers.tsx** — React Query + session
 
 ## Dữ liệu mock còn lại

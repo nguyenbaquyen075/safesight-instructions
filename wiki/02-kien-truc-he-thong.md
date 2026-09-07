@@ -1,6 +1,6 @@
 # 02 — Kiến trúc hệ thống
 
-## Tổng quan 3 tiến trình
+## Tổng quan 4 tiến trình
 
 ```
 ┌──────────────────┐      ┌──────────────────┐      ┌──────────────────┐
@@ -10,13 +10,18 @@
 └──────────────────┘      └──────────────────┘      └──────────────────┘
         │  POST /api/violations (header X-AI-Engine-Secret)   │
         └─────────────────────────────────────────────────────┘
-                                   ▼
-                        ┌──────────────────────┐
-                        │ Prisma + SQLite (dev) │──▶ Telegram (alert-notifier)
-                        └──────────────────────┘
+                                   ▼                            │ poke (AGENT_BRIDGE_SECRET)
+                        ┌──────────────────────┐                ▼
+                        │ Prisma + SQLite (dev) │◄──────┐  ┌───────────────┐
+                        │                       │──────▶│  │ agent/ (4002) │
+                        └───────────┬───────────┘       └──┤ trực vận hành │
+                                    │                       │ + cán bộ an  │
+                                    ▼                       │ toàn + Q&A   │
+                              Telegram                      └───────────────┘
+                          (alert-notifier)
 ```
 
-Cả 3 tiến trình khởi động bằng **một lệnh** `npm run dev` (`dev-all.sh`) — xem [Cài đặt & vận hành](03-cai-dat-va-van-hanh.md).
+Cả 4 tiến trình khởi động bằng **một lệnh** `npm run dev` (`dev-all.sh`) — xem [Cài đặt & vận hành](03-cai-dat-va-van-hanh.md).
 
 ## Vai trò từng thành phần
 
@@ -35,6 +40,12 @@ Cả 3 tiến trình khởi động bằng **một lệnh** `npm run dev` (`dev-
 - Next.js 16 App Router (port **3000**), NextAuth v5 (Credentials), Prisma 7.
 - Nhận realtime qua hook `useYolo` (`src/hooks/useYolo.ts`), vẽ khung trên `CameraCard`.
 - API routes (`src/app/api/`) đọc/ghi DB thật; `POST /api/violations` gọi `notifyViolation()` gửi Telegram theo `AlertRule` (fire-and-forget, không chặn vòng lặp AI).
+
+### 4. Agent — `agent/`
+- Tiến trình Node riêng (port **4002**, nội bộ, không mở ra ngoài), khởi động cùng `npm run dev`. Không chạy được thì các tiến trình còn lại vẫn hoạt động bình thường.
+- Hai lane trên cùng hàng đợi `AgentTask`: **trực tiếp** (`agent/direct/*`, tất định, không cần model) và **nghiên cứu** (`agent/session.ts`, Claude Tool Runner qua `@anthropic-ai/sdk`, cần `ANTHROPIC_API_KEY`).
+- Next.js chỉ **ghi** `AgentTask` rồi poke agent (`POST /internal/dispatch`, `/internal/ask`, header `Authorization: Bearer AGENT_BRIDGE_SECRET`) — không phân loại, không gọi model, không quyết định gì trong route.
+- Chi tiết đầy đủ: [Agent giám sát tự động](09-agent.md).
 
 ## Luồng dữ liệu
 
@@ -58,6 +69,7 @@ Nguồn video ──▶ ppe_tracker.process_frame() ──(HTTP)──▶ yolo_b
 | Next.js Dashboard | 3000 | HTTP |
 | YOLO Bridge | 4001 | HTTP (`POST /detections`) + Socket.IO |
 | AI Engine | — | không mở cổng, chỉ gửi đi |
+| Agent | 4002 | HTTP nội bộ (`/internal/dispatch`, `/internal/ask`, `/health`), chỉ `127.0.0.1` |
 
 ---
 👉 Tiếp theo: [Cài đặt & vận hành](03-cai-dat-va-van-hanh.md)

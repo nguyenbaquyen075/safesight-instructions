@@ -15,6 +15,8 @@ import { toast } from '@/lib/toast';
 import { Severity, ViolationStatus } from '@/types/enums';
 import { MicButton } from '@/components/cameras/MicButton';
 import { useUpdateViolationStatus } from '@/hooks/use-violations';
+import { AgentReviewCard } from '@/components/agent/AgentReviewCard';
+import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 import type { Violation } from '@/types/models';
 
 // Bản ghi AI lưu ở localStorage có thêm date/time/description ngoài kiểu Violation từ DB.
@@ -22,6 +24,7 @@ type ViolationLike = Violation & { date?: string; time?: string; description?: s
 
 export function ViolationDetailModal({ violation, onClose }: { violation: ViolationLike, onClose: () => void }) {
   const [showTicket, setShowTicket] = useState(false);
+  const [tab, setTab] = useState<'detail' | 'agent'>('detail');
   const [empName, setEmpName] = useState('');
   const [empDept, setEmpDept] = useState('');
   const [penalty, setPenalty] = useState('200.000đ');
@@ -109,6 +112,13 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
                  </button>
               </div>
 
+              <div className="flex gap-1 mb-4" role="tablist">
+                {(['detail', 'agent'] as const).map(t => (
+                  <button key={t} role="tab" aria-selected={tab === t} onClick={() => setTab(t)} className={cn('px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]', tab === t ? 'bg-[var(--primary)] text-white' : 'text-white/50 hover:text-white')}>{t === 'detail' ? 'Chi tiết' : 'Agent'}</button>
+                ))}
+              </div>
+
+              {tab === 'detail' && (
               <div className="space-y-6">
                  <div className="p-4 rounded-2xl bg-[var(--background-secondary)] border border-white/5 space-y-4">
                     <div className="flex items-center gap-3">
@@ -136,6 +146,14 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
                     </p>
                  </div>
               </div>
+              )}
+
+              {tab === 'agent' && (
+                <div className="space-y-4">
+                  <AgentReviewCard review={violation.agentReview ?? null} />
+                  <SubjectAgentPanel subjectType="violation" subjectId={violation.id} />
+                </div>
+              )}
            </div>
 
            <div className="pt-8 border-t border-white/5 space-y-4">
