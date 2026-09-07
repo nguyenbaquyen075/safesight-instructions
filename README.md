@@ -10,12 +10,9 @@ Phát hành theo giấy phép **MIT** (OSI-approved) — xem toàn văn tại [`
 
 ## Kiến trúc hệ thống
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="wiki/assets/yolo-architecture-dark.png">
-  <img alt="Sơ đồ kiến trúc: YOLOv8 Model (Python) → YOLO Bridge (Node.js, cổng 4001) → Next.js Dashboard (cổng 3000); AI Engine và Dashboard cùng gọi API POST /api/violations, lưu qua Prisma vào SQLite (dev) / Postgres (production)" src="wiki/assets/yolo-architecture-light.png" width="100%">
-</picture>
+<img alt="Sơ đồ kiến trúc: YOLOv8 Model (Python) → YOLO Bridge (Node.js, cổng 4001) → Next.js Dashboard (cổng 3000); AI Engine và Dashboard cùng gọi API POST /api/violations, lưu qua Prisma vào SQLite (dev) / Postgres (production)" src="wiki/assets/yolo-architecture-animated-dark.svg" width="100%">
 
-Bản tương tác (zoom, đổi theme): mở [`wiki/assets/yolo-architecture.html`](./wiki/assets/yolo-architecture.html) trong trình duyệt. Sửa sơ đồ thì xuất lại 2 ảnh PNG cùng thư mục.
+Sơ đồ là SVG có chuyển động minh họa luồng dữ liệu (tự theo theme sáng/tối của trình duyệt); nguồn tại [`wiki/assets/yolo-architecture-animated-dark.svg`](./wiki/assets/yolo-architecture-animated-dark.svg).
 
 - **AI Engine** (`ai-engine/`) — Python/YOLOv8 nhận diện PPE + `ppe_tracker.py` theo dõi đối tượng (track ID), xác nhận vi phạm sau khi thấy liên tục ≥3s để giảm báo động giả. Gửi detection cho `yolo_bridge.js` (overlay real-time) và ghi violation đã xác nhận vào DB qua Next.js API.
 - **YOLO Bridge** (`ai-engine/yolo_bridge.js`) — Server Socket.IO trung gian, broadcast detection theo room từng camera (đỡ băng thông cho client chỉ xem 1 camera).
