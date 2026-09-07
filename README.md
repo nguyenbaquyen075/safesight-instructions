@@ -1,8 +1,14 @@
 # SafeSight Instructions
 
+[![Release](https://img.shields.io/github/v/release/nguyenbaquyen075/safesight-instructions?display_name=tag&sort=semver)](https://github.com/nguyenbaquyen075/safesight-instructions/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE) [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org) [![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-blue)](https://docs.ultralytics.com)
+
 Hệ thống giám sát vi phạm trang bị bảo hộ lao động (PPE) theo thời gian thực trên công trường xây dựng, dùng YOLOv8 (Computer Vision) kết hợp Next.js Dashboard.
 
 Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang, không đeo găng, không đi giày bảo hộ — ghi nhận bằng chứng (ảnh + bounding box), cảnh báo real-time qua Socket.IO, lưu trữ vi phạm vào cơ sở dữ liệu.
+
+## Phiên bản
+
+Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`.
 
 ## Giấy phép
 
