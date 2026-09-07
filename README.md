@@ -1,8 +1,14 @@
 # SafeSight Instructions
 
+[![Release](https://img.shields.io/github/v/release/nguyenbaquyen075/safesight-instructions?display_name=tag&sort=semver)](https://github.com/nguyenbaquyen075/safesight-instructions/releases) [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE) [![Next.js 16](https://img.shields.io/badge/Next.js-16-black)](https://nextjs.org) [![YOLOv8](https://img.shields.io/badge/YOLOv8-Ultralytics-blue)](https://docs.ultralytics.com)
+
 Hệ thống giám sát vi phạm trang bị bảo hộ lao động (PPE) theo thời gian thực trên công trường xây dựng, dùng YOLOv8 (Computer Vision) kết hợp Next.js Dashboard.
 
 Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang, không đeo găng, không đi giày bảo hộ — ghi nhận bằng chứng (ảnh + bounding box), cảnh báo real-time qua Socket.IO, lưu trữ vi phạm vào cơ sở dữ liệu.
+
+## Phiên bản
+
+Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELOG.md); mỗi tag `vX.Y.Z` được workflow `.github/workflows/release.yml` tự động chuyển thành [GitHub Release](https://github.com/nguyenbaquyen075/safesight-instructions/releases). Quy trình phát hành: cập nhật `CHANGELOG.md` và `version` trong `package.json`, commit, rồi `git tag -a vX.Y.Z -m "SafeSight vX.Y.Z" && git push origin vX.Y.Z`.
 
 ## Giấy phép
 
@@ -10,12 +16,9 @@ Phát hành theo giấy phép **MIT** (OSI-approved) — xem toàn văn tại [`
 
 ## Kiến trúc hệ thống
 
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="wiki/assets/yolo-architecture-dark.png">
-  <img alt="Sơ đồ kiến trúc: YOLOv8 Model (Python) → YOLO Bridge (Node.js, cổng 4001) → Next.js Dashboard (cổng 3000); AI Engine và Dashboard cùng gọi API POST /api/violations, lưu qua Prisma vào SQLite (dev) / Postgres (production)" src="wiki/assets/yolo-architecture-light.png" width="100%">
-</picture>
+<img alt="Sơ đồ kiến trúc: YOLOv8 Model (Python) → YOLO Bridge (Node.js, cổng 4001) → Next.js Dashboard (cổng 3000); AI Engine và Dashboard cùng gọi API POST /api/violations, lưu qua Prisma vào SQLite (dev) / Postgres (production)" src="wiki/assets/yolo-architecture-animated-dark.svg" width="100%">
 
-Bản tương tác (zoom, đổi theme): mở [`wiki/assets/yolo-architecture.html`](./wiki/assets/yolo-architecture.html) trong trình duyệt. Sửa sơ đồ thì xuất lại 2 ảnh PNG cùng thư mục.
+Sơ đồ là SVG có chuyển động minh họa luồng dữ liệu (tự theo theme sáng/tối của trình duyệt); nguồn tại [`wiki/assets/yolo-architecture-animated-dark.svg`](./wiki/assets/yolo-architecture-animated-dark.svg).
 
 - **AI Engine** (`ai-engine/`) — Python/YOLOv8 nhận diện PPE + `ppe_tracker.py` theo dõi đối tượng (track ID), xác nhận vi phạm sau khi thấy liên tục ≥3s để giảm báo động giả. Gửi detection cho `yolo_bridge.js` (overlay real-time) và ghi violation đã xác nhận vào DB qua Next.js API.
 - **YOLO Bridge** (`ai-engine/yolo_bridge.js`) — Server Socket.IO trung gian, broadcast detection theo room từng camera (đỡ băng thông cho client chỉ xem 1 camera).
