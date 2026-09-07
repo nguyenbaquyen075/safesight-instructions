@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 
-import { Camera as CameraIcon, Activity, AlertTriangle, WifiOff, Settings2, Maximize2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Camera as CameraIcon, Activity, WifiOff, Settings2, Maximize2, ShieldCheck, ShieldAlert } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { CameraStatus } from '@/types/enums';
 import type { Camera } from '@/types/models';
@@ -37,6 +37,7 @@ export function CameraCard({ camera }: CameraCardProps) {
             )}
           />
         ) : camera.thumbnailUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- ảnh snapshot động trong public/snapshots, không qua next/image
           <img
             src={camera.thumbnailUrl}
             alt={camera.name}

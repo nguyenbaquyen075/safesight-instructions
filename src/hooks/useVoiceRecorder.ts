@@ -19,7 +19,9 @@ export function useVoiceRecorder(onStop: (blob: Blob) => void): UseVoiceRecorder
   const streamRef = useRef<MediaStream | null>(null);
   const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const onStopRef = useRef(onStop);
-  onStopRef.current = onStop;
+  useEffect(() => {
+    onStopRef.current = onStop;
+  }, [onStop]);
 
   const cleanupStream = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());

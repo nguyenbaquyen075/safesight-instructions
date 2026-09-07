@@ -6,22 +6,20 @@ import { useState, useEffect } from 'react';
 import { 
   Bell, 
   Search, 
-  Filter, 
   AlertTriangle, 
   ShieldAlert, 
   Info,
-  MoreVertical,
   Calendar,
   Clock,
   MapPin,
   CheckCircle2,
-  X,
   ChevronRight,
   ShieldCheck
 } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useViolations } from '@/hooks/use-violations';
+import { useMounted } from '@/hooks/use-mounted';
 import { ViolationDetailModal } from '@/components/violations/ViolationDetailModal';
 import { Severity } from '@/types/enums';
 import type { Violation } from '@/types/models';
@@ -33,14 +31,17 @@ const READ_KEY = 'safesight_read_alerts';
 export default function AlertsPage() {
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
   const [search, setSearch] = useState('');
-  const [mounted, setMounted] = useState(false);
+  const mounted = useMounted();
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [selectedAlert, setSelectedAlert] = useState<Violation | null>(null);
   const { data: allAlerts = [] } = useViolations();
 
   useEffect(() => {
-    setMounted(true);
+    // Nạp trạng thái "đã đọc" từ localStorage SAU khi hydrate (đọc lúc render sẽ lệch
+    // server/client). Chuyển sang useSyncExternalStore là refactor riêng vì persistRead
+    // cũng ghi state này.
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReadIds(new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')));
     } catch {
       setReadIds(new Set());
@@ -72,6 +73,8 @@ export default function AlertsPage() {
   });
 
   const last24h = 24 * 60 * 60 * 1000;
+  // Cố ý lấy giờ hiện tại mỗi lần render để đếm "24h gần nhất"; trang chỉ render sau hydrate.
+  // eslint-disable-next-line react-hooks/purity
   const now = Date.now();
   const recent = allAlerts.filter(a => now - new Date(a.detectedAt).getTime() < last24h);
 
@@ -138,7 +141,7 @@ export default function AlertsPage() {
           {['TẤT CẢ', 'NGHIÊM TRỌNG', 'CAO', 'TRUNG BÌNH', 'THẤP'].map(s => (
             <button
               key={s}
-              onClick={() => setFilter(s as any)}
+              onClick={() => setFilter(s as SeverityFilter)}
               className={cn(
                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap",
                 filter === s 

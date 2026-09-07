@@ -20,6 +20,8 @@ export function useDashboardKPIs() {
   const { data: violations = [], isLoading } = useViolations();
 
   const data = React.useMemo<DashboardKPIs>(() => {
+    // Cố ý: KPI "hôm nay/hôm qua" tính theo giờ thật tại lần đổi dữ liệu vi phạm.
+    // eslint-disable-next-line react-hooks/purity
     const now = Date.now();
     const today = dayKey(now);
     const yesterday = dayKey(now - DAY_MS);

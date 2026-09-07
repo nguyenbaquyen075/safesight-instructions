@@ -15,8 +15,12 @@ import { toast } from '@/lib/toast';
 import { Severity, ViolationStatus } from '@/types/enums';
 import { MicButton } from '@/components/cameras/MicButton';
 import { useUpdateViolationStatus } from '@/hooks/use-violations';
+import type { Violation } from '@/types/models';
 
-export function ViolationDetailModal({ violation, onClose }: { violation: any, onClose: () => void }) {
+// Bản ghi AI lưu ở localStorage có thêm date/time/description ngoài kiểu Violation từ DB.
+type ViolationLike = Violation & { date?: string; time?: string; description?: string };
+
+export function ViolationDetailModal({ violation, onClose }: { violation: ViolationLike, onClose: () => void }) {
   const [showTicket, setShowTicket] = useState(false);
   const [empName, setEmpName] = useState('');
   const [empDept, setEmpDept] = useState('');
@@ -128,7 +132,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: any, o
                  <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-white/40 uppercase tracking-widest">Mô tả AI</h4>
                     <p className="text-sm text-white/70 leading-relaxed italic">
-                       "{violation.description || `Hệ thống phát hiện tự động đã ghi nhận vi phạm: ${getViolationTypeLabel(violation.type)}. Bằng chứng đã được lưu trữ để xem xét tuân thủ.`}"
+                       &quot;{violation.description || `Hệ thống phát hiện tự động đã ghi nhận vi phạm: ${getViolationTypeLabel(violation.type)}. Bằng chứng đã được lưu trữ để xem xét tuân thủ.`}&quot;
                     </p>
                  </div>
               </div>

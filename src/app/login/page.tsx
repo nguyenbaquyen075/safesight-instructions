@@ -36,7 +36,7 @@ function LoginContent() {
         router.push(callbackUrl);
         router.refresh(); // Force reload to update session state in layouts
       }
-    } catch (err) {
+    } catch {
       setError('Đã xảy ra lỗi không mong muốn');
     } finally {
       setIsLoading(false);

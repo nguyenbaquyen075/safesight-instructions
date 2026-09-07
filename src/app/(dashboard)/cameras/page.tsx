@@ -6,35 +6,23 @@ import * as React from 'react';
 import Link from 'next/link';
 import {
   Camera as CameraIcon,
-  Search,
   Filter,
-  MoreVertical,
-  Building2,
   Activity,
   Wifi,
-  WifiOff,
-  AlertCircle,
-  Plus,
   Maximize2,
-  RefreshCw,
   X,
-  History,
-  PlayCircle,
-  Clock,
   ShieldAlert,
-  Bell,
   Terminal,
-  ChevronRight,
   Cpu,
   ShieldCheck,
-  Zap,
   Radio
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useYolo, Detection } from '@/hooks/useYolo';
+import { useMounted } from '@/hooks/use-mounted';
 import { mockCameras } from '@/data/mock-cameras';
-import { mockViolations } from '@/data/mock-violations';
-import { CameraStatus, Severity } from '@/types/enums';
+import type { Camera } from '@/types/models';
+import { CameraStatus } from '@/types/enums';
 import cameraVideos from '@/data/camera-videos.json';
 import { MicButton } from '@/components/cameras/MicButton';
 import { WebcamPreview } from '@/components/cameras/WebcamPreview';
@@ -79,7 +67,7 @@ function videoForCamera(cameraId: string, source?: string): string {
 const TOC_DO_PHAT = 0.75;
 
 function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detections: Detection[]; aiPos?: number }) {
-  const [ratio, setRatio] = React.useState<number | null>(null);
+  const [, setRatio] = React.useState<number | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   // TUA video theo vị trí AI đang phân tích. Không có bước này thì hai bên chỉ
@@ -169,19 +157,17 @@ function AIDetectionBox({ detection }: { detection: Detection }) {
 }
 
 function LiveLog({ lastEvent }: { lastEvent: string | null }) {
-  const [logs, setLogs] = React.useState<string[]>([]);
-
-  React.useEffect(() => {
-    if (lastEvent) {
-      setLogs(prev => [lastEvent, ...prev.slice(0, 5)]);
-    }
-  }, [lastEvent]);
-
-  React.useEffect(() => {
-    if (logs.length === 0) {
-      setLogs(['[HỆ THỐNG] Đang khởi tạo mô hình AI...', '[HỆ THỐNG] Đang kết nối tới YOLO Bridge...']);
-    }
-  }, []);
+  const [logs, setLogs] = React.useState<string[]>([
+    '[HỆ THỐNG] Đang khởi tạo mô hình AI...',
+    '[HỆ THỐNG] Đang kết nối tới YOLO Bridge...',
+  ]);
+  // Sự kiện mới -> chèn lên đầu, giữ 6 dòng. Làm ngay trong render theo mẫu
+  // "adjust state on prop change" thay vì setState trong effect.
+  const [prevEvent, setPrevEvent] = React.useState(lastEvent);
+  if (lastEvent !== prevEvent) {
+    setPrevEvent(lastEvent);
+    if (lastEvent) setLogs(prev => [lastEvent, ...prev.slice(0, 5)]);
+  }
 
   return (
     <div className="bg-black/80 backdrop-blur-xl border border-white/10 rounded-2xl p-4 h-48 overflow-hidden font-mono text-[10px] text-[var(--success)] shadow-2xl">
@@ -201,17 +187,28 @@ function LiveLog({ lastEvent }: { lastEvent: string | null }) {
   );
 }
 
+// Bản ghi vi phạm AI lưu ở localStorage 'safesight_alerts' (ghi ở CamerasPage bên dưới)
+interface StoredAiAlert {
+  id: string;
+  trackId: number | null;
+  type: string;
+  cameraName: string;
+  siteName: string;
+  date: string;
+  time: string;
+}
+
 // --- NEW: Camera Expansion Modal ---
-function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: any, detections: Detection[], onClose: () => void, videoUrl: string }) {
+function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Camera, detections: Detection[], onClose: () => void, videoUrl: string }) {
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   // Lịch sử vi phạm ĐÃ GHI NHẬN của camera này (đọc từ feed thật, tự cập nhật khi có bản ghi mới)
-  const [history, setHistory] = React.useState<any[]>([]);
+  const [history, setHistory] = React.useState<StoredAiAlert[]>([]);
 
   React.useEffect(() => {
     const load = () => {
       try {
-        const all = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
-        setHistory(all.filter((a: any) => a.cameraName === camera?.name));
+        const all: StoredAiAlert[] = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
+        setHistory(all.filter((a) => a.cameraName === camera?.name));
       } catch {
         setHistory([]);
       }
@@ -235,8 +232,8 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: any
   // (tránh 1 người vừa hiện ở "live" vừa hiện lại ở "đã ghi nhận" cùng lúc).
   const liveTrackIds = new Set(detections.filter(d => d.trackId != null).map(d => d.trackId));
   const historyItems = history
-    .filter((h: any) => h.trackId == null || !liveTrackIds.has(h.trackId))
-    .map((h: any, i: number) => ({
+    .filter((h) => h.trackId == null || !liveTrackIds.has(h.trackId))
+    .map((h, i) => ({
       key: `his-${h.id ?? i}`,
       title: h.type,
       desc: `Đã ghi nhận lúc ${h.time} ${h.date} • ${h.siteName}`,
@@ -395,9 +392,9 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: any
 }
 
 export default function CamerasPage() {
-  const [selectedCamera, setSelectedCamera] = React.useState<any>(null);
-  const [mounted, setMounted] = React.useState(false);
-  const [notification, setNotification] = React.useState<any>(null);
+  const [selectedCamera, setSelectedCamera] = React.useState<{ cam: Camera; videoUrl: string } | null>(null);
+  const mounted = useMounted();
+  const [notification, setNotification] = React.useState<{ id: number; title: string; desc: string; type: 'success' | 'danger' | 'warning' } | null>(null);
   const [showViolationsOnly, setShowViolationsOnly] = React.useState(false);
   const [voiceMode, setVoiceMode] = React.useState<'demo' | 'broadcast'>('demo');
 
@@ -414,10 +411,6 @@ export default function CamerasPage() {
     setNotification({ id: Math.random(), title, desc, type });
     setTimeout(() => setNotification(null), 5000);
   };
-
-  React.useEffect(() => {
-    setMounted(true);
-  }, []);
 
   // --- Ghi nhận vi phạm THỜI GIAN THỰC, nhưng MỖI ĐỐI TƯỢNG chỉ 1 LẦN ---
   // Cùng 1 người (trackId) xuất hiện ở nhiều khung hình -> chỉ lưu 1 lần duy nhất
@@ -707,7 +700,7 @@ export default function CamerasPage() {
                   />
                   {isDemo && (
                     <button
-                      onClick={() => setSelectedCamera({ cam, videoUrl })}
+                      onClick={() => setSelectedCamera({ cam, videoUrl: videoUrl! })}
                       className="w-8 h-8 rounded-lg bg-white/10 hover:bg-[var(--primary)] backdrop-blur-md flex items-center justify-center text-white transition-all"
                     >
                       <Maximize2 className="w-4 h-4" />

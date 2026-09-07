@@ -38,7 +38,7 @@ export function ViolationDonut({ data }: ViolationDonutProps) {
                 fontSize: '13px',
               }}
               itemStyle={{ color: 'var(--text-primary)' }}
-              formatter={(value: any, name: any, props: any) => [
+              formatter={(value, _name, props) => [
                 `${value} (${props.payload.percentage.toFixed(1)}%)`,
                 props.payload.label,
               ]}

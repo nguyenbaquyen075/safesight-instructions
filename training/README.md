@@ -2,8 +2,10 @@
 
 > Mục tiêu: model mới **ghim khung riêng cho từng bộ phận** — đầu (mũ), thân (áo), tay (găng), chân (giày) — thay cho model 4 lớp hiện tại chỉ có mũ + áo.
 
-## Vì sao cần bước này
-Model đang chạy (`ppe_v8s_custom.pt`) **chỉ biết 4 lớp** (helmet/vest/no_helmet/no_vest). Không thể vẽ khung "găng tay" hay "chân" nếu model chưa được huấn luyện các lớp đó. → Phải train model mới.
+> ⚠️ **Tài liệu lịch sử.** Model đang chạy là `ppe_multiclass.pt` (11 lớp, đã có găng/giày). Quy trình train lại hiện hành là [`detech_ppe_colab.md`](detech_ppe_colab.md) + `build_dataset.py`. Các bước dưới đây chỉ còn đúng khi cần **thêm lớp hoàn toàn mới**.
+
+## Vì sao cần bước này (bối cảnh cũ)
+Model cũ (`ppe_v8s_custom.pt`) chỉ biết 4 lớp (helmet/vest/no_helmet/no_vest) nên phải train model mới có găng/giày — việc này đã xong.
 
 ## Các bước
 
@@ -24,12 +26,7 @@ python training/train_ppe.py
 ### 3. Gắn model mới vào hệ thống
 1. Copy `best.pt` → gốc repo, đổi tên (vd `ppe_multiclass.pt`).
 2. `yolo_inference.py`: đổi `MODEL_PATH = "ppe_multiclass.pt"`.
-3. `ppe_tracker.py`: cập nhật `self.class_names` cho khớp lớp mới, ví dụ:
-   ```python
-   self.class_names = ['person','helmet','no_helmet','vest','no_vest',
-                       'gloves','no_gloves','boots','no_boots']
-   ```
-   và mở rộng dòng `is_violation = cls_name in ['no_helmet','no_vest','no_gloves','no_boots']`.
+3. `ppe_tracker.py` đọc tên lớp thẳng từ model (`self.model.names`) nên không phải sửa danh sách lớp; chỉ thêm tên hiển thị vào `PPE_VN` và (nếu bắt buộc) đưa lớp mới vào `required_ppe` + `PPE_VIOLATION_MAP` trong `yolo_inference.py`.
 4. (Tuỳ chọn) Thêm `ViolationType` cho găng tay/giày trong `prisma/schema.prisma` + giao diện.
 
 ### 4. Chạy lại

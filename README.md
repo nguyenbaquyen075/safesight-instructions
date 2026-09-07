@@ -2,7 +2,7 @@
 
 Hệ thống giám sát vi phạm trang bị bảo hộ lao động (PPE) theo thời gian thực trên công trường xây dựng, dùng YOLOv8 (Computer Vision) kết hợp Next.js Dashboard.
 
-Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang — ghi nhận bằng chứng (ảnh + bounding box), cảnh báo real-time qua Socket.IO, lưu trữ vi phạm vào cơ sở dữ liệu.
+Phát hiện: không đội mũ bảo hộ, không mặc áo phản quang, không đeo găng, không đi giày bảo hộ — ghi nhận bằng chứng (ảnh + bounding box), cảnh báo real-time qua Socket.IO, lưu trữ vi phạm vào cơ sở dữ liệu.
 
 ## Giấy phép
 
@@ -97,11 +97,12 @@ Mọi file `.pt` đều bị `.gitignore` chặn. Máy mới clone về phải c
 
 | file | vai trò | thiếu thì sao |
 |---|---|---|
-| `ppe_multiclass.pt` | model chính — người, mũ, áo, găng | **không chạy được** |
+| `ppe_multiclass.pt` | model chính 11 lớp — người, mũ, áo (và găng/giày khi thiếu model phụ) | **không chạy được** |
 | `ppe_boots.pt` | model phụ, CHỈ lớp giày | chạy tiếp bằng model chính, giày bỏ lọt cao hơn |
+| `ppe_gang.pt` | model phụ, CHỈ lớp găng | chạy tiếp bằng model chính, găng bỏ lọt cao hơn |
 | `yolov8n-pose.pt` | toạ độ cổ tay/cổ chân để đặt khung "THIẾU GĂNG/GIÀY" | chạy tiếp, mất khung chỉ chỗ (ultralytics tự tải nếu có mạng) |
 
-Hai file phụ đều có đường lui, chỉ `ppe_multiclass.pt` là bắt buộc.
+Ba file phụ đều có đường lui, chỉ `ppe_multiclass.pt` là bắt buộc.
 
 Nghiệm thu sau khi thay model — chạy cả hai, đừng tin mAP:
 
@@ -196,6 +197,8 @@ cloud với model local, khỏi chạy script.
 ├── ai-engine/                  # AI/CV engine (Python + bridge Node.js)
 │   ├── yolo_inference.py       #   Vòng lặp inference chính
 │   ├── ppe_tracker.py          #   Logic tracking + xác nhận vi phạm
+│   ├── eval_ppe_decision.py    #   Nghiệm thu báo oan / bỏ lọt
+│   ├── sweep_threshold.py      #   Quét ngưỡng theo lớp
 │   ├── roboflow_workflow.py    #   Client Roboflow Workflow (ảnh tĩnh, đối chiếu)
 │   ├── demo_roboflow_stream.py #   Demo đo độ ổn định Roboflow trên nguồn video
 │   └── yolo_bridge.js          #   Socket.IO bridge (room theo camera)
@@ -210,7 +213,10 @@ cloud với model local, khỏi chạy script.
 | Class | Trạng thái |
 |-------|-----------|
 | `helmet`, `vest`, `gloves`, `boots`, `goggles` | ✅ An toàn |
-| `no_helmet`, `no_vest` (bắt buộc) | ❌ Vi phạm |
+| Thiếu `helmet`, `vest`, `gloves`, `boots` (4 món bắt buộc trong `required_ppe`) | ❌ Vi phạm → ghi DB |
+| `goggles` | Có trong model, chưa bắt buộc |
+
+Model không có lớp `no_vest`; "thiếu áo" suy ra khi không thấy `vest` trên người trong cửa sổ bằng chứng. Xem `wiki/06-tich-hop-yolo.md`.
 
 ## Tài liệu tham khảo
 

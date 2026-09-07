@@ -143,7 +143,7 @@ export function CameraMonitoringCard({ variant = 'camera' }: CameraMonitoringCar
         ))}
         {!isLoading && realCameras?.length === 0 && (
           <p className="text-sm text-[var(--text-muted)] text-center py-6">
-            Chưa có {noun} thật nào — bấm "Thêm {noun}" để kết nối webcam hoặc camera IP.
+            Chưa có {noun} thật nào — bấm &quot;Thêm {noun}&quot; để kết nối webcam hoặc camera IP.
           </p>
         )}
       </div>

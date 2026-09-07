@@ -28,7 +28,9 @@ const YOLO_SERVER_URL =
  */
 export const useYolo = (cameraId?: string) => {
   const [isConnected, setIsConnected] = useState(false);
-  const [lastEvent, setLastEvent] = useState<string | null>(null);
+  const [lastEvent, setLastEvent] = useState<string | null>(
+    YOLO_SERVER_URL ? null : 'YOLO server not configured (NEXT_PUBLIC_YOLO_SERVER_URL)'
+  );
   const [detectionsMap, setDetectionsMap] = useState<Record<string, Detection[]>>({});
   // cameraId -> giây trong video mà AI vừa phân tích (chỉ có với camera video mẫu)
   const [videoPosMap, setVideoPosMap] = useState<Record<string, number>>({});
@@ -38,11 +40,8 @@ export const useYolo = (cameraId?: string) => {
   const STICKY_MS = 500; // giữ khung 0.5s sau lần bắt cuối (đủ chống nhấp nháy, ít trễ)
 
   useEffect(() => {
-    // Skip connection if no YOLO server URL is configured
-    if (!YOLO_SERVER_URL) {
-      setLastEvent('YOLO server not configured (NEXT_PUBLIC_YOLO_SERVER_URL)');
-      return;
-    }
+    // Skip connection if no YOLO server URL is configured (thông báo đã đặt ở state khởi tạo)
+    if (!YOLO_SERVER_URL) return;
 
     const socket = io(YOLO_SERVER_URL, {
       reconnection: true,
@@ -106,7 +105,7 @@ export const useYolo = (cameraId?: string) => {
       });
     }, 500);
 
-    socket.on('new-violation', (data: any) => {
+    socket.on('new-violation', (data: { label: string }) => {
       setLastEvent(`🚨 VIOLATION: ${data.label}`);
     });
 

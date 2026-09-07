@@ -81,12 +81,16 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
     return () => { cancelled = true; };
   }, [isOpen, isDemo]);
 
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!camera) {
+  // Mở dialog / đổi camera / có danh sách site -> nạp lại form ngay trong render
+  // (mẫu "adjust state on prop change" của React) thay vì setState trong effect.
+  const [prevProps, setPrevProps] = useState({ isOpen, camera, sites });
+  if (prevProps.isOpen !== isOpen || prevProps.camera !== camera || prevProps.sites !== sites) {
+    setPrevProps({ isOpen, camera, sites });
+    if (!isOpen) {
+      // đóng: giữ nguyên form, không làm gì (giống effect cũ return sớm)
+    } else if (!camera) {
       setForm({ ...EMPTY_FORM, siteId: sites?.[0]?.id ?? '' });
-      return;
-    }
+    } else {
     const demo = mockCameras.some((m) => m.id === camera.id);
     const parsed = parseCameraSource(camera.rtspUrl);
     setForm({
@@ -106,7 +110,8 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
         : (demo ? (cameraVideos as Record<string, string>)[camera.id] ?? '' : ''),
       status: camera.status,
     });
-  }, [isOpen, camera, sites]);
+    }
+  }
 
   const handleSave = async () => {
     if (!form.name.trim()) { toast(`Nhập tên ${noun}`, 'error'); return; }

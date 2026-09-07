@@ -5,10 +5,10 @@
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { vi } from 'date-fns/locale';
-import { AlertTriangle, CheckCircle2, ShieldAlert } from 'lucide-react';
+import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { cn, getSeverityColor, getViolationTypeLabel } from '@/lib/utils';
 import type { Alert } from '@/types/models';
-import { AlertStatus, Severity } from '@/types/enums';
+import { AlertStatus } from '@/types/enums';
 
 interface AlertTimelineProps {
   alerts: Alert[];

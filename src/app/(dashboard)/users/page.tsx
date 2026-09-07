@@ -3,7 +3,7 @@
 
 
 import { useState } from 'react';
-import { Users, UserPlus, Search, Filter, ShieldCheck, UserCog, Key } from 'lucide-react';
+import { UserPlus, Search, Filter, ShieldCheck, UserCog, Key } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { UserRole } from '@/types/enums';
 import { useUsers, useUpdateUser, useDeleteUser } from '@/hooks/use-users';

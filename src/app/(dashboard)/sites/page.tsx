@@ -22,21 +22,20 @@ import {
   LayoutGrid,
   List as ListIcon,
   Activity,
-  CheckCircle2,
   AlertCircle,
-  Clock,
   X,
   ShieldCheck,
   Eye,
   Copy,
-  Trash2
+  Trash2,
+  type LucideIcon
 } from 'lucide-react';
-import { cn, formatPercentage } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { SiteStatus } from '@/types/enums';
 
 // --- Sub-components ---
 
-function RegisterSiteModal({ onClose, onRegister }: { onClose: () => void; onRegister: (data: any) => void }) {
+function RegisterSiteModal({ onClose, onRegister }: { onClose: () => void; onRegister: (data: { name: string; location: string; industry: string }) => void }) {
   const [formData, setFormData] = useState({ name: '', location: '', industry: 'Xây dựng Thương mại' });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -131,7 +130,7 @@ function RegisterSiteModal({ onClose, onRegister }: { onClose: () => void; onReg
   );
 }
 
-function SiteStatCard({ title, value, icon: Icon, trend, color }: any) {
+function SiteStatCard({ title, value, icon: Icon, trend, color }: { title: string; value: number; icon: LucideIcon; trend?: number; color: string }) {
   return (
     <div className="bg-[var(--surface)] border border-[var(--border)] p-5 rounded-2xl space-y-3 animate-fade-up">
       <div className="flex justify-between items-start">
@@ -163,14 +162,17 @@ export default function SitesPage() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'TẤT CẢ' | 'HOẠT ĐỘNG' | 'THIẾT LẬP'>('TẤT CẢ');
-  const [notification, setNotification] = useState<any>(null);
+  const [notification, setNotification] = useState<{ id: number; title: string; desc: string; type: 'success' | 'danger' | 'warning' } | null>(null);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [customSites, setCustomSites] = useState<SiteStatusSummary[]>([]);
   const [selectedSite, setSelectedSite] = useState<SiteStatusSummary | null>(null);
   const { data: alerts = [] } = useViolations();
 
   useEffect(() => {
+    // Nạp công trình tự đăng ký từ localStorage SAU khi hydrate (handleRegister/xoá
+    // cũng ghi state này nên chưa chuyển sang useSyncExternalStore).
     try {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setCustomSites(JSON.parse(localStorage.getItem('safesight_custom_sites') || '[]'));
     } catch {
       setCustomSites([]);
@@ -182,7 +184,7 @@ export default function SitesPage() {
     setTimeout(() => setNotification(null), 5000);
   };
 
-  const handleRegister = (data: any) => {
+  const handleRegister = (data: { name: string; location: string; industry: string }) => {
     showNotification('Đã Đăng ký Công trình', `Đã tạo dự án thành công: ${data.name}`, 'success');
 
     // Site mới đăng ký -> chưa có camera nào -> trạng thái THIẾT LẬP, lưu localStorage để còn đó sau khi F5
@@ -310,7 +312,7 @@ export default function SitesPage() {
 
       {/* Stats Row */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, idx) => (
+        {stats.map((stat) => (
           <SiteStatCard key={stat.title} {...stat} />
         ))}
       </div>
@@ -336,13 +338,13 @@ export default function SitesPage() {
               Tất cả
             </button>
             <button 
-              onClick={() => setStatusFilter('HOẠT ĐỘNG' as any)}
+              onClick={() => setStatusFilter('HOẠT ĐỘNG')}
               className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", statusFilter === 'HOẠT ĐỘNG' ? "bg-[var(--surface)] text-[var(--success)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}
             >
               Hoạt động
             </button>
             <button 
-              onClick={() => setStatusFilter('THIẾT LẬP' as any)}
+              onClick={() => setStatusFilter('THIẾT LẬP')}
               className={cn("px-4 py-1.5 rounded-lg text-xs font-bold transition-all", statusFilter === 'THIẾT LẬP' ? "bg-[var(--surface)] text-[var(--warning)] shadow-sm" : "text-[var(--text-muted)] hover:text-[var(--text-primary)]")}
             >
               Thiết lập

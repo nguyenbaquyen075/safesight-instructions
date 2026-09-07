@@ -11,8 +11,9 @@
 - `ppe_tracker.py`: đã có khung riêng cho gloves/boots (Tầng 1), lọc theo `PART_MIN_CONF=0.35`
   để bớt khung nhiễu tin cậy thấp. Khung "GIÀY" bịa vị trí (khi model không thấy gì) đã bị xoá —
   giờ chỉ hiện khung THẬT, không có thì thôi.
-- `required_ppe` trong `PPEViolationTracker.__init__` **CHƯA** bao gồm `gloves`/`boots` — cố tình
-  để vậy vì bật lên sẽ báo vi phạm oan hàng loạt (xem cảnh báo trên).
+- `required_ppe` **ĐÃ bật** `gloves`/`boots` từ 24/08/2026 (truyền từ `yolo_inference.py`),
+  kèm model phụ `ppe_gang.pt`/`ppe_boots.pt` và các cơ chế chống báo oan trong `ppe_tracker.py`.
+  Mốc đo gần nhất: găng oan 8.7%, giày 6.3% — mục tiêu ≤ 1%.
 - `yolo_inference.py`: `PPE_VIOLATION_MAP` đã map sẵn `gloves`→`safety_gloves`,
   `boots`→`safety_footwear` — DB (`ViolationType` enum) đã sẵn sàng nhận 2 loại này.
 
@@ -21,7 +22,7 @@
 ```
 Train lại model (nhiều epoch/imgsz hơn cho vật nhỏ) → So mAP gloves/boots với model cũ
   → Thay .pt vào repo → Chạy thử, xem log present=[...] có ổn định không
-  → Bật 'gloves','boots' vào required_ppe → Theo dõi tỉ lệ báo vi phạm có hợp lý không
+  → Giữ 'gloves','boots' trong required_ppe → Theo dõi tỉ lệ báo vi phạm có hợp lý không
 ```
 
 ## Cách train lại (nhanh nhất — dùng ĐÚNG dataset đã có)
