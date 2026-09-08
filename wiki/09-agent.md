@@ -96,7 +96,10 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
   đổi `rtspUrl`, sửa ngưỡng nhận diện, đọc/ghi file ngoài `public/snapshots`, gọi mạng ngoài
   Anthropic và Telegram.
 - **Trần token:** vượt `AgentSettings.dailyTokenCap` (mặc định 2 000 000) → lane nghiên cứu
-  tạm dừng tới 0h, task giữ nguyên `dueAt`; lane trực tiếp không bị ảnh hưởng.
+  tạm dừng tới 0h, task giữ nguyên `dueAt`; lane trực tiếp không bị ảnh hưởng. Trước khi
+  ném lỗi, `runSession` luôn phát `AgentEvent session.ended { stop: 'skipped', reason,
+  retryAfterMs }` — nếu không thì panel hỏi-đáp (`AskAgentBox`) poll theo `sessionId` sẽ
+  không bao giờ thấy điểm dừng và treo "Agent đang trả lời…" mãi.
 - Bị chặn → tool trả kết quả có lý do (không `is_error`) để model viết lại thay vì thử lại.
 
 ## Tool (`agent/tools/*.ts`, mỗi file một tool)
@@ -138,7 +141,10 @@ Route Next.js mới, tất cả bắt buộc đăng nhập, đọc DB thật, kh
 - `POST /api/agent/ask { subjectType?, subjectId?, sessionId?, message }` → ghi
   `AgentEvent message.user`, tạo/nối `AgentTask kind=ask` với `sessionId`, poke agent, trả
   `sessionId`. Panel poll `/api/agent/events?sessionId` mỗi 2s tới khi thấy
-  `session.ended` hoặc im lặng 90s.
+  `session.ended` hoặc im lặng 90s. Nối vào task `ask` cũ (câu hỏi thứ hai trong cùng
+  thread) luôn reset `attempts` về 0 và xoá `outcome` cũ — task đã hết `MAX_ATTEMPTS`
+  không bao giờ được `claimDue` nhặt lại và sẽ bị `retireExhausted` đóng, nên câu hỏi mới
+  cần được cấp lại nguyên ngân sách thử, không thì bị rơi âm thầm.
 
 Bridge Next → agent: `POST http://127.0.0.1:${AGENT_PORT}/internal/dispatch` và
 `/internal/ask`, header `Authorization: Bearer ${AGENT_BRIDGE_SECRET}`; thiếu secret ở

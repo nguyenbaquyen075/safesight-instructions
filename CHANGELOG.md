@@ -18,6 +18,12 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
 
+### Sửa
+- Chạm trần token trong ngày giờ luôn phát `session.ended (stop: skipped)` trước khi báo lỗi, để panel hỏi-đáp (`AskAgentBox`) không treo poll mãi; event `error` từ vòng chính (`agent/main.ts`) gắn đúng `sessionId` của task thay vì tạo phiên rời rạc.
+- Vòng lặp agent thoát ngay khi nhận SIGTERM/SIGINT giữa lúc đang xử lý, không ngủ hết 20s rồi mới dừng.
+- `PATCH /api/cameras/[id]` chỉ đánh thức agent sau khi task `health.probe` đã ghi xong DB, không còn race trước khi task tồn tại.
+- Hỏi tiếp câu mới vào một task `ask` đã hết lượt thử không còn bị âm thầm bỏ qua: nối vào task cũ giờ reset `attempts` về 0.
+
 ## [0.6.0] - 2026-09-07
 
 ### Thêm

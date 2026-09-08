@@ -31,8 +31,10 @@ export async function POST(request: NextRequest) {
   await prisma.agentEvent.create({ data: { sessionId, subjectType, subjectId: subjectId ?? null, type: 'message.user', data: JSON.stringify({ text: message, userId: session.user.id, userName: session.user.name ?? '' }) } });
   // Câu hỏi thứ hai khi agent đang trả lời câu trước: tạo task mới, không gộp vào task đang lease (completeTask sẽ đóng luôn lượt sau).
   const open = await prisma.agentTask.findFirst({ where: { kind: 'ask', sessionId, finishedAt: null, OR: [{ leasedUntil: null }, { leasedUntil: { lt: new Date() } }] }, select: { id: true } });
+  // Reset attempts/outcome khi nối lại task cũ: task đã hết lượt (attempts >= MAX_ATTEMPTS) không bao giờ được claimDue
+  // nhặt lại, và retireExhausted sẽ đóng nó — câu hỏi mới bị rơi âm thầm nếu không cấp lại ngân sách thử.
   const task = open
-    ? await prisma.agentTask.update({ where: { id: open.id }, data: { reason: message.slice(0, 200), dueAt: new Date() }, select: { id: true } })
+    ? await prisma.agentTask.update({ where: { id: open.id }, data: { reason: message.slice(0, 200), dueAt: new Date(), attempts: 0, outcome: null }, select: { id: true } })
     : await prisma.agentTask.create({ data: { kind: 'ask', subjectType, subjectId: subjectId ?? null, reason: message.slice(0, 200), priority: 500, budget: 8, dueAt: new Date(), sessionId }, select: { id: true } });
   pokeAgent('/internal/ask', { taskId: task.id });
   return NextResponse.json({ sessionId, taskId: task.id }, { status: 202 });

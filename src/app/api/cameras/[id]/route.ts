@@ -74,9 +74,10 @@ export async function PATCH(
   });
 
   // Fire-and-forget như route violations: xếp lịch cho agent hỏng thì cũng không được làm hỏng một PATCH đã thành công.
+  // poke chỉ sau khi task đã ghi xong, không thì agent có thể dậy sớm hơn cả lúc row tồn tại.
   enqueueAgentTask({ kind: 'health.probe', subjectType: 'camera', subjectId: id, reason: 'Camera vừa được sửa trong Cài đặt', priority: 800 })
+    .then(() => pokeAgent('/internal/dispatch'))
     .catch(err => console.warn('[cameras] không xếp được health.probe', err instanceof Error ? err.message : String(err)));
-  pokeAgent('/internal/dispatch');
 
   return NextResponse.json(toCameraDTO(camera, camera.site.name));
 }
