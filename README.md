@@ -104,7 +104,10 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # panel; thiếu thì agent vẫn chạy theo chu kỳ 20s, sinh bằng
                       # `openssl rand -base64 24`)
                       #
-                      # ANTHROPIC_API_KEY (tuỳ chọn — mở lane nghiên cứu của agent: review vi
+                      # ALLOW_DEV_LOGIN (tuỳ chọn — tài khoản thử nghiệm admin@safesight.ai/password123 chỉ
+                      # hoạt động khi NODE_ENV khác production; đặt =true để cố ý mở nó trên bản build)
+                      #
+# ANTHROPIC_API_KEY (tuỳ chọn — mở lane nghiên cứu của agent: review vi
                       # phạm bằng ảnh, báo cáo ca, hỏi đáp; thiếu thì chỉ chạy trực vận hành)
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không

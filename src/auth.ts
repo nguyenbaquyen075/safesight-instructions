@@ -7,6 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@/types/enums";
 
+function devLoginAllowed(): boolean {
+  if (process.env.ALLOW_DEV_LOGIN === "true") return true;
+  return process.env.NODE_ENV !== "production";
+}
+
 export const { handlers, auth, signIn, signOut } = NextAuth({
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
@@ -31,8 +36,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
           const { email, password } = parsed.data;
 
-          // Hardcoded test account
-          if (email === "admin@safesight.ai" && password === "password123") {
+          // Tài khoản dev cứng: chỉ mở ngoài production, hoặc khi cố ý bật ALLOW_DEV_LOGIN=true.
+          // Production phải đăng nhập bằng User trong DB (npm run db:seed tạo admin thật).
+          if (devLoginAllowed() && email === "admin@safesight.ai" && password === "password123") {
             return {
               id: "user-005",
               name: "SafeSight Admin",

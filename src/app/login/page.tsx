@@ -122,13 +122,15 @@ function LoginContent() {
             </button>
           </form>
 
-          {/* Test credentials info */}
+          {/* Gợi ý tài khoản thử nghiệm: chỉ hiện ngoài production (khớp devLoginAllowed() trong src/auth.ts) */}
+          {process.env.NODE_ENV !== 'production' && (
           <div className="mt-6 pt-6 border-t border-[var(--border)]">
             <div className="p-3 rounded-lg bg-[var(--surface)] border border-[var(--border-subtle)]">
               <p className="text-xs text-[var(--text-muted)] font-medium mb-1">Thông tin đăng nhập thử nghiệm:</p>
               <p className="text-xs font-mono text-[var(--text-secondary)]">admin@safesight.ai / password123</p>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>
