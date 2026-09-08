@@ -16,7 +16,7 @@ export const searchSchema = z.object({
 export async function searchViolations(f: z.infer<typeof searchSchema>) {
   const rows = await prisma.violation.findMany({
     where: {
-      cameraId: f.cameraId, siteId: f.siteId, type: f.type, status: f.status ? { in: [f.status.toUpperCase(), f.status.toLowerCase()] } : undefined, // row cũ có thể ghi chữ thường
+      cameraId: f.cameraId, siteId: f.siteId, type: f.type, status: f.status?.toUpperCase(), // DB lưu chữ HOA (seed() nắn row cũ lúc agent khởi động)
       detectedAt: { gte: f.from ? new Date(f.from) : undefined, lte: f.to ? new Date(f.to) : undefined },
     },
     orderBy: { detectedAt: 'desc' }, take: f.limit, include: { camera: { select: { name: true } } },

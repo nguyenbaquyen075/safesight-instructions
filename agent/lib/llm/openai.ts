@@ -1,28 +1,12 @@
 // SPDX-License-Identifier: MIT
-import * as z from 'zod/v4';
+import Anthropic from '@anthropic-ai/sdk';
+import type { BetaRunnableTool } from '@anthropic-ai/sdk/lib/tools/BetaRunnableTool';
 import { env } from '../env';
 import type { SessionClient, Turn } from './types';
 
-// Lỗi HTTP từ endpoint tương thích OpenAI — session.ts ánh xạ status sang SessionError.
-export class LlmHttpError extends Error {
-  status: number;
-  body: string;
-  constructor(status: number, body: string) {
-    super(`LLM HTTP ${status}: ${body.slice(0, 300)}`);
-    this.status = status;
-    this.body = body;
-  }
-}
-
-// Hình dạng tool do betaZodTool sinh ra (xem @anthropic-ai/sdk/helpers/beta/zod).
-interface RunnableTool {
-  name: string;
-  description?: string;
-  input_schema?: Record<string, unknown>;
-  inputSchema?: z.ZodType;
-  parse?: (args: unknown) => unknown;
-  run: (args: never) => unknown;
-}
+// Mọi tool ở đây đều do betaZodTool sinh ra, nên input_schema/description/parse luôn có —
+// giao kiểu union tool của SDK với hình dạng đó để khỏi phải bóc từng nhánh.
+type ZodRunnableTool = BetaRunnableTool & { description?: string; input_schema: Record<string, unknown> };
 
 interface ToolCall { id: string; function: { name: string; arguments: string } }
 interface ChatMessage { role: string; content: unknown; tool_calls?: ToolCall[]; tool_call_id?: string }
@@ -31,10 +15,9 @@ interface ChatResponse {
   usage?: { prompt_tokens?: number; completion_tokens?: number };
 }
 
-function toFunctionTool(tool: RunnableTool) {
-  const schema = tool.input_schema ?? (tool.inputSchema ? z.toJSONSchema(tool.inputSchema) : { type: 'object', properties: {} });
+function toFunctionTool(tool: ZodRunnableTool) {
   // $schema là siêu dữ liệu của JSON Schema, một số proxy từ chối tham số lạ.
-  const parameters = { ...schema } as Record<string, unknown>;
+  const parameters = { ...tool.input_schema };
   delete parameters.$schema;
   return { type: 'function' as const, function: { name: tool.name, description: tool.description ?? '', parameters } };
 }
@@ -71,13 +54,13 @@ function toolResultText(result: unknown, imageInput: boolean, images: ChatMessag
 }
 
 // Vòng lặp agentic tối thiểu trên POST /chat/completions — không thêm dependency, không gửi field riêng của Anthropic.
-export function openAiClient(override: { baseUrl?: string; apiKey?: string | null; imageInput?: boolean } = {}): SessionClient {
+export function openAiClient(override: { baseUrl?: string; apiKey?: string | null } = {}): SessionClient {
   const baseUrl = (override.baseUrl ?? env.llmBaseUrl ?? 'https://api.openai.com/v1').replace(/\/+$/, '');
   const apiKey = override.apiKey ?? env.llmKey;
-  const imageInput = override.imageInput ?? env.llmImageInput;
+  const imageInput = env.llmImageInput;
   return {
     async *run(p): AsyncGenerator<Turn> {
-      const runnables = p.tools as RunnableTool[];
+      const runnables = p.tools as ZodRunnableTool[];
       const byName = new Map(runnables.map(t => [t.name, t]));
       const tools = runnables.map(toFunctionTool);
       const messages: ChatMessage[] = [
@@ -94,7 +77,13 @@ export function openAiClient(override: { baseUrl?: string; apiKey?: string | nul
           headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey ?? ''}` },
           body: JSON.stringify({ model: p.model, messages, tools, tool_choice: 'auto', max_tokens: 4096 }),
         });
-        if (!res.ok) throw new LlmHttpError(res.status, await res.text().catch(() => ''));
+        if (!res.ok) {
+          // Ném đúng lớp lỗi của SDK để mapError (session.ts) xử lý 429/401/403/400/5xx như nhau
+          // cho cả hai provider, không cần nhánh riêng.
+          const raw = await res.text().catch(() => '');
+          let parsedBody: unknown; try { parsedBody = JSON.parse(raw); } catch { parsedBody = undefined; }
+          throw Anthropic.APIError.generate(res.status, parsedBody as object | undefined, `LLM HTTP ${res.status}: ${raw.slice(0, 300)}`, res.headers);
+        }
         const data = await res.json() as ChatResponse;
         const choice = data.choices?.[0];
         const text = choice?.message?.content ?? '';
@@ -119,14 +108,22 @@ export function openAiClient(override: { baseUrl?: string; apiKey?: string | nul
           else {
             try {
               const parsed = JSON.parse(call.function.arguments || '{}');
-              content = toolResultText(await tool.run((tool.parse ? tool.parse(parsed) : parsed) as never), imageInput, images);
+              content = toolResultText(await tool.run(tool.parse(parsed)), imageInput, images);
             } catch (error) {
               content = `lỗi tool ${call.function.name}: ${error instanceof Error ? error.message : String(error)}`;
             }
           }
           messages.push({ role: 'tool', tool_call_id: call.id, content });
         }
-        messages.push(...images);
+        // Ảnh chỉ tải lên MỘT lần mỗi phiên: mỗi vòng gửi lại toàn bộ `messages`, giữ nguyên data URL
+        // của các lượt trước là nhân đôi payload mỗi vòng. Thay bằng ghi chú, model vẫn biết đã thấy ảnh.
+        if (images.length) {
+          for (const m of messages) {
+            if (!Array.isArray(m.content)) continue;
+            m.content = (m.content as Array<{ type: string }>).map(part => part.type === 'image_url' ? { type: 'text', text: '(ảnh đã gửi ở lượt trước)' } : part);
+          }
+          messages.push(...images);
+        }
       }
     },
   };

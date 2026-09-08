@@ -6,6 +6,9 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { pokeAgent } from '@/lib/agent-bridge';
 
+// Giữ khớp với MAX_ATTEMPTS trong agent/lib/tasks.ts (không import: file đó kéo theo Prisma client riêng của worker).
+const MAX_ATTEMPTS = 3;
+
 const askSchema = z.object({
   message: z.string().min(1).max(2000),
   subjectType: z.enum(['violation', 'camera', 'site', 'system']).default('system'),
@@ -30,12 +33,13 @@ export async function POST(request: NextRequest) {
   }
   await prisma.agentEvent.create({ data: { sessionId, subjectType, subjectId: subjectId ?? null, type: 'message.user', data: JSON.stringify({ text: message, userId: session.user.id, userName: session.user.name ?? '' }) } });
   // Câu hỏi thứ hai khi agent đang trả lời câu trước: tạo task mới, không gộp vào task đang lease (completeTask sẽ đóng luôn lượt sau).
-  const open = await prisma.agentTask.findFirst({ where: { kind: 'ask', sessionId, finishedAt: null, OR: [{ leasedUntil: null }, { leasedUntil: { lt: new Date() } }] }, select: { id: true } });
-  // Reset attempts/outcome khi nối lại task cũ: task đã hết lượt (attempts >= MAX_ATTEMPTS) không bao giờ được claimDue
-  // nhặt lại, và retireExhausted sẽ đóng nó — câu hỏi mới bị rơi âm thầm nếu không cấp lại ngân sách thử.
-  const task = open
-    ? await prisma.agentTask.update({ where: { id: open.id }, data: { reason: message.slice(0, 200), dueAt: new Date(), attempts: 0, outcome: null }, select: { id: true } })
-    : await prisma.agentTask.create({ data: { kind: 'ask', subjectType, subjectId: subjectId ?? null, reason: message.slice(0, 200), priority: 500, budget: 8, dueAt: new Date(), sessionId }, select: { id: true } });
+  // Cùng vị từ với claimDue (agent/lib/tasks.ts): task đã hết lượt thì KHÔNG nối lại — reset attempts
+  // về 0 sẽ đua với retireExhausted và có thể bị đóng ngay sau đó, câu hỏi rơi âm thầm. Cứ tạo task mới.
+  const open = await prisma.agentTask.findFirst({ where: { kind: 'ask', sessionId, finishedAt: null, attempts: { lt: MAX_ATTEMPTS }, OR: [{ leasedUntil: null }, { leasedUntil: { lt: new Date() } }] }, select: { id: true } });
+  // updateMany + finishedAt: null — task có thể vừa xong/bị retire giữa lúc đọc và lúc ghi; 0 dòng thì tạo mới.
+  const reused = open && (await prisma.agentTask.updateMany({ where: { id: open.id, finishedAt: null }, data: { reason: message.slice(0, 200), dueAt: new Date() } })).count === 1
+    ? open : null;
+  const task = reused ?? await prisma.agentTask.create({ data: { kind: 'ask', subjectType, subjectId: subjectId ?? null, reason: message.slice(0, 200), priority: 500, budget: 8, dueAt: new Date(), sessionId }, select: { id: true } });
   pokeAgent('/internal/ask', { taskId: task.id });
   return NextResponse.json({ sessionId, taskId: task.id }, { status: 202 });
 }

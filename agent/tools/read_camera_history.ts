@@ -11,7 +11,7 @@ export async function cameraHistory(cameraId: string, hours: number) {
   if (!camera) return null;
   const since = new Date(Date.now() - hours * 3_600_000);
   const rows = await prisma.violation.findMany({ where: { cameraId, detectedAt: { gte: since } }, orderBy: { detectedAt: 'desc' }, take: 200 });
-  const fp = rows.filter(r => r.status.toUpperCase() === 'FALSE_POSITIVE').length;
+  const fp = rows.filter(r => r.status === 'FALSE_POSITIVE').length;
   const byHour: Record<string, number> = {};
   for (const r of rows) { const h = String(r.detectedAt.getHours()).padStart(2, '0'); byHour[h] = (byHour[h] ?? 0) + 1; }
   const lastHealth = await prisma.agentEvent.findFirst({ where: { type: 'health', subjectType: 'camera', subjectId: cameraId }, orderBy: { emittedAt: 'desc' } });

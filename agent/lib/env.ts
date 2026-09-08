@@ -26,7 +26,5 @@ export const env = {
   llmModelDefault: optional('LLM_MODEL_DEFAULT'),
   // Nhiều proxy tương thích OpenAI không nhận ảnh: mặc định bỏ ảnh, bật lại bằng LLM_IMAGE_INPUT=true.
   llmImageInput: optional('LLM_IMAGE_INPUT') === 'true',
-  // Tên cũ, giữ để không phải sửa nơi khác.
-  anthropicKey: llmKey,
   snapshotDir: path.resolve(process.cwd(), 'public', 'snapshots'),
 };

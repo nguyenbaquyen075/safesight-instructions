@@ -53,11 +53,21 @@ fps}`) mỗi 5s và xoá file này khi thoát (Ctrl+C/kill/hết chương trình
 
 Chỉ "còn tiến trình mang pid đó" là chưa đủ: hệ điều hành có thể cấp lại pid đã chết cho một
 tiến trình khác hoàn toàn (dev khác, bridge, editor…). Trước khi tin `pid` trong heartbeat là
-engine, `agent/direct/health.ts` đọc `/proc/<pid>/cmdline` và đòi có `yolo_inference.py`
-trong đó (`isEngineProcess`) — sai bất kỳ bước nào (không phải Linux, không đọc được, không
-khớp) đều coi là **không phải engine**. Heartbeat quá cũ (> `heartbeatGoneMs` = 5 phút) cũng
-luôn bị coi là "engine đã mất" (`detail.pidAlive = false`) dù bước kiểm danh tính nói khác —
-phòng hờ trường hợp hiếm pid cũ vừa được cấp lại đúng cho một `yolo_inference.py` mới.
+engine, `agent/direct/health.ts` **trên Linux** đọc `/proc/<pid>/cmdline` và đòi có
+`yolo_inference.py` trong đó (`isEngineProcess`); đọc không được hoặc không khớp = **không
+phải engine**. Ngoài Linux không có `/proc` nên chỉ kiểm còn sống bằng `process.kill(pid, 0)`
+— coi engine khoẻ là "đã mất" ở đó thì mỗi vòng quét lại sinh `engine.stalled` giả và sau 3
+lần lặp là leo thang cho trực vận hành.
+
+`detail.pidAlive` **không** bị hạ về `false` theo tuổi heartbeat. Engine treo thật (pid còn
+sống, kẹt trong một lời gọi cv2/torch) có heartbeat cũ dần mãi; hạ `pidAlive` sau 5 phút làm
+`actions.ts` bỏ qua bước SIGTERM và engine không bao giờ được khởi động lại. Việc chống pid bị
+tái sử dụng đã do bước kiểm `cmdline` lo. `detail.heartbeatAgeMs` vẫn được báo để biết đã treo
+bao lâu.
+
+`ai-engine/yolo_inference.py` ghi heartbeat **ngay khi khởi động**, trước lúc nạp model (mất
+vài chục giây): nếu chờ tới vòng lặp đầu tiên thì trong khoảng đó agent vẫn đọc heartbeat của
+lần chạy trước và có thể SIGTERM nhầm pid cũ.
 
 `agent/direct/actions.ts` xử lý `engine.stalled`: kiểm `detail.pidAlive === true` **trước**
 khi gọi `rateLimit('engine-restart', …)` — pid chết/không phải engine thì không SIGTERM và
@@ -67,16 +77,23 @@ hiệu vẫn ăn mất một suất restart thật).
 ### Probe vs sweep
 
 `health.probe` (do `PATCH /api/cameras/[id]` xếp lịch khi đổi nguồn/trạng thái) và
-`health.sweep` (định kỳ 60s) dùng chung logic quét (`runProbe` gọi thẳng `runSweep`), nhưng
-chỉ `health.sweep` mới tự hẹn vòng kế tiếp (`task.kind === 'health.sweep'`) — trước đây
+`health.sweep` (định kỳ 60s) dùng chung logic quét (`runProbe` gọi `runSweep(task, true)`),
+nhưng chỉ `health.sweep` mới tự hẹn vòng kế tiếp (`task.kind === 'health.sweep'`) — trước đây
 `runProbe` cũng hẹn/gộp vào `health.sweep` đang chờ, mỗi lần đổi camera lại đẩy lùi lịch quét
 định kỳ thêm 60s.
 
+Probe cũng **không đụng vào bộ đếm leo thang**: `bridgeFailStreak` và map `repeats` được định
+nghĩa theo *nhịp* quét định kỳ (3 vòng 60s), nên probe đọc `bridgeFailStreak` nhưng không cộng
+dồn, và dùng một map `repeats` dùng một lần. Nếu không, đổi nguồn camera vài lần liên tiếp là
+đủ chạm ngưỡng `bridge.down`/leo thang mà chưa hề có 3 vòng quét thật.
+
 ### Luật dọn snapshot
 
-`snapshot.cleanup` (`agent/direct/cleanup.ts`, `pickCleanup`) chỉ giữ lại ảnh **chưa có
-Violation tham chiếu** (có thể đang được ghi) hoặc **mới hơn 24h** (bằng chứng gần, không bao
-giờ đụng). Không còn luật giữ 30 ngày: `yolo_inference.py` xoá sạch `violation_*.jpg` mỗi lần
+`snapshot.cleanup` (`agent/direct/cleanup.ts`, `pickCleanup`) chỉ xoá ảnh thoả **cả ba**: đã có
+Violation tham chiếu (ảnh chưa tham chiếu có thể đang được ghi), vi phạm đó đã **đóng**
+(`RESOLVED`/`FALSE_POSITIVE`), và cũ hơn **24h**. Ảnh của vi phạm còn `OPEN`/`UNDER_REVIEW` là
+bằng chứng của hồ sơ chưa xử lý xong — không xoá dù đĩa đang đầy; `runCleanup` đọc `status`
+kèm `snapshotUrl` và truyền cờ `closed` cho từng file. Không còn luật giữ 30 ngày: `yolo_inference.py` xoá sạch `violation_*.jpg` mỗi lần
 engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0 file
 và `disk.pressure` lặp lại mỗi sweep dù đĩa đang đầy thật.
 
@@ -178,10 +195,12 @@ Route Next.js mới, tất cả bắt buộc đăng nhập, đọc DB thật, kh
 - `POST /api/agent/ask { subjectType?, subjectId?, sessionId?, message }` → ghi
   `AgentEvent message.user`, tạo/nối `AgentTask kind=ask` với `sessionId`, poke agent, trả
   `sessionId`. Panel poll `/api/agent/events?sessionId` mỗi 2s tới khi thấy
-  `session.ended` hoặc im lặng 90s. Nối vào task `ask` cũ (câu hỏi thứ hai trong cùng
-  thread) luôn reset `attempts` về 0 và xoá `outcome` cũ — task đã hết `MAX_ATTEMPTS`
-  không bao giờ được `claimDue` nhặt lại và sẽ bị `retireExhausted` đóng, nên câu hỏi mới
-  cần được cấp lại nguyên ngân sách thử, không thì bị rơi âm thầm.
+  `session.ended` hoặc im lặng 90s. Câu hỏi thứ hai trong cùng thread chỉ nối vào task `ask`
+  cũ khi task đó thoả **đúng vị từ của `claimDue`** (`finishedAt: null`, chưa bị lease,
+  `attempts < MAX_ATTEMPTS`); task đã hết lượt thì rơi xuống nhánh tạo task mới. Trước đây
+  route reset `attempts` về 0 — cách đó đua với `retireExhausted` (có thể đóng task ngay sau
+  khi reset) và không khớp vị từ `claimDue`. Nhánh nối lại dùng `updateMany` kèm
+  `finishedAt: null`; 0 dòng (task vừa xong giữa lúc đọc và ghi) cũng tạo task mới.
 
 Bridge Next → agent: `POST http://127.0.0.1:${AGENT_PORT}/internal/dispatch` và
 `/internal/ask`, header `Authorization: Bearer ${AGENT_BRIDGE_SECRET}`; thiếu secret ở
@@ -223,9 +242,9 @@ Lane nghiên cứu chạy được trên hai loại endpoint. Mặc định là 
 | Biến | Mặc định | Ghi chú |
 |---|---|---|
 | `LLM_PROVIDER` | `anthropic` | `openai` chuyển sang endpoint `/chat/completions` |
-| `LLM_BASE_URL` | `ANTHROPIC_BASE_URL`, rồi `https://api.openai.com/v1` | URL gốc, agent tự nối `/chat/completions` |
+| `LLM_BASE_URL` | `ANTHROPIC_BASE_URL`, rồi `https://api.openai.com/v1` | URL gốc. Chế độ `openai`: agent tự nối `/chat/completions`. Chế độ `anthropic`: truyền thẳng vào `baseURL` của SDK, nên proxy định dạng Anthropic cũng dùng được |
 | `LLM_API_KEY` | `ANTHROPIC_API_KEY` | Gửi ở header `Authorization: Bearer` khi dùng chế độ openai |
-| `LLM_MODEL_DEFAULT` | — | Tên model ghi vào `AgentSettings.model` lúc tạo dòng cài đặt đầu tiên; đổi sau trên trang `/agent` |
+| `LLM_MODEL_DEFAULT` | — | Tên model ghi vào `AgentSettings.model` lúc tạo dòng cài đặt đầu tiên. Ngoài ra, mỗi lần worker khởi động với `LLM_PROVIDER=openai`, nếu `model` đang lưu bắt đầu bằng `claude-` (dòng cài đặt do route Next tạo trước, mặc định schema là `claude-opus-5`) thì `applyModelDefault()` nắn về giá trị này và ghi log — không thì proxy trả 400 và mọi task nghiên cứu chết. Đổi sau trên trang `/agent`: ô Model là `<input list>` + `<datalist>`, gõ được tên model bất kỳ, `PATCH /api/agent/settings` nhận chuỗi tự do 1–100 ký tự |
 | `LLM_IMAGE_INPUT` | `false` | Cho phép gửi ảnh snapshot sang endpoint openai |
 
 Ví dụ `.env.local`:
@@ -241,12 +260,15 @@ LLM_MODEL_DEFAULT=ten-model-cua-proxy
 **bỏ** block ảnh trong kết quả tool (chỉ giữ phần văn bản), nên `read_violation` vẫn trả
 bbox và dữ kiện nhưng model không *nhìn* được snapshot — phán quyết sẽ dựa trên số liệu.
 Đặt `LLM_IMAGE_INPUT=true` nếu proxy hỗ trợ ảnh; ảnh được gửi thành một tin nhắn
-`user` riêng dạng data URL ngay sau kết quả tool.
+`user` riêng dạng data URL ngay sau kết quả tool. Mỗi ảnh chỉ tải lên **một lần**: trước khi
+thêm ảnh mới, các block `image_url` của lượt trước bị thay bằng ghi chú `(ảnh đã gửi ở lượt
+trước)` — mỗi vòng đều gửi lại toàn bộ `messages`, giữ nguyên data URL là nhân đôi payload.
 
 Chế độ openai không gửi các field riêng của Anthropic (`thinking`, `output_config`), nên
-`reviewEffort` trên trang `/agent` không có tác dụng ở chế độ này. Lỗi HTTP được quy đổi
-giống lỗi SDK: 401/403 tắt chốt lane nghiên cứu tới lần khởi động sau, 429 và 5xx chờ 60s,
-400 là lỗi chết.
+`reviewEffort` trên trang `/agent` không có tác dụng ở chế độ này. Lỗi HTTP được ném lại bằng
+`Anthropic.APIError.generate(status, …)` nên `mapError` xử lý **chung một nhánh** cho cả hai
+provider: 401/403 tắt chốt lane nghiên cứu tới lần khởi động sau, 429 và 5xx chờ 60s, 400 là
+lỗi chết.
 Kiểm thử (`agent/test/*.test.ts`), file mới thêm để lấp khoảng trống test:
 - `usage.test.ts` — `dailyTokensUsed()` (`agent/lib/usage.ts`): cộng token trong ngày, bỏ qua
   JSON hỏng, row thiếu `usage`, row hôm qua và event không phải `session.ended`.
@@ -257,6 +279,19 @@ Kiểm thử (`agent/test/*.test.ts`), file mới thêm để lấp khoảng tr�
   đang chờ, không gộp vào task đang lease hoặc đã xong.
 - `violation-status.test.ts` — bất biến status viết HOA (route `PATCH
   src/app/api/violations/[id]/route.ts`): SQLite phân biệt hoa/thường trên cột TEXT.
+
+### Chuẩn hoá `Violation.status`
+
+SQLite phân biệt hoa/thường trên cột TEXT còn dữ liệu cũ có thể ghi chữ thường. Thay vì rải
+idiom không-phân-biệt-hoa-thường ở từng chỗ gọi, `seed()` (`agent/main.ts`) chạy một lần lúc
+worker khởi động:
+
+```sql
+UPDATE "Violation" SET status = upper(status) WHERE status <> upper(status)
+```
+
+Idempotent, chỉ ghi log khi thật sự có dòng bị đổi. Nhờ đó `search_violations` và
+`read_camera_history` so sánh bằng chữ HOA thẳng.
 
 `npm run dev` (`dev-all.sh`) tự chạy agent là tiến trình thứ 4, sau bridge và trước Next.
 Lúc khởi động in 4 dòng `[agent] on/off <capability> (<nguồn>)` rồi `✅ Agent HTTP nội bộ:
