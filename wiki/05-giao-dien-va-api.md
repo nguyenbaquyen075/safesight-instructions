@@ -40,6 +40,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma) |
+| `/api/cameras/[id]/zones` | GET, PUT | Vùng nhận diện (Zone `type=MONITORING`) của camera; `assertSiteAccess`. PUT thay TOÀN BỘ danh sách (`{ zones: [{ name?, points: [{x,y}] }] }`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. AI engine tự đọc lại bảng `Zone` mỗi 60s |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
 | `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`) |
@@ -61,7 +62,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | Hook | File | Nguồn |
 |---|---|---|
 | `useViolations`, `useOpenViolationCount` | `use-violations.ts` | `/api/violations`, `/api/violations/count` |
-| `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera` | `use-cameras.ts` | `/api/cameras` |
+| `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
 | `useUsers` | `use-users.ts` | `/api/users` |
 | `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |

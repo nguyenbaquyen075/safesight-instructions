@@ -9,6 +9,7 @@ import { toast } from '@/lib/toast';
 import { useSites } from '@/hooks/use-sites';
 import { useCreateCamera, useUpdateCamera } from '@/hooks/use-cameras';
 import { parseCameraSource } from '@/lib/camera-source';
+import { ZoneEditor } from './ZoneEditor';
 import { mockCameras } from '@/data/mock-cameras';
 import cameraVideos from '@/data/camera-videos.json';
 import { CameraStatus } from '@/types/enums';
@@ -336,6 +337,10 @@ export function CameraEditDialog({ camera, isOpen, onClose, variant = 'camera' }
                 )}
               </div>
             )}
+
+            {/* Vùng nhận diện chỉ có nghĩa với camera ĐÃ tồn tại (cần id để đọc ảnh
+                xem trước và lưu vùng) -> camera mới thì lưu xong mở lại là vẽ được. */}
+            {camera && !isMic && <ZoneEditor cameraId={camera.id} />}
 
             {camera && (
               <div className="space-y-1.5">

@@ -21,6 +21,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 |---|---|
 | `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
+| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
 | `src/hooks/useYolo.ts` | Hook WebSocket phía frontend |
 | `ppe_multiclass.pt` | Model YOLOv8 ĐANG DÙNG — 11 lớp: Person + helmet/vest/gloves/boots/goggles + no_helmet/no_boots/no_gloves/no_goggle (KHÔNG có `no_vest`, xem ghi chú bên dưới) |
@@ -30,7 +31,35 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 | `src/app/api/roboflow/route.ts` | Route gọi Roboflow phía server — giữ API key khỏi lộ ra trình duyệt, bắt buộc đăng nhập |
 | `src/app/(dashboard)/roboflow/page.tsx` | Trang `/roboflow`: kéo thả ảnh → xem khung detection của model cloud |
 | `public/videos/` | Video đầu vào mẫu |
-| `public/snapshots/` | Ảnh chụp vi phạm (tự sinh, tự xoá khi tắt dự án) |
+| `public/snapshots/` | Ảnh chụp vi phạm (tự sinh, tự xoá khi tắt dự án) + ảnh xem trước `preview_<cameraId>.jpg` |
+
+## Vùng nhận diện (Zone/ROI) theo camera
+
+Người ở NGOÀI vùng làm việc (khách đi ngang, nhà dân cạnh công trường) không cần bị
+soi PPE. Mỗi camera khai được tối đa 10 vùng đa giác; ai có **điểm chân** (giữa cạnh
+dưới khung người) nằm ngoài **mọi** vùng thì bị loại TRƯỚC khi xét PPE — không sinh
+vi phạm và không tính là người quan sát. Camera không khai vùng nào = xét cả khung.
+
+```
+Zone (isActive, type=MONITORING, polygonData = [{x,y}] tỉ lệ 0–1)
+   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s
+   ▼
+ppe_tracker.process_frame(frame, zones=[...])
+   │  zones.filter_persons_in_zones() — ray casting, bỏ người ngoài vùng
+   ▼
+phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
+```
+
+- Vẽ vùng ở **Cài đặt > Giám sát > sửa camera > "Vùng nhận diện"** (`ZoneEditor.tsx`),
+  lưu qua `PUT /api/cameras/[id]/zones`. Sửa xong AI áp dụng trong tối đa 60 giây,
+  không cần khởi động lại engine.
+- Nền của trình vẽ là `public/snapshots/preview_<cameraId>.jpg` — engine ghi lại mỗi
+  **30 giây** cho từng camera (JPEG rộng 640px, dùng lại đúng khung vừa đọc, nén/ghi ở
+  thread phụ nên không làm chậm vòng lặp). Chưa chạy engine thì chưa có ảnh và trình
+  vẽ hiện trạng thái rỗng.
+- Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
+  vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
+- `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
 
 ## Các lớp phát hiện (model `ppe_multiclass.pt` hiện tại)
 

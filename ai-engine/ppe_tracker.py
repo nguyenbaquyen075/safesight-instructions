@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 from collections import defaultdict
+from zones import filter_persons_in_zones
 import time
 import os
 import json
@@ -282,12 +283,15 @@ class PPEViolationTracker:
             "height": f"{((box[3]-box[1])/frame.shape[0])*100}%",
         }
 
-    def process_frame(self, frame: np.ndarray) -> list:
+    def process_frame(self, frame: np.ndarray, zones: list | None = None) -> list:
         """Process frame -> detections cho dashboard.
 
         2 tầng khung:
           1) Khung TỪNG BỘ PHẬN model thấy (mũ/áo/găng/giày...) — xanh, hoặc đỏ nếu là no_*.
           2) Khung TỪNG NGƯỜI — xét đủ/thiếu PPE bắt buộc: thiếu -> ĐỎ + VI PHẠM.
+
+        zones: danh sách đa giác (toạ độ tỉ lệ 0–1 theo khung) = vùng làm việc của
+        camera. None/rỗng -> xét cả khung như trước.
         """
         final_detections = []
 
@@ -339,6 +343,15 @@ class PPEViolationTracker:
 
             status = "VIOLATION" if low.startswith('no_') else "SAFE"
             print(f"[DETECT] {cls_name:10} | Conf: {conf:.2f} | Status: {status}")
+
+        # VÙNG LÀM VIỆC: người có ĐIỂM CHÂN ngoài mọi vùng MONITORING -> loại ngay
+        # tại đây, trước khi xét PPE, nên họ không sinh vi phạm và cũng không được
+        # tính là người quan sát. Logic nhận diện phía dưới giữ nguyên.
+        if zones:
+            _truoc = len(persons)
+            persons = filter_persons_in_zones(persons, zones, frame.shape[1], frame.shape[0])
+            if len(persons) < _truoc:
+                print(f"[ZONE] bỏ qua {_truoc - len(persons)} người ngoài vùng làm việc")
 
         # Thay khung GĂNG/GIÀY bằng kết quả model phụ (nếu có). Chỉ đụng đúng
         # những lớp trong parts_classes — người/mũ/áo giữ nguyên của model chính.

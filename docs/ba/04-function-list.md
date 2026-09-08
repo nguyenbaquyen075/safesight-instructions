@@ -25,7 +25,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AI-02 | Violation | AI Engine | Chốt vi phạm theo thời gian | M | Workflow | conf ≥ 0.6, thiếu liên tục ≥ 3s, 1 vi phạm / người theo món nặng nhất | v0.6 |
 | F-AI-03 | Violation | AI Engine | Chụp ảnh bằng chứng | S | Workflow | Khung tại đầu / cổ tay / cổ chân từ keypoint | v0.6 |
 | F-AI-04 | Violation | AI Engine | Báo lại vi phạm kéo dài | S | Workflow | Mỗi 60s / người, tăng `occurrenceCount` | v0.6 |
-| F-AI-05 | Zone | AI Engine | Lọc theo vùng nhận diện | M | Advanced | Model `Zone` đã có, chưa nối tracker | P1 |
+| F-AI-05 | Zone | AI Engine | Lọc theo vùng nhận diện | M | Advanced | Vùng `MONITORING` (3–20 điểm, tỉ lệ 0–1); người có điểm chân ngoài mọi vùng bị bỏ trước khi xét PPE; engine đọc lại DB mỗi 60s | v0.9 |
 | F-AI-06 | — | AI Engine | Nghiệm thu model | M | Other | `eval_ppe_decision.py` (báo oan / bỏ sót), `sweep_threshold.py` | v0.6 |
 | F-VIO-01 | Violation | Vi phạm | Xem danh sách vi phạm | S | Basic | Lọc theo loại, mức, trạng thái, camera | v0.6 |
 | F-VIO-02 | Violation | Vi phạm | Xem chi tiết vi phạm | S | Basic | Ảnh bằng chứng, bbox, tab Agent | v0.6 |
