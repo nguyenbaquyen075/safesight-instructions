@@ -23,7 +23,7 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic |
 | `/alerts` | `(dashboard)/alerts/page.tsx` | tất cả | Danh sách cảnh báo từ vi phạm thật |
 | `/violations` | `(dashboard)/violations/page.tsx` | tất cả | Bảng vi phạm + modal chi tiết (ảnh snapshot) |
-| `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm |
+| `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm, bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí camera (lọc 7/30/90 ngày) |
 | `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, Zalo OA, quy tắc cảnh báo |
@@ -100,6 +100,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 
 - **layout/** — `Sidebar.tsx` (drawer di động + thu gọn), `Header.tsx` (hamburger dưới `md`), `sidebar-context.tsx` (`SidebarProvider`/`useSidebar`)
 - **dashboard/** — `AlertTimeline.tsx`, `ComplianceChart.tsx`, `SiteStatusGrid.tsx`, `ViolationDonut.tsx`
+- **analytics/** — `TimeHeatmap.tsx` (lưới 7×24 giờ×thứ, tô theo `--danger`), `PositionHeatmap.tsx` (chọn camera, ảnh xem trước `preview_<id>.jpg` + chấm mờ tại tâm bbox); phần thuần gộp dữ liệu ở `src/lib/heatmap-shape.ts` (`hourWeekdayGrid`, `bboxCenters`, `maxCell`)
 - **cameras/** — `CameraCard.tsx`, `CameraGrid.tsx`, `MicButton.tsx`, `WebcamPreview.tsx`
 - **violations/** — `ViolationsTable.tsx`, `ViolationDetailModal.tsx`
 - **alerts/** — `AlertsTable.tsx`
