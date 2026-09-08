@@ -158,7 +158,7 @@ export default function ReportsPage() {
             >
               <Download className="w-4 h-4" /> Xuất phản hồi agent (CSV)
             </a>
-            <p className="basis-full text-xs text-[var(--text-muted)]">File mở ở tab mới và cần quyền xem công trường đang chọn.</p>
+            <p className="basis-full text-xs text-[var(--text-muted)]">File tải trực tiếp và cần quyền xem công trường đang chọn.</p>
           </div>
         </div>
       </SettingCard>
