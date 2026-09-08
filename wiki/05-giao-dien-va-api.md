@@ -45,7 +45,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | Route | Method | Ghi chú |
 |---|---|---|
 | `/api/auth/[...nextauth]` | * | NextAuth handler |
-| `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session) rồi gọi `notifyViolation()` (Telegram / Zalo OA / webhook ký HMAC) |
+| `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session), nhận thêm `clipUrl` tuỳ chọn (clip bằng chứng ~8s) rồi gọi `notifyViolation()` (Telegram / Zalo OA / webhook ký HMAC) |
 | `/api/violations/count` | GET | Cần session; `{ open, openIds }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |

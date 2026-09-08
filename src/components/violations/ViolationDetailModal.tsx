@@ -64,14 +64,21 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
       <div className="relative w-full max-w-5xl bg-[var(--surface)] rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl flex flex-col lg:flex-row">
         {/* Video Side */}
         <div className="flex-1 bg-black relative aspect-video lg:aspect-auto">
+          {/* Có clip 8s (20 khung trước + 12 khung sau lúc chốt) thì phát clip, dùng ảnh chốt làm
+              poster để khung hình không bị đen lúc chờ tải; không có clip thì rơi về ảnh chốt. */}
           {violation.clipUrl ? (
             <video
               src={violation.clipUrl}
+              poster={violation.snapshotUrl}
               className="w-full h-full object-contain"
-              autoPlay
               controls
-              loop
+              muted
+              playsInline
+              preload="metadata"
             />
+          ) : violation.snapshotUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element -- ảnh do AI engine ghi lúc chạy, không qua next/image
+            <img src={violation.snapshotUrl} alt="Ảnh bằng chứng vi phạm" className="w-full h-full object-contain" />
           ) : (
             <div className="w-full h-full flex flex-col items-center justify-center gap-4 text-white/20">
                <ShieldAlert className="w-20 h-20" />
@@ -202,8 +209,11 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
               <div className="sm:col-span-2 space-y-2">
                 <label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Ảnh bằng chứng</label>
                 <div className="relative rounded-2xl overflow-hidden border border-white/10 h-40 bg-black">
-                  {violation.clipUrl ? (
-                    <video src={violation.clipUrl} autoPlay muted loop className="w-full h-full object-cover" />
+                  {violation.snapshotUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element -- ảnh do AI engine ghi lúc chạy, không qua next/image
+                    <img src={violation.snapshotUrl} alt="Ảnh bằng chứng đính kèm phiếu phạt" className="w-full h-full object-cover" />
+                  ) : violation.clipUrl ? (
+                    <video src={violation.clipUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20"><ShieldAlert className="w-10 h-10" /></div>
                   )}

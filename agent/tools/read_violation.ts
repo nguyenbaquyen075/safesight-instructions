@@ -15,7 +15,7 @@ export async function violationFacts(id: string) {
     violationId: v.id, cameraId: v.cameraId, cameraName: v.camera.name, siteId: v.siteId, siteName: v.site.name,
     type: v.type, severity: v.severity, confidence: v.confidence, occurrenceCount: v.occurrenceCount,
     status: v.status.toLowerCase(), detectedAt: v.detectedAt.toISOString(),
-    bbox: parseJsonOr(v.bboxData, []), snapshotUrl: v.snapshotUrl,
+    bbox: parseJsonOr(v.bboxData, []), snapshotUrl: v.snapshotUrl, clipUrl: v.clipUrl,
     agentReview: parseJsonOr(v.agentReview, null),
   };
 }
@@ -30,7 +30,9 @@ export const makeReadViolation = (ctx: ToolContext) => betaZodTool({
     await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: 'violation', subjectId: violationId, type: 'tool.call', data: { tool: 'read_violation', found: !!facts } });
     if (!facts) return JSON.stringify({ error: 'không có vi phạm này' });
     const image = await loadSnapshotBase64(facts.snapshotUrl);
-    const text = JSON.stringify({ ...facts, snapshotUrl: undefined });
+    // Agent chỉ đọc được ảnh; clip là để NGƯỜI xem, nên chỉ nhắc là có chứ không tải video.
+    const text = JSON.stringify({ ...facts, snapshotUrl: undefined })
+      + (facts.clipUrl ? '\n(có clip 8s kèm vi phạm này, người quản lý xem trong modal chi tiết)' : '');
     if (!image) return text + '\n(ảnh snapshot không còn trên đĩa)';
     return [
       { type: 'text' as const, text },

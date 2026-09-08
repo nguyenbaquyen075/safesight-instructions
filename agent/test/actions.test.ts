@@ -2,7 +2,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { applyFindings, type ActionContext } from '../direct/actions';
-import { pickCleanup } from '../direct/cleanup';
+import { isEvidenceFile, pickCleanup } from '../direct/cleanup';
 import type { Finding } from '../direct/health';
 import { runProbe, runSweep } from '../direct/sweep';
 import { prisma } from '../lib/db';
@@ -33,6 +33,22 @@ test('pickCleanup deletes oldest files first, skips files under 24h, unreference
 test('pickCleanup selects a closed violation snapshot that is only 2 days old', () => {
   const files = [{ name: 'violation_c.jpg', mtimeMs: now - 2 * DAY, referenced: true, closed: true }];
   assert.deepEqual(pickCleanup(files, now, 1, { 'violation_c.jpg': 100 }), ['violation_c.jpg']);
+});
+
+test('isEvidenceFile accepts violation snapshots and violation clips, nothing else', () => {
+  assert.ok(isEvidenceFile('violation_cam-001_20260908-101500.jpg'));
+  assert.ok(isEvidenceFile('clip_cam-001_20260908-101500.mp4'));
+  assert.ok(!isEvidenceFile('preview_cam-001.jpg'));
+  assert.ok(!isEvidenceFile('.heartbeat.json'));
+  assert.ok(!isEvidenceFile('clip_cam-001.txt'));
+});
+
+test('pickCleanup keeps the clip of a still-open violation and deletes the clip of a closed one', () => {
+  const files = [
+    { name: 'clip_open.mp4', mtimeMs: now - 30 * DAY, referenced: true, closed: false },
+    { name: 'clip_closed.mp4', mtimeMs: now - 30 * DAY, referenced: true, closed: true },
+  ];
+  assert.deepEqual(pickCleanup(files, now, 1000, { 'clip_open.mp4': 100, 'clip_closed.mp4': 100 }), ['clip_closed.mp4']);
 });
 
 test('escapeHtml blocks HTML tags in model-generated text', () => {

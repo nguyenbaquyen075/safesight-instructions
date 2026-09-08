@@ -22,6 +22,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 | `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB, gửi số người quan sát được mỗi phút |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
 | `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
+| `clips.py` | Clip bằng chứng: `FrameRing` (đệm 20 khung gần nhất), `ClipWriter` (bọc `cv2.VideoWriter`), `PendingClip`/`start_clip` — chỉ `ClipWriter` cần cv2 nên test được bằng `python3 -m unittest ai-engine/test_clips.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
 | `src/hooks/useYolo.ts` | Hook WebSocket phía frontend |
 | `ppe_multiclass.pt` | Model YOLOv8 ĐANG DÙNG — 11 lớp: Person + helmet/vest/gloves/boots/goggles + no_helmet/no_boots/no_gloves/no_goggle (KHÔNG có `no_vest`, xem ghi chú bên dưới) |
@@ -31,7 +32,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 | `src/app/api/roboflow/route.ts` | Route gọi Roboflow phía server — giữ API key khỏi lộ ra trình duyệt, bắt buộc đăng nhập |
 | `src/app/(dashboard)/roboflow/page.tsx` | Trang `/roboflow`: kéo thả ảnh → xem khung detection của model cloud |
 | `public/videos/` | Video đầu vào mẫu |
-| `public/snapshots/` | Ảnh chụp vi phạm (tự sinh, tự xoá khi tắt dự án) + ảnh xem trước `preview_<cameraId>.jpg` |
+| `public/snapshots/` | Ảnh chụp vi phạm `violation_*.jpg` + clip bằng chứng `clip_*.mp4` (tự sinh, tự xoá khi tắt dự án) + ảnh xem trước `preview_<cameraId>.jpg` (KHÔNG bị xoá) |
 
 ## Vùng nhận diện (Zone/ROI) theo camera
 
@@ -60,6 +61,31 @@ phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
 - Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
   vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
 - `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
+
+## Clip bằng chứng cho mỗi vi phạm
+
+Một tấm ảnh đứng yên không cho biết người đó vừa tháo mũ ra hay đang đội vào. Vì vậy
+mỗi vi phạm ĐÃ CHỐT còn kèm một clip ngắn khoảng **8 giây**:
+
+```
+mỗi khung đọc được  ->  st["ring"].push(frame)      (FrameRing giữ 20 khung gần nhất)
+   ▼
+chốt vi phạm  ->  cv2.imwrite(violation_<cam>_<ts>.jpg)   ảnh bằng chứng như cũ
+              ->  start_clip(clip_<cam>_<ts>.mp4, ring.snapshot())
+                     ghi ngay 20 khung TRƯỚC, trả PendingClip(remaining=12)
+   ▼
+mỗi vòng lặp sau  ->  pending.feed(frame): ghi 1 khung, đếm ngược; đủ 12 thì tự đóng
+```
+
+- mp4v, 4 fps, kích thước lấy từ khung đầu tiên → 32 khung ≈ 8 giây.
+- Vòng lặp KHÔNG bị chặn: mỗi vòng chỉ ghi thêm một khung cho mỗi clip đang mở.
+- Tên clip dùng đúng khoá của ảnh (`<cameraId>_<timestamp>`) nên nhìn tên là ghép được
+  cặp ảnh–clip của cùng một vi phạm.
+- `report_violation()` gửi kèm `clipUrl` (chỉ khi ghi được — API nhận trường tuỳ chọn,
+  không nhận `null`), lưu vào `Violation.clipUrl`.
+- `clear_snapshots()` xoá cả `violation_*.jpg` lẫn `clip_*.mp4` khi engine khởi động/tắt.
+- Trí nhớ: 20 khung 720p ≈ 55MB cho mỗi luồng. Chạy nhiều luồng độ phân giải cao thì
+  thu nhỏ khung trước khi `push` (xem ghi chú `ponytail:` trong `clips.py`).
 
 ## Đếm người quan sát được (mẫu số của tỉ lệ tuân thủ)
 

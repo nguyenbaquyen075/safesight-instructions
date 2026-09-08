@@ -14,7 +14,7 @@ test.before(async () => {
   await prisma.site.create({ data: { id: 'site-t', orgId: 'org-t', name: 'Site T', address: 'x', lat: 0, lng: 0 } });
   await prisma.camera.create({ data: { id: 'cam-t', siteId: 'site-t', name: 'Cam T', rtspUrl: 'video:samples1.mp4', location: 'gate', status: 'ONLINE' } });
   await prisma.violation.createMany({ data: [
-    { id: 'v-a', cameraId: 'cam-t', siteId: 'site-t', type: 'hard_hat', severity: 'critical', confidence: 0.8, bboxData: '[]', snapshotUrl: '/snapshots/violation_x.jpg', status: 'OPEN', occurrenceCount: 2 },
+    { id: 'v-a', cameraId: 'cam-t', siteId: 'site-t', type: 'hard_hat', severity: 'critical', confidence: 0.8, bboxData: '[]', snapshotUrl: '/snapshots/violation_x.jpg', clipUrl: '/snapshots/clip_x.mp4', status: 'OPEN', occurrenceCount: 2 },
     { id: 'v-b', cameraId: 'cam-t', siteId: 'site-t', type: 'safety_gloves', severity: 'medium', confidence: 0.7, bboxData: '[]', snapshotUrl: '/snapshots/violation_y.jpg', status: 'FALSE_POSITIVE' },
   ] });
 });
@@ -23,6 +23,12 @@ test('violationFacts returns neighboring ids and a lowercase status', async () =
   const f = await violationFacts('v-a');
   assert.equal(f?.cameraId, 'cam-t'); assert.equal(f?.siteId, 'site-t'); assert.equal(f?.status, 'open'); assert.equal(f?.occurrenceCount, 2);
   assert.equal(await violationFacts('nope'), null);
+});
+
+// Agent không xem được video (chưa có ffmpeg) nhưng phải biết clip tồn tại để nhắc người quản lý mở modal.
+test('violationFacts exposes the evidence clip url, or null when the violation has none', async () => {
+  assert.equal((await violationFacts('v-a'))?.clipUrl, '/snapshots/clip_x.mp4');
+  assert.equal((await violationFacts('v-b'))?.clipUrl, null);
 });
 
 test('cameraHistory computes the false-positive rate and returns siteId', async () => {

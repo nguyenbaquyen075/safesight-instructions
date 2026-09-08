@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { buildViolationWhere } from '../../src/lib/violation-shape';
+import { buildViolationWhere, toViolationDTO } from '../../src/lib/violation-shape';
+import type { Violation as ViolationRow } from '@prisma/client';
 
 // buildViolationWhere là phần thuần của GET /api/violations (route handler cần
 // ngữ cảnh Next request + auth() nên không test trực tiếp được).
@@ -45,4 +46,18 @@ test('a user with no assigned site matches nothing', () => {
 
 test('empty query params are ignored', () => {
   assert.deepEqual(buildViolationWhere({ siteId: null, type: null, severity: null, status: null }, null), {});
+});
+
+// Cột clipUrl là NULL với vi phạm không ghi được clip (engine cũ, ring chưa đủ khung):
+// DTO phải trả undefined chứ không phải null, vì UI kiểm tra `violation.clipUrl ? ...`.
+const row = {
+  id: 'v-1', cameraId: 'cam-1', siteId: 'site-1', zoneId: null, type: 'hard_hat', severity: 'critical',
+  confidence: 0.9, occurrenceCount: 1, bboxData: '[]', snapshotUrl: '/snapshots/violation_x.jpg',
+  status: 'OPEN', agentReview: null, detectedAt: new Date(0), createdAt: new Date(0), updatedAt: new Date(0),
+  camera: { name: 'Cam 1' }, site: { name: 'Site 1' },
+} as unknown as ViolationRow & { camera: { name: string }; site: { name: string } };
+
+test('the DTO carries the evidence clip url through, and turns a missing clip into undefined', () => {
+  assert.equal(toViolationDTO({ ...row, clipUrl: '/snapshots/clip_cam-1_20260908-101500.mp4' }).clipUrl, '/snapshots/clip_cam-1_20260908-101500.mp4');
+  assert.equal(toViolationDTO({ ...row, clipUrl: null }).clipUrl, undefined);
 });

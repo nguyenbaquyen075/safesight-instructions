@@ -12,6 +12,7 @@ import sys
 import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
+from clips import FrameRing, start_clip
 from zones import parse_polygon
 from env_local import load_dotenv_local
 
@@ -169,6 +170,8 @@ def report_violation(cam_id, detection):
             }],
             "snapshotUrl": snapshot_url,
             "occurrenceCount": detection.get("occurrenceCount", 1),
+            # Clip chỉ gửi khi ghi được (API nhận clipUrl tuỳ chọn, không nhận null).
+            **({"clipUrl": detection["clipUrl"]} if detection.get("clipUrl") else {}),
         }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
     except requests.exceptions.RequestException:
         pass
@@ -338,19 +341,20 @@ session = requests.Session()
 
 
 def clear_snapshots():
-    """Xoá toàn bộ ảnh vi phạm đã bắt — ảnh chỉ tồn tại TRONG LÚC chạy dự án."""
+    """Xoá toàn bộ bằng chứng đã bắt (ảnh + clip) — chỉ tồn tại TRONG LÚC chạy dự án."""
     if not os.path.isdir(SNAPSHOT_DIR):
         return
     removed = 0
     for name in os.listdir(SNAPSHOT_DIR):
-        if name.startswith("violation_") and name.endswith(".jpg"):
+        if ((name.startswith("violation_") and name.endswith(".jpg"))
+                or (name.startswith("clip_") and name.endswith(".mp4"))):
             try:
                 os.remove(os.path.join(SNAPSHOT_DIR, name))
                 removed += 1
             except OSError:
                 pass
     if removed:
-        print(f"🧹 Đã xoá {removed} ảnh vi phạm.")
+        print(f"🧹 Đã xoá {removed} tệp bằng chứng vi phạm.")
     # Xoá heartbeat để agent biết ngay engine đã tắt, không đợi pid cũ bị hệ điều hành tái sử dụng.
     try:
         os.remove(HEARTBEAT_PATH)
@@ -555,6 +559,10 @@ def run_inference():
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
 
+            # Đệm khung cho clip bằng chứng (setdefault: mọi luồng đều có, kể cả luồng
+            # tạo ở nhánh dự phòng camera 0).
+            st.setdefault("ring", FrameRing()).push(frame)
+
             # Phân tích ĐÚNG video của luồng này -> khung khớp người trong ô đó
             vi_tri_video = None
             if not st["is_live"]:
@@ -621,10 +629,21 @@ def run_inference():
                     annotated = _draw_violation_box(frame.copy(), d["bbox"], d["label"])
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
                     d['snapshotUrl'] = f"/snapshots/{filename}"
+                    # Clip = 20 khung đã đệm + 12 khung kế tiếp; ghi phần đuôi ở các vòng
+                    # lặp sau nên không chặn frame loop.
+                    clip_name = f"clip_{cam_id}_{timestamp}.mp4"
+                    pending = start_clip(f"{SNAPSHOT_DIR}/{clip_name}", st["ring"].snapshot())
+                    if pending:
+                        st.setdefault("pending_clips", []).append(pending)
+                        d['clipUrl'] = f"/snapshots/{clip_name}"
                     violation_count[key] = violation_count.get(key, 0) + 1
                     d['occurrenceCount'] = violation_count[key]
                     report_violation(cam_id, d)
                     last_reported[key] = now
+
+            # Phần đuôi của các clip đang mở: mỗi vòng thêm 1 khung, đủ 12 khung thì tự đóng.
+            if st.get("pending_clips"):
+                st["pending_clips"] = [p for p in st["pending_clips"] if not p.feed(frame)]
 
         _hb_frames += 1
         if time.time() - _hb_last >= 5.0:

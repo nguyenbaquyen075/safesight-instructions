@@ -48,7 +48,7 @@ Màn hình hiển thị, không có trường nhập. Thành phần: 4 thẻ KPI
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
 |---|---|---|---|---|---|
 | 1 | Tab | tab: Bằng chứng / Agent | — | Bằng chứng | |
-| 2 | Ảnh bằng chứng | image + bbox overlay | — | snapshot | Khung đỏ tại vị trí thiếu PPE; hệ thống tự sinh, không sửa |
+| 2 | Bằng chứng | video (có clip) / image (không có clip) | — | clip nếu có, không thì ảnh snapshot | Có `clipUrl` → `<video controls muted playsInline>` với ảnh snapshot làm poster; không có → ảnh snapshot khoanh khung đỏ tại vị trí thiếu PPE. Hệ thống tự sinh, không sửa |
 | 3 | Thông tin | section chỉ đọc | — | — | Camera, công trường, loại, mức, độ tin cậy, thời gian, số lần tái diễn |
 | 4 | Trạng thái | dropdown fix cứng | — | trạng thái hiện tại | Đổi → PATCH ngay, toast |
 | 5 | Mic | button (giữ để nói) | — | — | Gửi tới loa của camera này |
