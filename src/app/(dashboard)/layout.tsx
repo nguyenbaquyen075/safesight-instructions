@@ -10,6 +10,7 @@ import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 import { SidebarProvider, useSidebar } from '@/components/layout/sidebar-context';
 import { Toaster } from '@/components/ui/Toaster';
+import { AgentChatWidget } from '@/components/agent/AgentChatWidget';
 import { canAccessPath } from '@/lib/auth/permissions';
 import { UserRole } from '@/types/enums';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,7 @@ function DashboardShell({
           )}
         </main>
       </div>
+      <AgentChatWidget />
       <Toaster />
     </div>
   );

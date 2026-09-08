@@ -1,5 +1,7 @@
 // SPDX-License-Identifier: MIT
+import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toChatItems } from '@/lib/chat-shape';
 import type { AgentEventView, AgentSettingsView, AgentTaskView, CameraAgentUpdate, CameraAgentView } from '@/types/agent';
 
 const qs = (o: Record<string, string | number | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
@@ -39,6 +41,44 @@ export function useAskAgent() {
     mutationFn: async (data: { message: string; subjectType?: string; subjectId?: string; sessionId?: string }) => { const r = await fetch('/api/agent/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error('Gửi câu hỏi thất bại'); return r.json() as Promise<{ sessionId: string; taskId: string }>; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['agent-events'] }); qc.invalidateQueries({ queryKey: ['agent-tasks'] }); },
   });
+}
+
+const QUIET_MS = 90_000;
+
+export type AskSubjectType = 'violation' | 'camera' | 'site' | 'system';
+
+// Một cuộc hỏi đáp với agent (dùng chung cho widget nổi, trang /agent và tab Agent trong modal):
+// gửi qua /api/agent/ask, poll event theo sessionId khi đang chờ, im lặng 90s hoặc session.ended là xong.
+export function useAskSession({ subjectType = 'system', subjectId }: { subjectType?: AskSubjectType; subjectId?: string }) {
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [text, setText] = useState('');
+  const [sentAt, setSentAt] = useState<number | null>(null);
+  const ask = useAskAgent();
+  const { data: events = [] } = useAgentEvents({ sessionId: sessionId ?? undefined, limit: 200 }, { live: sentAt !== null, enabled: !!sessionId });
+
+  const ended = useMemo(() => events.some(e => e.type === 'session.ended' && sentAt !== null && new Date(e.emittedAt).getTime() > sentAt), [events, sentAt]);
+  // "Đang trả lời" = đã gửi, chưa thấy session.ended, và chưa im lặng quá 90s. Tick 5s để hết hạn 90s cũng tự tắt poll.
+  const [tick, setTick] = useState(0);
+  useEffect(() => { if (sentAt === null) return; const t = setInterval(() => setTick(n => n + 1), 5_000); return () => clearInterval(t); }, [sentAt]);
+  void tick;
+  // eslint-disable-next-line react-hooks/purity -- Date.now() chỉ dùng để tính "còn đang chờ" cho hiển thị; đồng hồ tick 5s đã ép re-render, không phải nguồn state
+  const working = sentAt !== null && !ended && Date.now() - sentAt < QUIET_MS;
+
+  useEffect(() => {
+    if (sentAt !== null && !working) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- tắt poll khi phiên đã xong
+      setSentAt(null);
+    }
+  }, [working, sentAt]);
+
+  const submit = async () => {
+    const message = text.trim(); if (!message || ask.isPending) return;
+    const r = await ask.mutateAsync({ message, subjectType, subjectId, sessionId: sessionId ?? undefined });
+    setSessionId(r.sessionId); setSentAt(Date.now()); setText('');
+  };
+
+  const items = useMemo(() => toChatItems(events), [events]);
+  return { text, setText, submit, items, working, isPending: ask.isPending, isError: ask.isError };
 }
 
 // Subagent theo camera: danh sách đủ cho cả lưới thẻ ở /agent và panel trong modal camera

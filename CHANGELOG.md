@@ -4,6 +4,12 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- Widget **Trợ lý SafeSight** nổi góc phải dưới trên mọi trang dashboard (trừ `/agent`): nút tròn mở panel chat với agent (header gradient, bong bóng chào, câu hỏi bên phải / trả lời bên trái, ô nhập Enter để gửi, Esc để đóng, nút mở trang `/agent`). Phiên hỏi đáp giữ nguyên khi đổi trang vì widget nằm ở layout.
+
+### Thay đổi
+- Ô hỏi đáp trên `/agent` và tab Agent trong modal camera/vi phạm/công trường chuyển sang dạng bong bóng chat (cùng `useAskSession` và `ChatThread` với widget); phần thuần `toChatItems`/`eventSummary` tách ra `src/lib/chat-shape.ts` có test. Toast dời lên `bottom-24` để không đè nút chat.
+
 ## [0.9.0] - 2026-09-08
 
 ### Thêm

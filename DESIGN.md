@@ -98,7 +98,15 @@ xanh dương = hành động chính. Không dùng màu khác cho các ý này.
 - **Observation chip**: viền `border`, chữ `text-secondary`, 10px, tiếng Việt từ `WEIGHTS[kind].label`.
 - **Dòng thời gian AgentEvent**: mỗi dòng có icon theo `type` (tool.call = Terminal, verdict = ShieldCheck/ShieldAlert,
   action = Zap, health = Activity, error = AlertCircle, message = MessageSquare), giờ `HH:mm:ss` mono.
-- **Ô hỏi đáp**: textarea + nút gửi; khi phiên đang chạy hiện "Agent đang trả lời…" và poll 2s; im lặng 90s coi là xong.
+- **Chat với agent** (`ChatThread` + `ChatComposer` trong `src/components/agent/ChatThread.tsx`): bong bóng người hỏi bên phải
+  (`primary`, chữ trắng, bo `rounded-2xl` góc phải-dưới nhỏ), agent bên trái (`surface-elevated`, góc trái-dưới nhỏ), verdict/action là dòng
+  11px `text-muted` ở giữa, lỗi và phiên bị bỏ qua màu `danger`. Ô nhập một dòng "Nhập câu hỏi… (Enter để gửi)" + nút gửi 40px.
+  Khi phiên đang chạy hiện bong bóng "Agent đang trả lời…" và poll 2s; im lặng 90s coi là xong. Cùng một `useAskSession` cho
+  widget nổi, trang `/agent` và tab Agent trong modal.
+- **Widget trợ lý nổi** (`AgentChatWidget`, gắn ở layout dashboard, ẩn trên `/agent` và khi in): nút tròn 56px `gradient-primary`
+  góc phải dưới (`bottom-6 right-6`, `z-[150]` — dưới modal `z-[200]`, Toaster dời lên `bottom-24`); panel 380px cao ≤ 560px
+  (`min(560px, 100vh − 7.5rem)`), dưới `sm` trải ngang màn trừ lề 16px; header `gradient-primary` chữ trắng với tiêu đề
+  "Trợ lý SafeSight", nút mở `/agent` (Bot) và nút đóng (X, Esc cũng đóng); mở bằng `animate-fade-up`; `role="dialog"` có `aria-label`.
 - **Trạng thái rỗng/tải/lỗi** bắt buộc cho mọi khối: "Chưa có gì", skeleton `surface-elevated`, thông báo lỗi `danger-muted`.
 
 ## Thẻ subagent camera
