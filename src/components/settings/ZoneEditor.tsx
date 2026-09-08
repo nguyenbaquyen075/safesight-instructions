@@ -35,10 +35,14 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
   // Nạp bản nháp từ server ngay trong render (mẫu "adjust state on prop change",
   // giống CameraEditDialog) — không setState trong effect.
   const [draft, setDraft] = useState<ZonePoint[][]>([]);
+  // Tên vùng song song với draft theo chỉ số; undefined = vùng mới chưa đặt tên,
+  // server tự sinh "Vùng N" khi lưu (defaultZoneName).
+  const [names, setNames] = useState<(string | undefined)[]>([]);
   const [loadedFrom, setLoadedFrom] = useState<typeof zones>(undefined);
   if (zones && zones !== loadedFrom) {
     setLoadedFrom(zones);
     setDraft(zones.map((z) => z.points));
+    setNames(zones.map((z) => z.name));
     setActive(0);
   }
 
@@ -68,7 +72,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
     setDraft(next);
   };
 
-  const movePoint = (e: React.MouseEvent) => {
+  const movePoint = (e: React.PointerEvent) => {
     if (!dragging) return;
     const p = toRatio(e);
     if (!p) return;
@@ -83,12 +87,15 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
 
   const handleSave = async () => {
     // Vùng dưới 3 điểm chưa thành đa giác -> bỏ, đỡ để API trả 400 vì một vùng đang vẽ dở.
-    const ready = draft.filter((points) => points.length >= 3);
+    // Giữ tên vùng theo đúng chỉ số gốc (draft/names song song) khi lọc.
+    const ready = draft
+      .map((points, i) => ({ points, name: names[i] }))
+      .filter((zone) => zone.points.length >= 3);
     if (ready.length !== draft.length) {
       toast('Vùng chưa đủ 3 điểm sẽ không được lưu', 'error');
     }
     try {
-      await saveZones.mutateAsync(ready.map((points) => ({ points })));
+      await saveZones.mutateAsync(ready);
       toast(ready.length
         ? 'Đã lưu vùng nhận diện — AI áp dụng trong vòng 60 giây'
         : 'Đã xoá hết vùng — AI xét lại toàn khung hình', 'success');
@@ -133,11 +140,11 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                 ref={svgRef}
                 viewBox="0 0 1 1"
                 preserveAspectRatio="none"
-                className="absolute inset-0 h-full w-full cursor-crosshair"
+                className="absolute inset-0 h-full w-full cursor-crosshair touch-none"
                 onClick={addPoint}
-                onMouseMove={movePoint}
-                onMouseUp={() => setDragging(null)}
-                onMouseLeave={() => setDragging(null)}
+                onPointerMove={movePoint}
+                onPointerUp={() => setDragging(null)}
+                onPointerLeave={() => setDragging(null)}
               >
                 {draft.map((points, zi) => {
                   const color = ZONE_COLORS[zi % ZONE_COLORS.length];
@@ -160,7 +167,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                           stroke="#fff"
                           strokeWidth={0.003}
                           className="cursor-grab"
-                          onMouseDown={(e) => { e.stopPropagation(); setActive(zi); setDragging({ zone: zi, point: pi }); }}
+                          onPointerDown={(e) => { e.stopPropagation(); setActive(zi); setDragging({ zone: zi, point: pi }); }}
                           onClick={(e) => e.stopPropagation()}
                           onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); removePoint(zi, pi); }}
                         />
@@ -195,6 +202,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                   aria-label={`Xoá vùng ${zi + 1}`}
                   onClick={() => {
                     setDraft((prev) => prev.filter((_, i) => i !== zi));
+                    setNames((prev) => prev.filter((_, i) => i !== zi));
                     setActive(0);
                   }}
                   className="text-[var(--text-muted)] hover:text-[var(--danger)] focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded"
@@ -208,6 +216,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
               onClick={() => {
                 if (draft.length >= MAX_ZONES) { toast(`Tối đa ${MAX_ZONES} vùng`, 'error'); return; }
                 setDraft((prev) => [...prev, []]);
+                setNames((prev) => [...prev, undefined]);
                 setActive(draft.length);
               }}
               className="rounded-lg border border-dashed border-[var(--primary)] px-2 py-1 text-[11px] text-[var(--primary-light)] hover:bg-[var(--primary-muted)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"

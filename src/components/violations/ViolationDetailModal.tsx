@@ -24,6 +24,9 @@ type ViolationLike = Violation & { date?: string; time?: string; description?: s
 
 export function ViolationDetailModal({ violation, onClose }: { violation: ViolationLike, onClose: () => void }) {
   const [showTicket, setShowTicket] = useState(false);
+  // clip_*.mp4 bị dọn (clear_snapshots) trong khi Violation.clipUrl còn giữ đường dẫn cũ
+  // -> video 404 lúc phát; rơi về ảnh chốt thay vì ô video đen.
+  const [clipFailed, setClipFailed] = useState(false);
   const [tab, setTab] = useState<'detail' | 'agent'>('detail');
   const [empName, setEmpName] = useState('');
   const [empDept, setEmpDept] = useState('');
@@ -66,7 +69,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
         <div className="flex-1 bg-black relative aspect-video lg:aspect-auto">
           {/* Có clip 8s (20 khung trước + 12 khung sau lúc chốt) thì phát clip, dùng ảnh chốt làm
               poster để khung hình không bị đen lúc chờ tải; không có clip thì rơi về ảnh chốt. */}
-          {violation.clipUrl ? (
+          {violation.clipUrl && !clipFailed ? (
             <video
               src={violation.clipUrl}
               poster={violation.snapshotUrl}
@@ -75,6 +78,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
               muted
               playsInline
               preload="metadata"
+              onError={() => setClipFailed(true)}
             />
           ) : violation.snapshotUrl ? (
             // eslint-disable-next-line @next/next/no-img-element -- ảnh do AI engine ghi lúc chạy, không qua next/image
