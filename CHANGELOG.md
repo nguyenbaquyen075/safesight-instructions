@@ -19,6 +19,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
 
+### Sửa
+- Ghi Violation/Alert không còn văng `P1008 SocketTimeout` khi nhiều camera cùng báo vi phạm: `src/lib/prisma.ts` (dùng chung cho Next.js và agent) đặt `PRAGMA busy_timeout=5000` + `PRAGMA journal_mode=WAL` ngay khi mở connection SQLite, nên tiến trình đọc (AI engine) không còn chặn tiến trình ghi. Kèm test `agent/test/db-pragma.test.ts`; `dev.db-wal`/`dev.db-shm` đã thêm vào `.gitignore`.
+
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
 
