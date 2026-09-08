@@ -9,10 +9,7 @@ import type { ToolContext } from '../lib/tool-context';
 
 const ctx = (): ToolContext => ({ sessionId: 's-esc', taskId: null, taskKind: 'violation.review', budget: 6, spent: { calls: 0, escalations: 0, followups: 0, verdicts: new Set() } });
 
-const run = async (input: { violationId?: string; caption: string }) =>
-  JSON.parse((await makeEscalate(ctx()).run(input)) as string);
-
-const runWithCtx = async (c: ToolContext, input: { violationId?: string; caption: string }) =>
+const run = async (input: { violationId?: string; caption: string }, c: ToolContext = ctx()) =>
   JSON.parse((await makeEscalate(c).run(input)) as string);
 
 const reviewOf = (band: string, verdict = 'violation') => JSON.stringify({ band, verdict });
@@ -43,7 +40,7 @@ test('VERIFIED but occurrenceCount 1 and severity medium is not serious enough',
 
 test('VERIFIED + critical passes the gate; no Telegram configured so nothing sends, but the attempt is spent', async () => {
   const c = ctx();
-  const out = await runWithCtx(c, { violationId: 'v-esc-critical', caption: 'Cam Esc: mũ bảo hộ nghiêm trọng, cần xử lý ngay.' });
+  const out = await run({ violationId: 'v-esc-critical', caption: 'Cam Esc: mũ bảo hộ nghiêm trọng, cần xử lý ngay.' }, c);
   assert.equal(out.sent, false);
   assert.match(out.blockedReason, /AlertRule|cooldown|Telegram/);
   assert.equal(c.spent.escalations, 1);
@@ -52,7 +49,7 @@ test('VERIFIED + critical passes the gate; no Telegram configured so nothing sen
 test('escalatePerSession limit blocks further escalations without spending another attempt', async () => {
   const c = ctx();
   c.spent.escalations = LIMITS.escalatePerSession;
-  const out = await runWithCtx(c, { violationId: 'v-esc-critical', caption: 'Cam Esc: mũ bảo hộ nghiêm trọng, cần xử lý ngay.' });
+  const out = await run({ violationId: 'v-esc-critical', caption: 'Cam Esc: mũ bảo hộ nghiêm trọng, cần xử lý ngay.' }, c);
   assert.equal(out.sent, false);
   assert.match(out.blockedReason, /đủ số lần/);
   assert.equal(c.spent.escalations, LIMITS.escalatePerSession);
@@ -68,7 +65,7 @@ test('a paused agent blocks escalation', async () => {
 
 test('no violationId takes the ops path: sendOpsAlert, spends an attempt, and emits escalate.ops', async () => {
   const c = ctx();
-  const out = await runWithCtx(c, { caption: 'Vận hành: camera cổng mất kết nối 10 phút.' });
+  const out = await run({ caption: 'Vận hành: camera cổng mất kết nối 10 phút.' }, c);
   assert.equal(out.sent, false); // không có TelegramSettings trong DB test
   assert.equal(c.spent.escalations, 1);
   const ev = await prisma.agentEvent.findFirst({ where: { sessionId: c.sessionId, type: 'action', subjectType: 'system' }, orderBy: { emittedAt: 'desc' } });

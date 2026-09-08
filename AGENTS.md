@@ -215,7 +215,7 @@ in that order, unless the project's domain requirements clearly justify a differ
 
 
 # Project Workflow (SafeSight)
-- Knowledge discovery: `README.md` (setup, run, model files), `wiki/` (architecture, data model, YOLO integration, retraining), `docs/ba/` (BA document set: SRS, URD, BRD, HDSD, 15 BA artifacts), `docs/superpowers/specs/` and `docs/superpowers/plans/` (approved designs and plans).
+- Knowledge discovery: `README.md` (setup, run, model files), `wiki/` (architecture, data model, YOLO integration, retraining), `docs/ba/` (BA document set: SRS, URD, BRD, HDSD, 15 BA artifacts), `docs/superpowers/specs/` and `docs/superpowers/plans/` (approved designs and plans), `node_modules/next/dist/docs/` (bundled Next.js 16 guides — đọc trước khi đụng vào `src/`).
 - Development: run everything with `npm run dev` (dev-all.sh: Next.js 3000 + YOLO Bridge 4001 + Python inference). Dev DB is SQLite via `npx prisma db push && npm run db:seed`.
 - Validation: `npm run lint`, `npx tsc --noEmit`; for AI changes run `ai-engine/eval_ppe_decision.py` and `ai-engine/sweep_threshold.py` (see README "Nghiệm thu").
 - Documentation: when architecture, pages, routes, schema or model files change, update the matching `wiki/` page and `README.md` in the same change.

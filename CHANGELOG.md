@@ -21,6 +21,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Badge "Thông báo" ở Sidebar đếm vi phạm `open` từ DB thay vì `localStorage` + hằng 11; trang Công trường không ghi thông báo vào `safesight_alerts` nữa.
 - `docker-compose.yml` dùng bind mount `./data` và `./public/snapshots` để AI engine và agent chạy trên máy chủ dùng chung DB/ảnh với container.
 - `snapshot.cleanup` chỉ giữ ảnh mới hơn 24h (bỏ luật 30 ngày không bao giờ khớp vì engine xoá ảnh mỗi lần khởi động).
+- `agent/test/escalate.test.ts`: gộp hai helper `run`/`runWithCtx` trùng thân hàm thành một `run` nhận `ctx` tuỳ chọn.
+- Tách logic đọc/ghi `localStorage['safesight_read_alerts']` ở `/alerts` thành hook dùng chung `useReadAlertIds()`/`persistReadAlertIds()` (`src/hooks/use-read-alerts.ts`), chuẩn bị cho badge Sidebar trừ đi các thông báo đã đọc.
 
 ### Sửa
 - Vai trò người dùng lưu chữ HOA trong DB (mặc định `SAFETY_OFFICER`) được chuẩn hoá về chữ thường khi đăng nhập; kiểm tra org-wide không còn phân biệt hoa/thường, nên user tạo qua DB không bị coi nhầm là bị giới hạn theo site.
@@ -44,6 +46,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Badge Sidebar không còn hiện số "0" rời khi không có vi phạm.
 - Dashboard container không còn crash-loop khi bind mount `./data`/`./public/snapshots`: chạy bằng `user: "${UID:-1000}:${GID:-1000}"` trong `docker-compose.yml` thay vì uid riêng của user `app` trong image; `/app/data`/`/app/public/snapshots` trong image đã `chmod 777` và `docker-entrypoint.sh` báo lỗi rõ nếu vẫn không ghi được thay vì để `set -e` chết im lặng.
 - YOLO engine không còn im lặng bỏ qua khi bridge từ chối detection (401 do `AI_ENGINE_SECRET` lệch): in cảnh báo 1 lần/mã lỗi HTTP thay vì `except: pass`; `env_local.py` đọc thêm `.env` (không chỉ `.env.local`) để engine luôn khớp secret với bridge; `mock_yolo.js` gửi kèm header `X-AI-Engine-Secret` như engine thật.
+- `next dev` không còn tự chèn block `nextjs-agent-rules` vào `AGENTS.md` (Next.js 16.3 agent-file generation): đặt `agentRules: false` trong `next.config.ts`.
 
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).

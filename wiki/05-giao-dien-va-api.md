@@ -11,6 +11,7 @@ Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng t�
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
 Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViolationCount()` (`GET /api/violations/count` trả `{ open }`, đếm bằng SQL theo phạm vi site) — không tải cả danh sách vi phạm, không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
+Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useViolations()` (đếm `status === 'open'`), cùng nguồn với `/violations` — không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99. Số đếm hiển thị = số vi phạm `open` trừ đi các id đã đánh dấu "đã đọc" ở `/alerts` (`useReadAlertIds()` trong `src/hooks/use-read-alerts.ts`, nguồn `localStorage['safesight_read_alerts']`), để "Đánh dấu tất cả đã đọc" trên `/alerts` phản ánh đúng lên badge.
 
 | Route | File | Vai trò được xem | Nội dung |
 |---|---|---|---|
