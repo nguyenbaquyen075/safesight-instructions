@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { toChatItems } from '@/lib/chat-shape';
+import { askProgress, toChatItems } from '@/lib/chat-shape';
 import type { AgentEventView, AgentSettingsView, AgentTaskView, CameraAgentUpdate, CameraAgentView } from '@/types/agent';
 
 const qs = (o: Record<string, string | number | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
@@ -43,8 +43,6 @@ export function useAskAgent() {
   });
 }
 
-const QUIET_MS = 90_000;
-
 export type AskSubjectType = 'violation' | 'camera' | 'site' | 'system';
 
 // Một cuộc hỏi đáp với agent (dùng chung cho widget nổi, trang /agent và tab Agent trong modal):
@@ -56,13 +54,12 @@ export function useAskSession({ subjectType = 'system', subjectId }: { subjectTy
   const ask = useAskAgent();
   const { data: events = [] } = useAgentEvents({ sessionId: sessionId ?? undefined, limit: 200 }, { live: sentAt !== null, enabled: !!sessionId });
 
-  const ended = useMemo(() => events.some(e => e.type === 'session.ended' && sentAt !== null && new Date(e.emittedAt).getTime() > sentAt), [events, sentAt]);
-  // "Đang trả lời" = đã gửi, chưa thấy session.ended, và chưa im lặng quá 90s. Tick 5s để hết hạn 90s cũng tự tắt poll.
+  // Tick 5s để hết hạn 90s (askProgress) cũng tự tắt poll.
   const [tick, setTick] = useState(0);
   useEffect(() => { if (sentAt === null) return; const t = setInterval(() => setTick(n => n + 1), 5_000); return () => clearInterval(t); }, [sentAt]);
   void tick;
   // eslint-disable-next-line react-hooks/purity -- Date.now() chỉ dùng để tính "còn đang chờ" cho hiển thị; đồng hồ tick 5s đã ép re-render, không phải nguồn state
-  const working = sentAt !== null && !ended && Date.now() - sentAt < QUIET_MS;
+  const { working } = askProgress({ sentAt, events, now: Date.now() });
 
   useEffect(() => {
     if (sentAt !== null && !working) {

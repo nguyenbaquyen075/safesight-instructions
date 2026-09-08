@@ -31,9 +31,11 @@ export const makeDispatchToCamera = (ctx: ToolContext) => betaZodTool({
     if (!agent.isEnabled) return JSON.stringify({ dispatched: false, blockedReason: `subagent camera ${cameraId} đang tắt` });
     const dueAt = new Date(Date.now() + (minutes ?? 0) * 60_000);
     const { merged } = await scheduleTask({ kind: 'camera.instruction', subjectType: 'camera', subjectId: cameraId, reason: instruction, dueAt, priority: PRIORITY['camera.instruction'] });
-    const notes = await rememberCamera(cameraId, `Chỉ dẫn từ agent trưởng: ${instruction}`, ctx.sessionId);
+    // Task đã xếp xong; ghi trí nhớ thất bại (xung đột CAS với phiên của chính camera) không được biến lượt giao việc thành lỗi.
+    let memoryTotal: number | null = null;
+    try { memoryTotal = (await rememberCamera(cameraId, `Chỉ dẫn từ agent trưởng: ${instruction}`, ctx.sessionId)).length; } catch { memoryTotal = null; }
     ctx.spent.followups++;
-    await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: 'camera', subjectId: cameraId, type: 'action', data: { action: 'dispatch_to_camera', instruction, minutes: minutes ?? 0, merged } });
-    return JSON.stringify({ dispatched: true, dueAt: dueAt.toISOString(), replacedPending: merged, memoryTotal: notes.length });
+    await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: 'camera', subjectId: cameraId, type: 'action', data: { action: 'dispatch_to_camera', instruction, minutes: minutes ?? 0, merged, memoryWritten: memoryTotal !== null } });
+    return JSON.stringify({ dispatched: true, dueAt: dueAt.toISOString(), replacedPending: merged, memoryWritten: memoryTotal !== null, memoryTotal });
   }),
 });

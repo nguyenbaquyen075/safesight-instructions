@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { eventSummary, toChatItems } from '@/lib/chat-shape';
+import { askProgress, eventSummary, toChatItems } from '@/lib/chat-shape';
 import type { AgentEventView } from '@/types/agent';
 
 // Phần thuần cho widget chat với agent: đổi AgentEvent của một phiên hỏi đáp thành các
@@ -48,4 +48,17 @@ test('eventSummary renders the timeline text for each event type', () => {
   assert.equal(eventSummary(ev('message.user', { text: 'hi' })), '👤 hi');
   assert.equal(eventSummary(ev('session.ended', { stop: 'end_turn' })), 'kết thúc (end_turn)');
   assert.equal(eventSummary(ev('custom.type', {})), 'custom.type');
+});
+
+// Trạng thái chờ của một lượt hỏi: đã gửi, chưa thấy session.ended sau lúc gửi, chưa im lặng quá 90s.
+test('askProgress reports working until a session.ended after the send or 90s of silence', () => {
+  const sentAt = Date.parse('2026-09-08T08:00:00.000Z');
+  const at = (s: string) => Date.parse(s);
+  const endedBefore = { ...ev('session.ended', { stop: 'end_turn' }), emittedAt: '2026-09-08T07:59:00.000Z' };
+  const endedAfter = { ...ev('session.ended', { stop: 'end_turn' }), emittedAt: '2026-09-08T08:00:30.000Z' };
+  assert.deepEqual(askProgress({ sentAt: null, events: [], now: at('2026-09-08T08:00:10.000Z') }), { ended: false, working: false });
+  assert.deepEqual(askProgress({ sentAt, events: [endedBefore], now: at('2026-09-08T08:00:10.000Z') }), { ended: false, working: true });
+  assert.deepEqual(askProgress({ sentAt, events: [endedAfter], now: at('2026-09-08T08:00:40.000Z') }), { ended: true, working: false });
+  assert.deepEqual(askProgress({ sentAt, events: [], now: sentAt + 89_999 }), { ended: false, working: true });
+  assert.deepEqual(askProgress({ sentAt, events: [], now: sentAt + 90_000 }), { ended: false, working: false });
 });

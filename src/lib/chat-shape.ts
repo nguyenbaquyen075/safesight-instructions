@@ -42,3 +42,12 @@ export function toChatItems(events: AgentEventView[]): ChatItem[] {
   }
   return out;
 }
+
+export const QUIET_MS = 90_000;
+
+// Trạng thái một lượt hỏi: "đang trả lời" = đã gửi, chưa thấy session.ended SAU lúc gửi, và chưa im lặng quá 90s.
+export function askProgress({ sentAt, events, now }: { sentAt: number | null; events: AgentEventView[]; now: number }): { ended: boolean; working: boolean } {
+  if (sentAt === null) return { ended: false, working: false };
+  const ended = events.some(e => e.type === 'session.ended' && new Date(e.emittedAt).getTime() > sentAt);
+  return { ended, working: !ended && now - sentAt < QUIET_MS };
+}

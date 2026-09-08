@@ -11,6 +11,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 - `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1 tiếng Việt, thêm mục riêng về hình ảnh người lao động và secret vận hành), liên kết từ README và CONTRIBUTING.
 
+### Sửa
+- Đợt review trước v0.10.0 (`docs/review/2026-09-08-*`): `list_camera_agents` lọc trạng thái vi phạm chữ HOA như DB lưu (trước đó `openViolations` luôn 0), trả `status` chữ thường và `dailyTokenCap` mặc định 300 000; hai tool điều phối chỉ gắn vào phiên không thuộc camera nào (ask từ modal camera/vi phạm không còn điều phối được camera khác); `dispatch_to_camera` không báo lỗi khi ghi trí nhớ xung đột sau khi task đã xếp (`memoryWritten`); widget trợ lý chỉ hiện cho vai trò được vào `/agent`; toast dời lên góc phải trên để không đè panel chat; `CameraMonitoringCard` dùng `DEMO_CAMERA_IDS` chung thay tập id riêng từ `mockCameras`; `wiki/04` mô tả đúng Zone đã được engine dùng.
+
 ### Thay đổi
 - Ô hỏi đáp trên `/agent` và tab Agent trong modal camera/vi phạm/công trường chuyển sang dạng bong bóng chat (cùng `useAskSession` và `ChatThread` với widget); phần thuần `toChatItems`/`eventSummary` tách ra `src/lib/chat-shape.ts` có test. Toast dời lên `bottom-24` để không đè nút chat.
 

@@ -24,8 +24,10 @@ export function toolsFor(kind: string, ctx: ToolContext) {
 // Bộ tool CỐ ĐỊNH theo kind (thứ tự ổn định) để prompt cache không vỡ giữa các phiên cùng kind.
 function toolsForKind(kind: string, ctx: ToolContext) {
   const reads = [makeReadViolation(ctx), makeReadCameraHistory(ctx), makeReadSiteContext(ctx), makeSearchViolations(ctx), makeReadSystemHealth(ctx)];
-  // Điều phối subagent (list + dispatch) chỉ cho các kind toàn hệ thống, thêm ở CUỐI để không đổi thứ tự tool cũ.
-  const orchestration = [makeListCameraAgents(ctx), makeDispatchToCamera(ctx)];
+  // Điều phối subagent (list + dispatch) chỉ cho phiên toàn hệ thống (không thuộc camera nào) của các kind
+  // dưới đây, thêm ở CUỐI để không đổi thứ tự tool cũ. Ask từ modal camera/vi phạm chạy dưới subagent camera
+  // đó nên không được điều phối camera khác — cùng điều kiện với đoạn preamble "Subagent theo camera".
+  const orchestration = ctx.cameraId ? [] : [makeListCameraAgents(ctx), makeDispatchToCamera(ctx)];
   switch (kind) {
     case 'violation.review': return [...reads, makeRecordVerdict(ctx), makeEscalate(ctx), makeScheduleFollowup(ctx), makeWriteNote(ctx)];
     case 'followup': return [...reads, makeRecordVerdict(ctx), makeEscalate(ctx), makeScheduleFollowup(ctx), makeWriteNote(ctx)];

@@ -3,16 +3,21 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from 'next-auth/react';
+import { canAccessPath } from '@/lib/auth/permissions';
+import type { UserRole } from '@/types/enums';
 import { Bot, MessageCircle, X } from 'lucide-react';
 import { useAskSession } from '@/hooks/use-agent';
 import { ChatComposer, ChatThread } from './ChatThread';
 
 const GREETING = 'Xin chào! Em là Trợ lý SafeSight 🤖 Anh/chị cần hỏi gì về camera, vi phạm, cảnh báo hay tình trạng hệ thống?';
 
-// Widget chat nổi góc phải dưới, có mặt trên mọi trang dashboard trừ /agent (trang đó đã có ô hỏi riêng).
+// Widget chat nổi góc phải dưới, có mặt trên mọi trang dashboard trừ /agent (trang đó đã có ô hỏi riêng),
+// và chỉ cho các vai trò được vào /agent (cùng bảng PAGE_ROLES) — vai trò khác không thấy nút.
 // Nằm trong layout nên phiên hỏi đáp giữ nguyên khi đổi trang.
 export function AgentChatWidget() {
   const pathname = usePathname();
+  const { data: session, status } = useSession();
   const [open, setOpen] = useState(false);
   const chat = useAskSession({ subjectType: 'system' });
 
@@ -23,7 +28,7 @@ export function AgentChatWidget() {
     return () => window.removeEventListener('keydown', onKey);
   }, [open]);
 
-  if (pathname.startsWith('/agent')) return null;
+  if (pathname.startsWith('/agent') || status !== 'authenticated' || !canAccessPath(session?.user?.role as UserRole | undefined, '/agent')) return null;
 
   return (
     <div className="print:hidden">

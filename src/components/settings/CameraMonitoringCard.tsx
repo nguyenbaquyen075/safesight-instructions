@@ -9,11 +9,10 @@ import { SectionHeader, SettingCard } from './ui';
 import { useCameras, useDeleteCamera } from '@/hooks/use-cameras';
 import { CameraEditDialog } from './CameraEditDialog';
 import { parseCameraSource } from '@/lib/camera-source';
-import { mockCameras } from '@/data/mock-cameras';
+import { DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { CameraStatus } from '@/types/enums';
 import type { Camera } from '@/types/models';
 
-const DEMO_IDS = new Set(mockCameras.map((c) => c.id));
 
 function SourceBadge({ rtspUrl }: { rtspUrl: string }) {
   const parsed = parseCameraSource(rtspUrl);
@@ -47,8 +46,8 @@ export function CameraMonitoringCard({ variant = 'camera' }: CameraMonitoringCar
   const [editingCamera, setEditingCamera] = useState<Camera | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
 
-  const realCameras = allCameras?.filter((c) => !DEMO_IDS.has(c.id));
-  const demoCameras = allCameras?.filter((c) => DEMO_IDS.has(c.id));
+  const realCameras = allCameras?.filter((c) => !DEMO_CAMERA_IDS.has(c.id));
+  const demoCameras = allCameras?.filter((c) => DEMO_CAMERA_IDS.has(c.id));
 
   const handleAdd = () => {
     setEditingCamera(null);
@@ -61,7 +60,7 @@ export function CameraMonitoringCard({ variant = 'camera' }: CameraMonitoringCar
   };
 
   const handleDelete = async (camera: Camera) => {
-    const isDemo = DEMO_IDS.has(camera.id);
+    const isDemo = DEMO_CAMERA_IDS.has(camera.id);
     const warning = isDemo
       ? `Xoá ${noun} mẫu "${camera.name}"? Sẽ mất luôn lịch sử vi phạm demo gắn với ${noun} này, không phục hồi được. Cần khởi động lại hệ thống để có tác dụng.`
       : `Xoá ${noun} "${camera.name}"? Cần khởi động lại hệ thống để AI engine bỏ luồng này.`;
@@ -105,7 +104,7 @@ export function CameraMonitoringCard({ variant = 'camera' }: CameraMonitoringCar
         </div>
         <div className="p-4 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)]">
           <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">{isMic ? 'Mic mẫu (demo)' : 'Camera mẫu (demo)'}</p>
-          <p className="text-xl font-black text-[var(--text-muted)]">{demoCameras?.length ?? mockCameras.length}</p>
+          <p className="text-xl font-black text-[var(--text-muted)]">{demoCameras?.length ?? DEMO_CAMERA_IDS.size}</p>
         </div>
       </div>
 

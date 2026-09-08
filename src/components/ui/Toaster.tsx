@@ -30,7 +30,7 @@ export function Toaster() {
   }, []);
 
   return (
-    <div className="fixed bottom-24 right-6 z-[400] flex flex-col gap-2 pointer-events-none">
+    <div className="fixed top-20 right-6 z-[400] flex flex-col gap-2 pointer-events-none">
       {toasts.map((t) => (
         <div
           key={t.id}

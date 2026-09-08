@@ -216,13 +216,14 @@ cùng hàng đợi.
 | `write_note` | ghi | `subjectType, subjectId, note` | `{ ok }` |
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
 | `list_camera_agents` | đọc | — | `{ cameras: [{ cameraId, name, status, siteId, isEnabled, tokensUsedToday, dailyTokenCap, lastDigestAt, notes (3 ghi chú mới nhất), openViolations }] }` — chỉ trong phiên toàn hệ thống |
-| `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryTotal }` hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
+| `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryWritten, memoryTotal }` (task đã xếp thì ghi trí nhớ lỗi cũng không đổi thành lỗi) hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
 `camera.instruction` = như `camera.digest`; `ask` = tất cả. Các kind toàn hệ thống (`ask`, `shift.report`, `weekly.report`,
-`ops.escalate`) có thêm `list_camera_agents` + `dispatch_to_camera` ở cuối. Tool set cố định theo kind để cache prompt không vỡ;
+`ops.escalate`) có thêm `list_camera_agents` + `dispatch_to_camera` ở cuối — chỉ khi phiên **không thuộc camera nào**
+(`ctx.cameraId = null`); `ask` từ modal camera/vi phạm chạy dưới subagent camera đó nên không có hai tool này. Tool set cố định theo kind để cache prompt không vỡ;
 phiên thuộc một camera được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
 
 ## Skill (`agent/skills/<name>/SKILL.md`, nạp vào system prompt)

@@ -16,7 +16,7 @@ export const makeListCameraAgents = (ctx: ToolContext) => betaZodTool({
     const [cameras, agents, open] = await Promise.all([
       prisma.camera.findMany({ select: { id: true, name: true, status: true, siteId: true }, orderBy: { id: 'asc' } }),
       prisma.cameraAgent.findMany(),
-      prisma.violation.groupBy({ by: ['cameraId'], where: { status: { in: ['open', 'under_review'] } }, _count: { _all: true } }),
+      prisma.violation.groupBy({ by: ['cameraId'], where: { status: { in: ['OPEN', 'UNDER_REVIEW'] } } /* DB lưu chữ HOA */, _count: { _all: true } }),
     ]);
     const byId = new Map(agents.map(a => [a.id, a]));
     const openBy = new Map(open.map(o => [o.cameraId, o._count._all]));
@@ -24,8 +24,8 @@ export const makeListCameraAgents = (ctx: ToolContext) => betaZodTool({
       cameras: cameras.map(c => {
         const a = byId.get(c.id);
         return {
-          cameraId: c.id, name: c.name, status: c.status, siteId: c.siteId,
-          isEnabled: a?.isEnabled ?? true, tokensUsedToday: a?.tokensUsedToday ?? 0, dailyTokenCap: a?.dailyTokenCap ?? null,
+          cameraId: c.id, name: c.name, status: c.status.toLowerCase(), siteId: c.siteId,
+          isEnabled: a?.isEnabled ?? true, tokensUsedToday: a?.tokensUsedToday ?? 0, dailyTokenCap: a?.dailyTokenCap ?? 300_000, // mặc định của CameraAgent trong schema
           lastDigestAt: a?.lastDigestAt?.toISOString() ?? null,
           notes: parseMemory(a?.memory ?? '[]').slice(-3).map(n => n.text),
           openViolations: openBy.get(c.id) ?? 0,

@@ -104,9 +104,9 @@ xanh dương = hành động chính. Không dùng màu khác cho các ý này.
   Khi phiên đang chạy hiện bong bóng "Agent đang trả lời…" và poll 2s; im lặng 90s coi là xong. Cùng một `useAskSession` cho
   widget nổi, trang `/agent` và tab Agent trong modal.
 - **Widget trợ lý nổi** (`AgentChatWidget`, gắn ở layout dashboard, ẩn trên `/agent` và khi in): nút tròn 56px `gradient-primary`
-  góc phải dưới (`bottom-6 right-6`, `z-[150]` — dưới modal `z-[200]`, Toaster dời lên `bottom-24`); panel 380px cao ≤ 560px
+  góc phải dưới (`bottom-6 right-6`, `z-[150]` — dưới modal `z-[200]`; Toaster dời lên góc phải trên `top-20 right-6` để không đè panel); panel 380px cao ≤ 560px
   (`min(560px, 100vh − 7.5rem)`), dưới `sm` trải ngang màn trừ lề 16px; header `gradient-primary` chữ trắng với tiêu đề
-  "Trợ lý SafeSight", nút mở `/agent` (Bot) và nút đóng (X, Esc cũng đóng); mở bằng `animate-fade-up`; `role="dialog"` có `aria-label`.
+  "Trợ lý SafeSight", nút mở `/agent` (Bot) và nút đóng (X, Esc cũng đóng); mở bằng `animate-fade-up`; `role="dialog"` có `aria-label`; chỉ hiện cho vai trò được vào `/agent` (`canAccessPath`).
 - **Trạng thái rỗng/tải/lỗi** bắt buộc cho mọi khối: "Chưa có gì", skeleton `surface-elevated`, thông báo lỗi `danger-muted`.
 
 ## Thẻ subagent camera

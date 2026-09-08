@@ -44,14 +44,20 @@ test.beforeEach(async () => {
   await prisma.cameraAgent.create({ data: { id: CAM_B, usageDay: localDay(), isEnabled: false } });
 });
 
-test('list_camera_agents lists every camera with its subagent state and the latest notes', async () => {
+test('list_camera_agents lists every camera with its subagent state, open violations and the latest notes', async () => {
   for (let i = 0; i < 4; i++) await rememberCamera(CAM_A, `ghi chú ${i}`, 'older');
+  await prisma.violation.deleteMany({ where: { cameraId: CAM_A } });
+  await prisma.violation.create({ data: { cameraId: CAM_A, siteId: 'site-orch', type: 'hard_hat', severity: 'high', confidence: 0.9, bboxData: '[]', snapshotUrl: '/snapshots/orch.jpg', detectedAt: new Date() } }); // status mặc định 'OPEN' (DB lưu chữ HOA)
+  await prisma.violation.create({ data: { cameraId: CAM_A, siteId: 'site-orch', type: 'hard_hat', severity: 'high', confidence: 0.9, bboxData: '[]', snapshotUrl: '/snapshots/orch2.jpg', detectedAt: new Date(), status: 'RESOLVED' } });
   const out = await list();
   const a = out.cameras.find((c: { cameraId: string }) => c.cameraId === CAM_A);
   const b = out.cameras.find((c: { cameraId: string }) => c.cameraId === CAM_B);
   assert.equal(a.name, 'Cam A');
   assert.equal(a.isEnabled, true);
   assert.equal(a.tokensUsedToday, 1234);
+  assert.equal(a.openViolations, 1);
+  assert.equal(a.status, 'online'); // chữ thường cho model, như các tool đọc khác
+  assert.equal(b.dailyTokenCap, 300000); // mặc định schema, không phải null
   assert.deepEqual(a.notes, ['ghi chú 1', 'ghi chú 2', 'ghi chú 3']); // 3 ghi chú mới nhất, cũ → mới
   assert.equal(b.isEnabled, false);
   assert.deepEqual(b.notes, []);
@@ -89,6 +95,16 @@ test('dispatch_to_camera honours minutes, refuses a disabled subagent and an unk
   assert.ok(capped.blockedReason);
 });
 
+test('a second dispatch to the same camera replaces the pending instruction instead of queuing a duplicate', async () => {
+  const first = await dispatch({ cameraId: CAM_A, instruction: 'Chỉ dẫn thứ nhất cho camera A' });
+  assert.equal(first.replacedPending, false);
+  const second = await dispatch({ cameraId: CAM_A, instruction: 'Chỉ dẫn thứ hai thay chỉ dẫn thứ nhất' });
+  assert.equal(second.replacedPending, true);
+  const pending = await prisma.agentTask.findMany({ where: { kind: 'camera.instruction', subjectType: 'camera', subjectId: CAM_A, finishedAt: null } });
+  assert.equal(pending.length, 1);
+  assert.equal(pending[0].reason, 'Chỉ dẫn thứ hai thay chỉ dẫn thứ nhất');
+});
+
 test('a camera.instruction task runs a session even when the camera has no new activity', async () => {
   const task: LeasedTask = { id: 'task-orch-instr', kind: 'camera.instruction', subjectType: 'camera', subjectId: CAM_A, reason: 'Kiểm tra góc máy', budget: 6, attempts: 1, priority: 60, dueAt: new Date() };
   const client: SessionClient = { async *run() { yield { content: [{ type: 'text', text: 'Đã kiểm tra góc máy.' }], usage: { input_tokens: 50, output_tokens: 5 }, stop_reason: 'end_turn' }; } };
@@ -104,6 +120,8 @@ test('system-level sessions get the orchestration tools and preamble; camera-bou
   assert.ok(names('shift.report', null).includes('list_camera_agents'));
   assert.ok(!names('violation.review', CAM_A).includes('dispatch_to_camera'));
   assert.ok(!names('camera.instruction', CAM_A).includes('dispatch_to_camera'));
+  // ask từ modal camera/vi phạm chạy dưới subagent camera đó: không được điều phối camera khác
+  assert.ok(!names('ask', CAM_A).includes('dispatch_to_camera') && !names('ask', CAM_A).includes('list_camera_agents'));
   const system = await preambleFor({ id: 't', kind: 'ask', subjectType: 'system', subjectId: null, reason: 'hỏi', budget: 6, attempts: 1, priority: 500, dueAt: new Date() }, { userMessage: 'cam nào đang bận?' });
   assert.match(system, /list_camera_agents/);
   const bound = await preambleFor({ id: 't2', kind: 'camera.instruction', subjectType: 'camera', subjectId: CAM_A, reason: 'Kiểm tra góc máy', budget: 6, attempts: 1, priority: 60, dueAt: new Date() }, { cameraId: CAM_A });
