@@ -97,7 +97,8 @@ export function AlertsTable({
   }
 
   return (
-    <div className="w-full overflow-x-auto bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-sm">
+    <div className="w-full">
+    <div className="hidden md:block overflow-x-auto bg-[var(--surface)] border border-[var(--border)] rounded-xl shadow-sm">
       <table className="w-full text-left text-sm whitespace-nowrap">
         <thead className="bg-[var(--surface-hover)] border-b border-[var(--border)] text-[var(--text-muted)] font-medium">
           <tr>
@@ -220,6 +221,59 @@ export function AlertsTable({
           })}
         </tbody>
       </table>
+    </div>
+
+    {/* Thẻ danh sách dưới md, thay cho bảng */}
+    <div className="md:hidden space-y-3">
+      {alerts.map((alert) => {
+        const statusConfig = getStatusConfig(alert.status);
+        const violationTypeFormatted = alert.violation?.type.replace(/_/g, ' ') || 'Unknown Violation';
+
+        return (
+          <div
+            key={alert.id}
+            className="bg-[var(--surface)] border border-[var(--border)] rounded-xl p-4 space-y-2"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-[var(--text-primary)] capitalize truncate">
+                {violationTypeFormatted.toLowerCase()}
+              </span>
+              <span
+                className={cn(
+                  'flex-shrink-0 inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium border',
+                  statusConfig.classes
+                )}
+              >
+                {statusConfig.label}
+              </span>
+            </div>
+            <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-muted)]">
+              <span className="flex items-center gap-1 truncate">
+                {getChannelIcon(alert.channel)}
+                <span className="truncate">{alert.recipient}</span>
+              </span>
+              <span className="flex-shrink-0 flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {format(new Date(alert.createdAt), 'MMM d, HH:mm')}
+              </span>
+            </div>
+            <div className="flex items-center justify-end gap-2 pt-1">
+              {alert.status === AlertStatus.NEW && (
+                <button
+                  onClick={() => onAcknowledge(alert.id)}
+                  className="px-3 py-1.5 text-xs font-medium bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-md transition-colors"
+                >
+                  Acknowledge
+                </button>
+              )}
+              <button className="p-1.5 text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--surface-elevated)] rounded-md transition-colors">
+                <MoreVertical className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        );
+      })}
+    </div>
     </div>
   );
 }

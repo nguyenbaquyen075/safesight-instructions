@@ -38,5 +38,4 @@ Nguồn token giao diện: [`DESIGN.md`](../../DESIGN.md). Tài liệu này nêu
 
 ## Điểm còn yếu (đưa vào lộ trình)
 
-- Sidebar cố định 260px, chưa responsive dưới 768px; điện thoại bị cắt nội dung (ghi nhận, chưa sửa).
 - Trang Cài đặt có tab "Giám sát AI" và "Bảo mật" là mẫu tĩnh, dễ gây hiểu lầm là đã lưu.

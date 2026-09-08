@@ -10,6 +10,8 @@ Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng t�
 
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
+**Responsive & PWA:** trạng thái mở/thu gọn Sidebar và trạng thái mở drawer di động dùng chung một context (`src/components/layout/sidebar-context.tsx`, `SidebarProvider`/`useSidebar`). Dưới `md` (768px) Sidebar là drawer cố định ẩn ngoài màn hình (`-translate-x-full`), mở bằng nút hamburger ở Header (`aria-expanded`), có overlay tối đóng khi bấm ra ngoài, tự đóng khi đổi route; nút thu gọn chỉ hiện từ `md` trở lên. Nội dung chính bỏ margin trái dưới `md`, chỉ áp `md:ml-[260px]`/`md:ml-[68px]` khi ở màn lớn. Ba bảng dữ liệu chính (`ViolationsTable`, `AlertsTable`, `UserTable`) dùng `hidden md:block` cho bảng và một danh sách thẻ `md:hidden` (tên/loại + badge trạng thái, camera/thời gian, hành động) thay thế dưới `md`. Ứng dụng cài được như PWA: `public/manifest.webmanifest` (icon `public/icons/icon-192.png`/`icon-512.png` sinh một lần bằng `node scripts/make-icons.mjs` từ `wiki/assets/safesight-logo.svg`), `public/sw.js` (network-first cho điều hướng, bỏ qua `/api/` và `/snapshots/`) đăng ký trong `Providers.tsx` chỉ khi `NODE_ENV === 'production'`.
+
 Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViolationCount()` (`GET /api/violations/count` trả `{ open, openIds }` theo phạm vi site, chỉ id, không join) — không tải cả danh sách vi phạm, không còn đọc `localStorage['safesight_alerts']`. Số hiển thị = vi phạm `open` trừ các id đã đánh dấu "đã đọc" ở `/alerts` (`useReadAlertIds()` trong `src/hooks/use-read-alerts.ts`, nguồn `localStorage['safesight_read_alerts']`), nên "Đánh dấu tất cả đã đọc" phản ánh đúng lên badge. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
 
 | Route | File | Vai trò được xem | Nội dung |
@@ -96,7 +98,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 
 ## Component chính (`src/components/`)
 
-- **layout/** — `Sidebar.tsx`, `Header.tsx`
+- **layout/** — `Sidebar.tsx` (drawer di động + thu gọn), `Header.tsx` (hamburger dưới `md`), `sidebar-context.tsx` (`SidebarProvider`/`useSidebar`)
 - **dashboard/** — `AlertTimeline.tsx`, `ComplianceChart.tsx`, `SiteStatusGrid.tsx`, `ViolationDonut.tsx`
 - **cameras/** — `CameraCard.tsx`, `CameraGrid.tsx`, `MicButton.tsx`, `WebcamPreview.tsx`
 - **violations/** — `ViolationsTable.tsx`, `ViolationDetailModal.tsx`

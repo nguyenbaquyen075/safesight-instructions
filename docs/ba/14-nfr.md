@@ -35,7 +35,7 @@ Trạng thái: ✅ đã đáp ứng ở v0.6.0 · 🟡 một phần · 🔲 chư
 |---|---|---|---|
 | NFR-17 | Màu sắc: nền tối theo `DESIGN.md`; đỏ = vi phạm, vàng = cảnh báo, xanh lá = an toàn, xanh dương = hành động chính; tương phản chữ ≥ 4.5:1 | ✅ | |
 | NFR-18 | Quốc tế hoá: giao diện, thông báo, tài liệu tiếng Việt; định danh code, commit tiếng Anh; sẵn sàng thêm ngôn ngữ (chưa có i18n framework) | 🟡 | |
-| NFR-19 | Dễ sử dụng: thao tác chính ≤ 2 chạm; form ≤ 5 trường bắt buộc; có trạng thái tải / trống / lỗi; focus ring cho bàn phím | 🟡 | Sidebar chưa responsive < 768px |
+| NFR-19 | Dễ sử dụng: thao tác chính ≤ 2 chạm; form ≤ 5 trường bắt buộc; có trạng thái tải / trống / lỗi; focus ring cho bàn phím; responsive dưới 768px (sidebar drawer, bảng → thẻ) và cài đặt được như PWA | ✅ | |
 | NFR-20 | Backup: SQLite `dev.db` và thư mục `public/snapshots` sao lưu hằng ngày; Docker dùng volume `/app/data`; production chuyển PostgreSQL có backup tự động | 🔲 | Quy trình backup chưa viết |
 | NFR-21 | Khả năng vận hành: một lệnh `npm run dev` chạy 4 tiến trình; tiến trình Python / agent tự chạy lại khi thoát; `/health` cho bridge và agent | ✅ | |
 | NFR-22 | Khả năng kiểm thử: 45 test agent chạy trên SQLite tạm; CI lint / types / tests; nghiệm thu model bằng tỉ lệ báo oan / bỏ sót | ✅ | |

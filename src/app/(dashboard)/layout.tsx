@@ -8,9 +8,11 @@ import { useSession } from 'next-auth/react';
 import { ShieldAlert } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { SidebarProvider, useSidebar } from '@/components/layout/sidebar-context';
 import { Toaster } from '@/components/ui/Toaster';
 import { canAccessPath } from '@/lib/auth/permissions';
 import { UserRole } from '@/types/enums';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
   children,
@@ -47,9 +49,36 @@ export default function DashboardLayout({
   const { title, subtitle } = getHeaderInfo();
 
   return (
+    <SidebarProvider>
+      <DashboardShell title={title} subtitle={subtitle} allowed={allowed}>
+        {children}
+      </DashboardShell>
+    </SidebarProvider>
+  );
+}
+
+function DashboardShell({
+  title,
+  subtitle,
+  allowed,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  allowed: boolean;
+  children: React.ReactNode;
+}) {
+  const { collapsed } = useSidebar();
+
+  return (
     <div className="flex min-h-screen bg-[var(--background)]">
       <Sidebar />
-      <div className="flex-1 ml-[260px] print:ml-0 flex flex-col transition-all duration-300">
+      <div
+        className={cn(
+          'flex-1 flex flex-col transition-all duration-300 ml-0 print:ml-0',
+          collapsed ? 'md:ml-[68px]' : 'md:ml-[260px]'
+        )}
+      >
         <Header title={title} subtitle={subtitle} />
         <main className="flex-1 p-6 overflow-y-auto">
           {allowed ? children : (
