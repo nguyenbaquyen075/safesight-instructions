@@ -4,6 +4,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-08
+
 ### Thêm
 - **Loa công trường tự động**: bridge có `POST /announce` (`{ cameraId, text }`, cùng header
   `X-AI-Engine-Secret` như `/detections`) phát sự kiện `voice-announce` vào room `camera-<id>`
@@ -207,7 +209,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - Khởi tạo dự án: Next.js dashboard, Prisma, AI engine YOLOv8 và YOLO Bridge Socket.IO.
 
-[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...v0.8.0
