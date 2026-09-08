@@ -18,10 +18,11 @@ Trang chủ tài liệu nội bộ của dự án `safesight-instructions`. Dùn
 | 07 | [Lộ trình phát triển](07-lo-trinh-phat-trien.md) | Đã xong, ưu tiên tiếp theo, câu hỏi mở |
 | 08 | [Train lại model găng/giày](08-train-model-them-ppe.md) | Vì sao và cách train lại, nghiệm thu |
 | 09 | [Agent giám sát tự động](09-agent.md) | Trực vận hành + cán bộ an toàn + hỏi đáp, hàng đợi `AgentTask`, bằng chứng/band, tool, panel `/agent` |
+| 10 | [Lịch sử phát triển](10-lich-su-phat-trien.md) | Dòng thời gian các mốc theo ngày và phiên bản |
 
 ## ⚡ Tóm tắt nhanh
 
-- **Trạng thái:** 🟡 MVP đang phát triển (v0.1.0).
+- **Trạng thái:** 🟡 MVP đang phát triển (v0.8.0).
 - **Chạy:** `npm run dev` khởi động 4 tiến trình — Next.js (3000) + YOLO Bridge (4001) + AI engine Python + Agent (4002 nội bộ).
 - **Giao diện:** 11 trang trong dashboard, thiếu `/reports` và `/profile`.
 - **API:** 19 route, tất cả đã nối DB thật (Prisma + SQLite dev).

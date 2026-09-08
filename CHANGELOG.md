@@ -4,6 +4,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-09-08
+
 ### Thêm
 - Subagent giám sát theo camera: model `CameraAgent` (bật/tắt, trí nhớ ≤ 20 ghi chú, trần token riêng, nhịp tổng hợp), tool `remember_camera`, phiên nghiên cứu của vi phạm/camera chạy dưới subagent của camera đó, `camera.digest` định kỳ bỏ qua khi không có hoạt động mới, lane nghiên cứu chạy song song 3 phiên (mỗi camera một phiên). API `GET /api/agent/cameras`, `PATCH /api/agent/cameras/[id]`, `POST /api/agent/cameras/[id]/digest`; thẻ subagent trên `/agent` và trí nhớ trong tab Agent của modal camera.
 - Skill của agent chuyển sang chuẩn `agent/skills/<name>/SKILL.md` (frontmatter `name`/`description`, bảng chỉ mục tự sinh); skill mới `remembering-camera-context` viết theo quy trình kiểm thử skill (baseline không skill → viết → kiểm lại).
@@ -128,7 +130,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - Khởi tạo dự án: Next.js dashboard, Prisma, AI engine YOLOv8 và YOLO Bridge Socket.IO.
 
-[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.4.0...v0.5.0
