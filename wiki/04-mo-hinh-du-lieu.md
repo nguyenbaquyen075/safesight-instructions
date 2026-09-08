@@ -32,6 +32,7 @@ CameraAgent (1 dòng/camera: subagent riêng của camera)
 | `User` | Người dùng | `role`, `assignedSites` JSON array, `passwordHash` (Credentials login) |
 | `AuditLog` | Nhật ký thao tác | chưa có UI đọc |
 | `TelegramSettings` | Cấu hình bot Telegram dùng chung | `botTokenEncrypted` (AES-256-GCM, khoá `TELEGRAM_ENCRYPT_KEY`), `isEnabled` |
+| `ZaloSettings` | Cấu hình Zalo OA dùng chung | `accessTokenEncrypted` (AES-256-GCM, cùng khoá `TELEGRAM_ENCRYPT_KEY`), `isEnabled` |
 | `AgentTask` | Hàng đợi việc của agent | `kind`, lane suy từ kind, `priority`, `budget` (số tool call tối đa/phiên), `attempts`, `dueAt`/`leasedUntil` (lease), `sessionId`, `outcome`; xem [Agent giám sát tự động](09-agent.md) |
 | `AgentEvent` | Audit + lịch sử hội thoại agent | `sessionId`, `taskId?`, `subjectType?/subjectId?`, `type` (`tool.call`/`tool.result`/`verdict`/`action`/`message.user`/`message.assistant`/`health`/`error`/`report`/`session.ended`), `data` (JSON string) |
 | `AgentSettings` | Cấu hình agent (1 dòng) | `isEnabled` (kill switch), `model`, `reviewEffort`, `dailyTokenCap`, `shiftReportAt` |

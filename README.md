@@ -96,6 +96,16 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # đầu lưu token nếu thiếu, sinh bằng
                       # `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
                       #
+                      # WEBHOOK_SECRET (bắt buộc nếu dùng kênh cảnh báo webhook — ký body JSON
+                      # bằng HMAC-SHA256, gửi ở header X-SafeSight-Signature; thiếu thì kênh
+                      # webhook bỏ qua chứ không gửi bản chưa ký, sinh bằng
+                      # `openssl rand -base64 32`)
+                      #
+                      # PUBLIC_BASE_URL (tuỳ chọn — URL công khai của dashboard; có thì cảnh báo
+                      # Zalo OA gửi kèm ảnh snapshot và webhook nhận snapshotUrl tuyệt đối, không
+                      # có thì Zalo chỉ gửi chữ. Access token Zalo OA lưu trong DB qua trang
+                      # /settings, mã hoá bằng chính TELEGRAM_ENCRYPT_KEY)
+                      #
                       # ROBOFLOW_API_KEY (tuỳ chọn — chỉ cần nếu dùng Roboflow Workflow để
                       # đối chiếu kết quả trên ảnh tĩnh, xem mục "Đối chiếu bằng Roboflow
                       # Workflow" bên dưới; lấy ở app.roboflow.com/settings/api)

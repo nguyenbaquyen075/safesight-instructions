@@ -23,6 +23,7 @@ import {
 import { cn } from '@/lib/utils';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { TelegramBotCard } from '@/components/settings/TelegramBotCard';
+import { ZaloOaCard } from '@/components/settings/ZaloOaCard';
 import { AlertRulesCard } from '@/components/settings/AlertRulesCard';
 import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard';
 
@@ -272,6 +273,7 @@ export default function SettingsPage() {
                 </div>
               </SettingCard>
               <TelegramBotCard />
+              <ZaloOaCard />
               <AlertRulesCard />
             </div>
           )}

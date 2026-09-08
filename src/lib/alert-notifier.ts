@@ -2,13 +2,12 @@
 
 import type { Camera, Violation } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
-import { decrypt } from '@/lib/crypto';
-import { TelegramClient, type TelegramResult } from '@/lib/telegram';
-import { AlertChannel } from '@/types/enums';
+import { senderFor, recipientsForChannel } from '@/lib/alert-channels';
 import { getViolationTypeLabel } from '@/lib/utils';
 
 interface MatchedRule {
   id: string;
+  channels: string[];
   recipients: string[];
   cooldownSec: number;
   threshold: number;
@@ -29,18 +28,20 @@ async function findMatchingRules(violation: Violation, camera: Camera): Promise<
   });
 
   return rules
-    .filter((rule) => {
-      const channels = parseJsonArray(rule.channels);
-      if (!channels.includes(AlertChannel.TELEGRAM)) return false;
-      const violationTypes = parseJsonArray(rule.violationTypes);
-      return violationTypes.length === 0 || violationTypes.includes(violation.type);
-    })
     .map((rule) => ({
       id: rule.id,
+      // Chỉ giữ kênh đã nối sender (telegram/zalo/webhook); SMS, email… trong
+      // enum vẫn chưa gửi được nên bỏ qua.
+      channels: parseJsonArray(rule.channels).filter((channel) => senderFor(channel)),
       recipients: parseJsonArray(rule.recipients),
       cooldownSec: rule.cooldownSec,
       threshold: rule.threshold,
-    }));
+      violationTypes: parseJsonArray(rule.violationTypes),
+    }))
+    .filter((rule) => {
+      if (rule.channels.length === 0) return false;
+      return rule.violationTypes.length === 0 || rule.violationTypes.includes(violation.type);
+    });
 }
 
 // threshold<=1 (mặc định) = báo ngay vi phạm đầu tiên, bỏ qua bước đếm.
@@ -68,51 +69,52 @@ async function isInCooldown(rule: MatchedRule): Promise<boolean> {
   return elapsedSec < rule.cooldownSec;
 }
 
-async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, botToken: string, captionOverride?: string): Promise<void> {
-  const client = new TelegramClient(botToken);
+function buildCaption(violation: Violation, camera: Camera): string {
   // Lần đầu chỉ là nhắc nhở; còn tái phạm (occurrenceCount >= 2) mới tính là vi phạm chính thức.
   const title =
     violation.occurrenceCount <= 1
       ? '⚠️ Nhắc nhở vi phạm ATLĐ'
       : `🚨 Vi phạm ATLĐ (lần ${violation.occurrenceCount})`;
-  const caption = captionOverride ??
+  return (
     `<b>${title}</b>\n` +
     `Loại vi phạm: ${getViolationTypeLabel(violation.type)}\n` +
     `Camera: ${camera.name}\n` +
-    `Thời gian: ${violation.detectedAt.toISOString()}`;
+    `Thời gian: ${violation.detectedAt.toISOString()}`
+  );
+}
 
-  for (const chatId of rule.recipients) {
-    let result: TelegramResult;
-    try {
-      result = await client.sendPhoto(chatId, violation.snapshotUrl, caption);
-    } catch (err) {
-      result = { ok: false, description: err instanceof Error ? err.message : String(err) };
+async function sendToRecipients(rule: MatchedRule, violation: Violation, camera: Camera, caption: string): Promise<void> {
+  for (const channel of rule.channels) {
+    const sender = senderFor(channel);
+    if (!sender) continue;
+    for (const recipient of recipientsForChannel(channel, rule.recipients)) {
+      const result = await sender.send({ violation, camera, recipient, caption });
+      // Kênh chưa cấu hình / đang tắt: không ghi Alert, để cooldown không bị
+      // khoá bởi một lần "gửi" chưa từng xảy ra.
+      if (result.skipped) continue;
+      // status không set -> dùng default "NEW" của Prisma, giống cách Violation.create() không set status
+      await prisma.alert.create({
+        data: {
+          violationId: violation.id,
+          ruleId: rule.id,
+          channel,
+          recipient,
+          errorMessage: result.ok ? null : (result.error ?? 'Gửi thất bại'),
+        },
+      });
     }
-    // status không set -> dùng default "NEW" của Prisma, giống cách Violation.create() không set status
-    await prisma.alert.create({
-      data: {
-        violationId: violation.id,
-        ruleId: rule.id,
-        channel: AlertChannel.TELEGRAM,
-        recipient: chatId,
-        errorMessage: result.ok ? null : result.description,
-      },
-    });
   }
 }
 
 export async function notifyViolation(violation: Violation, camera: Camera, opts: { caption?: string } = {}): Promise<void> {
-  const settings = await prisma.telegramSettings.findFirst();
-  if (!settings || !settings.isEnabled || !settings.botTokenEncrypted) return;
-
   const rules = await findMatchingRules(violation, camera);
   if (rules.length === 0) return;
 
-  const botToken = decrypt(settings.botTokenEncrypted);
+  const caption = opts.caption ?? buildCaption(violation, camera);
 
   for (const rule of rules) {
     if (await isBelowThreshold(rule, violation, camera)) continue;
     if (await isInCooldown(rule)) continue;
-    await sendToRecipients(rule, violation, camera, botToken, opts.caption);
+    await sendToRecipients(rule, violation, camera, caption);
   }
 }

@@ -144,6 +144,15 @@ sách rỗng = xoá hết vùng, AI xét lại toàn khung hình.
 | 3 | Kiểm tra kết nối | button | — | — | Gọi `getMe`; thành công hiện tên bot, thất bại hiện lỗi |
 | 4 | Lưu | button | — | — | Thiếu `TELEGRAM_ENCRYPT_KEY` → lỗi rõ ràng |
 
+Thẻ **Zalo OA** nằm ngay dưới, cùng bố cục:
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Bật cảnh báo Zalo | switch | — | tắt | |
+| 2 | Access Token | password | Có khi lưu lần đầu | "Đã cấu hình" nếu có | Mã hoá AES-256-GCM trước khi lưu; token OA hết hạn sau 25 giờ, nhập lại khi cần |
+| 3 | Kiểm tra kết nối | button | — | — | Gọi `getoa`; thành công hiện thông tin OA, thất bại hiện lỗi Zalo |
+| 4 | Lưu | button | — | — | Chỉ SUPER_ADMIN/ORG_ADMIN |
+
 ## SCR-15 Cài đặt — tab Thông báo: Quy tắc cảnh báo (dialog)
 
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
@@ -151,8 +160,8 @@ sách rỗng = xoá hết vùng, AI xét lại toàn khung hình.
 | 1 | Tên quy tắc | free text | Có | trống | Ví dụ "Cảnh báo thiếu mũ bảo hộ" |
 | 2 | Công trường | dropdown (danh mục Site được phép) | Có | site đang chọn | Quản lý công trường chỉ thấy site được gán |
 | 3 | Loại vi phạm | checkbox nhiều lựa chọn (`ViolationType`) | Không | trống = mọi loại | |
-| 4 | Kênh gửi | checkbox (`AlertChannel`) | Có | Telegram | Chỉ Telegram đã nối; chọn Telegram thì mục 5 bắt buộc |
-| 5 | Người nhận (chat_id) | danh sách free text | Có khi kênh Telegram | trống | Chỉ số, có thể `-` ở đầu cho group; ≥ 1 giá trị |
+| 4 | Kênh gửi | checkbox (`AlertChannel`) | Có | Telegram | Đã nối: Telegram, Zalo OA, Webhook; mỗi kênh bật lên hiện một ô người nhận riêng ở mục 5 và bắt buộc ≥ 1 giá trị |
+| 5 | Người nhận theo kênh | danh sách free text (một khối cho mỗi kênh đang bật) | Có với mọi kênh đã nối đang bật | trống | Telegram: chat_id chỉ số, có thể `-` ở đầu cho group. Zalo OA: user id chỉ số. Webhook: URL `https://`. Lưu chung `recipients` với tiền tố kênh (`zalo:`, `webhook:`); mục không tiền tố là chat_id Telegram của quy tắc cũ |
 | 6 | Ngưỡng (số vi phạm) | number | — | 1 | Số nguyên ≥ 1 |
 | 7 | Cooldown (giây) | number | — | 300 | Số nguyên ≥ 0 |
 | 8 | Kích hoạt quy tắc | switch | — | bật | |

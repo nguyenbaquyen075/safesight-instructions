@@ -24,7 +24,7 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm |
 | `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
-| `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo |
+| `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, Zalo OA, quy tắc cảnh báo |
 | `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), ô hỏi toàn hệ thống, capabilities |
 | `/reports`, `/profile` | — | — | ❌ Chưa có |
 
@@ -35,7 +35,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | Route | Method | Ghi chú |
 |---|---|---|
 | `/api/auth/[...nextauth]` | * | NextAuth handler |
-| `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session) rồi gọi `notifyViolation()` (Telegram) |
+| `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session) rồi gọi `notifyViolation()` (Telegram / Zalo OA / webhook ký HMAC) |
 | `/api/violations/count` | GET | Cần session; `{ open, openIds }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
@@ -48,6 +48,8 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/alert-rules/[id]` | PATCH, DELETE | |
 | `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt |
 | `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
+| `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt |
+| `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
@@ -67,6 +69,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useUsers` | `use-users.ts` | `/api/users` |
 | `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |
 | `useTelegramSettings` + mutation | `use-telegram-settings.ts` | `/api/settings/telegram` |
+| `useZaloSettings` + mutation | `use-zalo-settings.ts` | `/api/settings/zalo` |
 | `useDashboardKPIs`, `useComplianceTrend`, `useViolationBreakdown` | `use-dashboard.ts` | Tính từ `useViolations` (không có API riêng); số camera online lấy từ `src/data/mock-cameras.ts` |
 | `useRealSitesFromCameras` | `use-real-sites.ts` | Gom site từ roster camera + vi phạm thật |
 | `useYolo` | `useYolo.ts` | Socket.IO → YOLO Bridge (`NEXT_PUBLIC_YOLO_SERVER_URL`) |
@@ -81,7 +84,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 - **cameras/** — `CameraCard.tsx`, `CameraGrid.tsx`, `MicButton.tsx`, `WebcamPreview.tsx`
 - **violations/** — `ViolationsTable.tsx`, `ViolationDetailModal.tsx`
 - **alerts/** — `AlertsTable.tsx`
-- **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx`, `ui.tsx`
+- **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `ZaloOaCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx` (người nhận nhập theo từng kênh đang bật), `ui.tsx`
 - **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
 - **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx`, `CameraAgentCard.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`). `SubjectAgentPanel` với `subjectType="camera"` hiện thêm khối đầu panel: trạng thái subagent (bật/tắt), token hôm nay/trần, digest gần nhất và **toàn bộ** trí nhớ camera — lấy từ `useCameraAgents()` lọc theo `cameraId` (không gọi API này ở modal vi phạm/công trường)
 - **ui/** — shadcn/Radix primitives, `Toaster.tsx` · **Providers.tsx** — React Query + session

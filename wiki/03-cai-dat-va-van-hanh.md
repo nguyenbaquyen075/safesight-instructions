@@ -37,7 +37,9 @@ npm run db:seed
 | `NEXTAUTH_SECRET` | ✅ | NextAuth v5 |
 | `NEXT_PUBLIC_YOLO_SERVER_URL` | ✅ | `http://localhost:4001` — thiếu thì UI không nối bridge |
 | `AI_ENGINE_SECRET` | ✅ | `POST /api/violations` từ chối request thiếu header `X-AI-Engine-Secret` khớp giá trị này (`openssl rand -base64 24`) |
-| `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram trong DB (32 byte base64) |
+| `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram **và** access token Zalo OA trong DB (32 byte base64) |
+| `WEBHOOK_SECRET` | bắt buộc nếu dùng kênh webhook | Ký body JSON (HMAC-SHA256) gửi ở header `X-SafeSight-Signature`; thiếu thì kênh webhook bỏ qua, không gửi bản chưa ký |
+| `PUBLIC_BASE_URL` | tuỳ chọn | URL công khai của dashboard; có thì Zalo gửi kèm ảnh snapshot và webhook nhận `snapshotUrl` tuyệt đối, không có thì Zalo chỉ gửi chữ |
 | `ROBOFLOW_API_KEY` | tuỳ chọn | Chỉ cần cho trang `/roboflow` và script đối chiếu ảnh tĩnh |
 | `NEXT_API_URL` | tuỳ chọn | AI engine gọi Next.js ở đâu (mặc định `http://localhost:3000`) |
 | `AGENT_BRIDGE_SECRET` | bắt buộc để poke/ask agent | Next gọi `POST http://127.0.0.1:4002/internal/*`; thiếu ở Next thì không gọi (task vẫn nằm hàng đợi), thiếu ở agent thì route trả 401 |

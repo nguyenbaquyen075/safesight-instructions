@@ -40,7 +40,9 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-TG-01 | TelegramSettings | Cảnh báo | Cấu hình bot Telegram | S | Basic | Token mã hoá AES-256-GCM | v0.6 |
 | F-TG-02 | TelegramSettings | Cảnh báo | Kiểm tra kết nối bot | S | Other | Gọi `getMe` | v0.6 |
 | F-TG-03 | Alert | Cảnh báo | Gửi cảnh báo Telegram theo quy tắc | M | Workflow | Ngưỡng, cooldown; nhắc nhở lần 1, leo thang từ lần 2 | v0.6 |
-| F-TG-04 | Alert | Cảnh báo | Gửi cảnh báo SMS / Email / Webhook | M | Other | Enum có, chưa nối | P3 |
+| F-TG-04 | Alert | Cảnh báo | Gửi cảnh báo Zalo OA và Webhook ký HMAC | M | Workflow | Zalo OA `message/cs`; webhook POST JSON kèm `X-SafeSight-Signature` | v0.9 |
+| F-TG-05 | ZaloSettings | Cảnh báo | Cấu hình + kiểm tra kết nối Zalo OA | S | Basic | Access token mã hoá AES-256-GCM, kiểm bằng `getoa` | v0.9 |
+| F-TG-06 | Alert | Cảnh báo | Gửi cảnh báo SMS / Email | M | Other | Enum có, chưa nối | P3 |
 | F-VOICE-01 | Camera | Cảnh báo giọng nói | Ghi âm và phát tới loa công trường | M | Workflow | Mic trên camera đang vi phạm và trong modal vi phạm | v0.6 |
 | F-VOICE-02 | Camera | Cảnh báo giọng nói | Nhận và phát audio tại loa | S | Workflow | Trang `/site-speaker` theo camera | v0.6 |
 | F-AN-01 | Violation | Phân tích | Xem xu hướng tuân thủ | M | Advanced | Recharts | v0.6 |
