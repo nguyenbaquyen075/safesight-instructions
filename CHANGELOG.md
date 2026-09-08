@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- Hai kênh cảnh báo mới bên cạnh Telegram: **Zalo OA** (model `ZaloSettings`, access token mã hoá AES-256-GCM, thẻ "Zalo OA" trong `/settings` với nút kiểm tra kết nối `getoa`, API `GET/POST /api/settings/zalo` và `POST /api/settings/zalo/test`) và **Webhook** (POST JSON `{ event, violation, camera, site, snapshotUrl }` kèm header `X-SafeSight-Signature: sha256=<HMAC-SHA256 body bằng WEBHOOK_SECRET>`, timeout 5s). `alert-notifier.ts` tách thành `src/lib/alert-channels/{index,telegram,zalo,webhook}.ts` theo interface `AlertSender`; `Alert.channel` ghi đúng kênh đã gửi. Dialog quy tắc cảnh báo hiện ô người nhận riêng cho từng kênh đang bật (chat_id / Zalo user id / URL https); `AlertRule.recipients` giữ nguyên một mảng, mục của kênh mới mang tiền tố `zalo:` / `webhook:` nên quy tắc Telegram cũ không phải sửa gì.
+
 ### Thay đổi
 - 5 skill của agent (`agent/skills/*/SKILL.md`) viết lại hoàn toàn bằng tiếng Anh theo chuẩn writing-skills (frontmatter "Use when…", Overview, Quick reference, Common mistakes); kiểm bằng kịch bản review vi phạm không skill → có skill (quan sát đúng kind chuẩn, không bịa `kind` cho `schedule_followup`, leo thang đúng luật).
 

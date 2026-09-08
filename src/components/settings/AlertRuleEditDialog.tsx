@@ -7,9 +7,48 @@ import { X, Plus, Trash2 } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { ViolationType, AlertChannel } from '@/types/enums';
-import { chatIdSchema } from '@/lib/validation/alert-rule';
+import {
+  recipientSchema,
+  recipientsForChannel,
+  formatRecipient,
+  SENDABLE_CHANNELS,
+  type SendableChannel,
+} from '@/lib/validation/alert-rule';
 import { useCreateAlertRule, useUpdateAlertRule, type AlertRuleView } from '@/hooks/use-alert-rules';
 import { Switch } from './ui';
+
+// Mỗi kênh có một dạng người nhận riêng; recipients lưu chung một mảng nên
+// mục của Zalo/Webhook mang tiền tố kênh (xem parseRecipient).
+const RECIPIENT_HINTS: Record<SendableChannel, { name: string; label: string; placeholder: string; hint: React.ReactNode }> = {
+  [AlertChannel.TELEGRAM]: {
+    name: 'Telegram',
+    label: 'Chat ID người nhận Telegram',
+    placeholder: 'VD: 123456789 hoặc -1001234567890',
+    hint: (
+      <>
+        Cá nhân: nhắn <code>@userinfobot</code> hoặc <code>/start</code> bot rồi gọi <code>getUpdates</code>.
+        Nhóm: thêm bot vào group trước, <code>getUpdates</code> mới ra id âm (<code>@userinfobot</code> không dùng được cho group).
+      </>
+    ),
+  },
+  [AlertChannel.ZALO]: {
+    name: 'Zalo OA',
+    label: 'Zalo user id người nhận',
+    placeholder: 'VD: 1234567890123456',
+    hint: <>Chỉ gồm chữ số. Lấy trong Zalo OA Open Platform (người dùng phải đã quan tâm OA thì mới nhận được tin).</>,
+  },
+  [AlertChannel.WEBHOOK]: {
+    name: 'Webhook',
+    label: 'URL webhook nhận sự kiện',
+    placeholder: 'https://hooks.example.com/safesight',
+    hint: (
+      <>
+        Bắt buộc https. Body JSON được ký HMAC-SHA256 bằng <code>WEBHOOK_SECRET</code>, gửi ở header{' '}
+        <code>X-SafeSight-Signature</code>.
+      </>
+    ),
+  },
+};
 
 interface AlertRuleEditDialogProps {
   rule: AlertRuleView | null;
@@ -30,7 +69,7 @@ const EMPTY_FORM = {
 
 export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRuleEditDialogProps) {
   const [form, setForm] = useState(EMPTY_FORM);
-  const [chatIdInput, setChatIdInput] = useState('');
+  const [recipientInputs, setRecipientInputs] = useState<Record<string, string>>({});
   const createRule = useCreateAlertRule();
   const updateRule = useUpdateAlertRule();
 
@@ -53,27 +92,34 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
             }
           : EMPTY_FORM
       );
-      setChatIdInput('');
+      setRecipientInputs({});
     }
   }
 
   const toggleInArray = (arr: string[], value: string): string[] =>
     arr.includes(value) ? arr.filter((v) => v !== value) : [...arr, value];
 
-  const addChatId = () => {
-    const parsed = chatIdSchema.safeParse(chatIdInput.trim());
+  const addRecipient = (channel: SendableChannel) => {
+    const value = (recipientInputs[channel] ?? '').trim();
+    const parsed = recipientSchema.safeParse(formatRecipient(channel, value));
     if (!parsed.success) {
       toast(parsed.error.issues[0].message, 'error');
       return;
     }
-    if (form.recipients.includes(parsed.data)) return;
-    setForm({ ...form, recipients: [...form.recipients, parsed.data] });
-    setChatIdInput('');
+    // So sánh theo giá trị đã bỏ tiền tố: chat_id cũ lưu không tiền tố, thêm lại
+    // cùng số thì không được tạo dòng thứ hai.
+    if (!recipientsForChannel(channel, form.recipients).includes(value)) {
+      setForm({ ...form, recipients: [...form.recipients, formatRecipient(channel, value)] });
+    }
+    setRecipientInputs({ ...recipientInputs, [channel]: '' });
   };
 
   const handleSave = async () => {
-    if (form.channels.includes(AlertChannel.TELEGRAM) && form.recipients.length === 0) {
-      toast('Cần ít nhất 1 người nhận khi bật kênh Telegram', 'error');
+    const missing = SENDABLE_CHANNELS.find(
+      (channel) => form.channels.includes(channel) && recipientsForChannel(channel, form.recipients).length === 0
+    );
+    if (missing) {
+      toast(`Cần ít nhất 1 người nhận khi bật kênh ${RECIPIENT_HINTS[missing].name}`, 'error');
       return;
     }
     try {
@@ -156,46 +202,52 @@ export function AlertRuleEditDialog({ rule, siteId, isOpen, onClose }: AlertRule
               </div>
             </div>
 
-            {form.channels.includes(AlertChannel.TELEGRAM) && (
-              <div className="space-y-2">
+            {SENDABLE_CHANNELS.filter((channel) => form.channels.includes(channel)).map((channel) => (
+              <div key={channel} className="space-y-2">
                 <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">
-                  Chat ID người nhận Telegram
+                  {RECIPIENT_HINTS[channel].label}
                 </label>
-                <p className="text-[10px] text-[var(--text-muted)]">
-                  Cá nhân: nhắn <code>@userinfobot</code> hoặc <code>/start</code> bot rồi gọi <code>getUpdates</code>.
-                  Nhóm: thêm bot vào group trước, <code>getUpdates</code> mới ra id âm (<code>@userinfobot</code> không dùng được cho group).
-                </p>
+                <p className="text-[10px] text-[var(--text-muted)]">{RECIPIENT_HINTS[channel].hint}</p>
                 <div className="flex gap-2">
                   <input
-                    value={chatIdInput}
-                    onChange={(e) => setChatIdInput(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addChatId(); } }}
-                    placeholder="VD: 123456789 hoặc -1001234567890"
-                    className="flex-1 px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] text-sm outline-none"
+                    value={recipientInputs[channel] ?? ''}
+                    onChange={(e) => setRecipientInputs({ ...recipientInputs, [channel]: e.target.value })}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addRecipient(channel); } }}
+                    placeholder={RECIPIENT_HINTS[channel].placeholder}
+                    className="flex-1 min-w-0 px-4 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] text-sm outline-none"
                   />
                   <button
                     type="button"
-                    onClick={addChatId}
+                    onClick={() => addRecipient(channel)}
+                    aria-label={`Thêm người nhận ${RECIPIENT_HINTS[channel].name}`}
                     className="px-3 rounded-xl border border-[var(--border)] hover:bg-[var(--surface-hover)]"
                   >
                     <Plus className="w-4 h-4" />
                   </button>
                 </div>
                 <div className="space-y-1.5">
-                  {form.recipients.map((chatId) => (
-                    <div key={chatId} className="flex items-center justify-between px-3 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)]">
-                      <span className="text-xs font-mono text-[var(--text-primary)]">{chatId}</span>
+                  {recipientsForChannel(channel, form.recipients).map((value) => (
+                    <div key={value} className="flex items-center gap-2 justify-between px-3 py-2 rounded-lg bg-[var(--background-secondary)] border border-[var(--border)]">
+                      <span className="text-xs font-mono text-[var(--text-primary)] break-all">{value}</span>
                       <button
                         type="button"
-                        onClick={() => setForm({ ...form, recipients: form.recipients.filter((c) => c !== chatId) })}
+                        aria-label={`Xoá ${value}`}
+                        onClick={() =>
+                          setForm({
+                            ...form,
+                            recipients: form.recipients.filter(
+                              (entry) => entry !== value && entry !== formatRecipient(channel, value)
+                            ),
+                          })
+                        }
                       >
-                        <Trash2 className="w-3.5 h-3.5 text-[var(--danger)]" />
+                        <Trash2 className="w-3.5 h-3.5 text-[var(--danger)] shrink-0" />
                       </button>
                     </div>
                   ))}
                 </div>
               </div>
-            )}
+            ))}
 
             <Switch
               enabled={form.isActive}
