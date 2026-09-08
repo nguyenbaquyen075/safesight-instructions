@@ -39,7 +39,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/violations/count` | GET | Cần session; `{ open, openIds }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
-| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess` |
+| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma) |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
 | `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`) |
@@ -52,6 +52,9 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
 | `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
 | `/api/agent/ask` | POST | `{ subjectType?, subjectId?, sessionId?, message }` → ghi `AgentEvent`, tạo/nối `AgentTask kind=ask`, poke agent, trả `sessionId` |
+| `/api/agent/cameras` | GET | Cần session; mỗi camera trong phạm vi site → cài đặt subagent + `memory[]` + `openViolations`, `reviewed24h`, `falsePositiveRate24h`. Camera chưa có dòng `CameraAgent` trả giá trị mặc định với `exists: false` (**không** upsert khi đọc) |
+| `/api/agent/cameras/[id]` | PATCH | SUPER_ADMIN/ORG_ADMIN; `{ isEnabled?, digestEveryMin? 5–1440, dailyTokenCap? ≥ 0, clearMemory?: true }`; upsert `CameraAgent`, `clearMemory` đặt `memory = '[]'`; ghi `AgentEvent action { action: 'camera-agent.settings', changes, userId }` |
+| `/api/agent/cameras/[id]/digest` | POST | `assertSiteAccess` theo site của camera; xếp `AgentTask kind=camera.digest` (priority 60, gộp với lần hẹn đang chờ) + poke; trả 202 `{ taskId }`, 404 khi camera không tồn tại |
 
 ## React Query hooks (`src/hooks/`)
 
@@ -68,6 +71,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useYolo` | `useYolo.ts` | Socket.IO → YOLO Bridge (`NEXT_PUBLIC_YOLO_SERVER_URL`) |
 | `useVoiceRecorder` | `useVoiceRecorder.ts` | `MediaRecorder` cho nút mic |
 | `useAgentTasks`, `useAgentEvents` (poll khi thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent` | `use-agent.ts` | `/api/agent/*` |
+| `useCameraAgents` (poll 15s), `useSaveCameraAgent`, `useDigestCamera` | `use-agent.ts` | `/api/agent/cameras*` |
 
 ## Component chính (`src/components/`)
 
