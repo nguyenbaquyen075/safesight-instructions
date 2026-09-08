@@ -105,17 +105,24 @@ và `disk.pressure` lặp lại mỗi sweep dù đĩa đang đầy thật.
 
 ### Việc khắc phục quá hạn (`capa.overdue`)
 
-`collectSignals()` đọc thêm `overdueActions`: các `CorrectiveAction` còn `OPEN`, đã qua `dueAt`
-và **chưa từng leo thang** (`escalatedAt = null`), tối đa 50 dòng, kèm `violationId`, `cameraId`
-và `assigneeName`. Có ít nhất một dòng thì `decide()` sinh **một** finding `capa.overdue`
-(`subjectType: 'system'`, `detail = { count, actions }`) — gộp chung chứ không phải mỗi việc một
+`collectSignals()` đọc thêm `overdueActionIds` (`findOverdueActionIds`): id của các
+`CorrectiveAction` còn `OPEN`, đã qua `dueAt` và **chưa từng leo thang** (`escalatedAt = null`),
+tối đa 50. Có ít nhất một id thì `decide()` sinh **một** finding `capa.overdue`
+(`subjectType: 'system'`, `detail = { count, ids }`) — gộp chung chứ không phải mỗi việc một
 finding, vì đây là một việc leo thang duy nhất cho trực vận hành.
 
-`applyFindings()` xếp một `AgentTask kind=ops.escalate` với lý do nêu tên **tối đa 5** việc (phần
-còn lại chỉ đếm), rồi `updateMany` đặt `escalatedAt` cho **toàn bộ** việc trong finding. Đó là
-dấu "đã báo người rồi": vòng quét sau (60s) không còn thấy chúng nữa, nên mỗi việc chỉ leo thang
-một lần thay vì báo lại mỗi phút. Agent **không** tự đóng hay tự làm việc khắc phục — đó là việc
-của người; nó chỉ nhắc.
+`detail` cố ý chỉ mang số đếm và id: nó được ghi nguyên vào `AgentEvent`, nên tên người xử lý
+được `applyFindings()` đọc lại từ DB đúng lúc dựng lý do. Hàm này xếp một
+`AgentTask kind=ops.escalate` với lý do nêu tên **tối đa 5** việc quá hạn lâu nhất (phần còn lại
+chỉ đếm), rồi `updateMany({ id: { in: ids }, escalatedAt: null })` đặt `escalatedAt` cho **toàn
+bộ** việc trong finding — điều kiện `escalatedAt: null` làm bước này idempotent khi cùng một
+finding chạy lại. Đó là dấu "đã báo người rồi": vòng quét sau (60s) không còn thấy chúng nữa,
+nên mỗi việc chỉ leo thang một lần thay vì báo lại mỗi phút.
+
+`capa.overdue` **không** đi qua khối leo thang theo số lần lặp (`repeats === 3`) như các phát
+hiện khác: nó đã tự leo thang ngay ở lần đầu và tự dập bằng `escalatedAt`, cho nó lặp tiếp sẽ
+tạo thêm một `ops.escalate` thứ hai và bắn `JSON.stringify(detail)` (tới 50 id) qua mọi kênh
+cảnh báo. Agent **không** tự đóng hay tự làm việc khắc phục — đó là việc của người; nó chỉ nhắc.
 
 ## Bằng chứng và band
 

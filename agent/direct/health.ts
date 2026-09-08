@@ -14,9 +14,6 @@ export const MODEL_FILES = [
   { file: 'yolov8n-pose.pt', required: false },
 ] as const;
 
-/** Một việc khắc phục quá hạn mà chưa từng leo thang (CorrectiveAction.escalatedAt = null). */
-export interface OverdueAction { id: string; violationId: string; cameraId: string; assigneeName: string; dueAt: string }
-
 export interface HealthSignals {
   now: number;
   bridge: { ok: boolean; lastDetectionAt: Record<string, string> } | null;
@@ -25,7 +22,8 @@ export interface HealthSignals {
   snapshotBytes: number;
   modelFiles: { required: boolean; present: boolean; file?: string }[];
   cameras: { id: string; status: string; rtspUrl: string }[];
-  overdueActions: OverdueAction[];
+  /** Id các việc khắc phục quá hạn chưa từng leo thang; tên người lấy sau, lúc dựng lý do. */
+  overdueActionIds: string[];
 }
 
 export type FindingCode = 'camera.stalled' | 'camera.recovered' | 'engine.stalled' | 'bridge.down' | 'disk.pressure' | 'model.missing' | 'capa.overdue';
@@ -66,16 +64,17 @@ async function exists(file: string): Promise<boolean> {
 
 // Chỉ lấy việc CHƯA từng leo thang: escalatedAt là dấu "đã báo người rồi", nếu không mỗi
 // vòng quét 60s lại báo lại đúng những việc đó. Trần 50 việc để một tồn đọng lớn không
-// kéo cả lượt quét.
-export async function findOverdueActions(now = new Date()): Promise<OverdueAction[]> {
+// kéo cả lượt quét. Chỉ trả id: detail của finding đi thẳng vào AgentEvent nên phải gọn,
+// tên người xử lý được đọc lại lúc dựng lý do leo thang (agent/direct/actions.ts).
+export async function findOverdueActionIds(now = new Date()): Promise<string[]> {
   try {
     const rows = await prisma.correctiveAction.findMany({
       where: { status: 'OPEN', escalatedAt: null, dueAt: { lt: now } },
       orderBy: { dueAt: 'asc' },
       take: 50,
-      select: { id: true, violationId: true, assigneeName: true, dueAt: true, violation: { select: { cameraId: true } } },
+      select: { id: true },
     });
-    return rows.map(r => ({ id: r.id, violationId: r.violationId, cameraId: r.violation.cameraId, assigneeName: r.assigneeName, dueAt: r.dueAt.toISOString() }));
+    return rows.map(r => r.id);
   } catch (error) {
     console.warn('[health] không đọc được bảng CorrectiveAction', error instanceof Error ? error.message : String(error));
     return [];
@@ -103,7 +102,7 @@ export async function collectSignals(): Promise<HealthSignals> {
     snapshotBytes: await dirBytes(env.snapshotDir),
     modelFiles: await Promise.all(MODEL_FILES.map(async m => ({ file: m.file, required: m.required, present: await exists(m.file) }))),
     cameras,
-    overdueActions: await findOverdueActions(),
+    overdueActionIds: await findOverdueActionIds(),
   };
 }
 
@@ -146,8 +145,8 @@ export function decide(s: HealthSignals, opts: { snapshotMaxMb: number; bridgeFa
   }
   // Việc khắc phục quá hạn là chuyện của NGƯỜI, agent không tự làm được -> gộp thành một
   // phát hiện toàn hệ thống rồi leo thang một lần, thay vì mỗi việc một finding.
-  if (s.overdueActions.length > 0) {
-    out.push({ code: 'capa.overdue', subjectType: 'system', subjectId: null, detail: { count: s.overdueActions.length, actions: s.overdueActions } });
+  if (s.overdueActionIds.length > 0) {
+    out.push({ code: 'capa.overdue', subjectType: 'system', subjectId: null, detail: { count: s.overdueActionIds.length, ids: s.overdueActionIds } });
   }
   return out;
 }

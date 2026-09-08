@@ -9,6 +9,10 @@ import type { CorrectiveAction } from '@prisma/client';
 export const ACTION_STATUSES = ['OPEN', 'DONE', 'CANCELLED'] as const;
 export type ActionStatus = (typeof ACTION_STATUSES)[number];
 
+// Việc khắc phục xong chỉ được tự đóng vi phạm khi vi phạm CHƯA được người chốt: người đã
+// đánh FALSE_POSITIVE (hoặc RESOLVED) rồi thì máy không được ghi đè phán quyết đó.
+export const AUTO_RESOLVABLE_STATUSES = ['OPEN', 'UNDER_REVIEW'] as const;
+
 /** Hạn mặc định khi người giao việc không chọn: 24 giờ kể từ lúc giao. */
 export const DEFAULT_DUE_MS = 24 * 3_600_000;
 

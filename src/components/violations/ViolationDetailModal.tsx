@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import {
   ShieldAlert,
   Check,
@@ -12,9 +13,10 @@ import {
   Volume2,
   X,
 } from 'lucide-react';
+import { canAccessPath } from '@/lib/auth/permissions';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
-import { Severity, ViolationStatus } from '@/types/enums';
+import { Severity, UserRole, ViolationStatus } from '@/types/enums';
 import { MicButton } from '@/components/cameras/MicButton';
 import {
   useCreateCorrectiveAction,
@@ -69,20 +71,26 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
   const updateStatus = useUpdateViolationStatus();
   const announceCamera = useAnnounceCamera();
   const { data: actions = [], isLoading: actionsLoading, isError: actionsError } = useViolationActions(violation?.id ?? '');
-  // Danh sách người chỉ mở cho quản trị (GET /api/users là ORG_WIDE) — vai trò khác vẫn
-  // giao việc được bằng cách gõ tay tên người xử lý.
-  const { data: users = [] } = useUsers();
+  // `GET /api/users` chỉ mở cho SUPER_ADMIN/ORG_ADMIN — cùng bộ vai trò của trang /users, nên
+  // hỏi thẳng PAGE_ROLES thay vì chép lại danh sách. Vai trò công trường không gọi API (tránh
+  // hai request chắc chắn 403) và vẫn giao việc được bằng cách gõ tay tên người xử lý.
+  const { data: session } = useSession();
+  const role = String(session?.user?.role ?? '').toLowerCase() as UserRole;
+  const canListUsers = !!role && canAccessPath(role, '/users');
+  const { data: users = [] } = useUsers(undefined, { enabled: canListUsers });
   const createAction = useCreateCorrectiveAction();
   const updateAction = useUpdateCorrectiveAction();
 
   if (!violation) return null;
 
   const submitAssignment = () => {
-    const match = users.find(u => u.name === assigneeName.trim());
+    // Hai người trùng tên thì không đoán bừa: gửi mỗi tên, `assigneeId` để trống còn hơn gắn
+    // việc cho nhầm người.
+    const matches = users.filter(u => u.name === assigneeName.trim());
     createAction.mutate(
       {
         violationId: violation.id,
-        assigneeId: match?.id,
+        assigneeId: matches.length === 1 ? matches[0].id : undefined,
         assigneeName: assigneeName.trim(),
         description: description.trim(),
         dueAt: dueAt ? new Date(dueAt).toISOString() : undefined,

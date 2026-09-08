@@ -10,7 +10,7 @@ import { isOverdue } from '@/lib/corrective-action-shape';
 import type { ToolContext } from '../lib/tool-context';
 
 export async function violationFacts(id: string) {
-  const v = await prisma.violation.findUnique({ where: { id }, include: { camera: true, site: true, actions: { orderBy: { dueAt: 'asc' } } } });
+  const v = await prisma.violation.findUnique({ where: { id }, include: { camera: true, site: true, actions: { orderBy: { dueAt: 'asc' }, take: 10 } } });
   if (!v) return null;
   return {
     violationId: v.id, cameraId: v.cameraId, cameraName: v.camera.name, siteId: v.siteId, siteName: v.site.name,
@@ -18,7 +18,8 @@ export async function violationFacts(id: string) {
     status: v.status.toLowerCase(), detectedAt: v.detectedAt.toISOString(),
     bbox: parseJsonOr(v.bboxData, []), snapshotUrl: v.snapshotUrl, clipUrl: v.clipUrl,
     agentReview: parseJsonOr(v.agentReview, null),
-    // Việc khắc phục đã giao cho người: agent cần biết để không leo thang lại chuyện đã có người nhận.
+    // Việc khắc phục đã giao cho người: agent cần biết để không leo thang lại chuyện đã có
+    // người nhận. Trần 10 việc (hạn gần nhất trước) để một vi phạm nhiều việc không phình prompt.
     actions: v.actions.map(a => ({ assigneeName: a.assigneeName, dueAt: a.dueAt.toISOString(), status: a.status, overdue: isOverdue(a) })),
   };
 }
