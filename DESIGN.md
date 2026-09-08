@@ -118,7 +118,15 @@ xanh dương = hành động chính. Không dùng màu khác cho các ý này.
 ## Responsive
 - Lưới `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` cho thẻ số; bảng/dòng thời gian cuộn ngang trong container `overflow-x-auto`.
 - Không bao giờ để trang cuộn ngang; văn bản dài `break-words`.
-- Ghi chú: layout hiện có sidebar cố định 260px chưa responsive (việc riêng, ngoài plan này).
+- **Breakpoint `md` (768px)** phân định desktop/di động cho khung layout: dưới `md` Sidebar là drawer ẩn ngoài màn hình
+  (`fixed`, `-translate-x-full`), mở bằng nút hamburger ở Header, đóng bằng overlay `bg-black/50` hoặc khi đổi route;
+  nội dung chính không có margin trái. Từ `md` trở lên Sidebar quay về hành vi cũ (cố định 260px hoặc 68px khi thu
+  gọn, nút thu gọn chỉ hiện từ `md`), nội dung chính dùng `md:ml-[260px]`/`md:ml-[68px]`.
+- **Bảng → thẻ dưới `md`**: `ViolationsTable`, `AlertsTable`, `UserTable` hiện bảng đầy đủ (`hidden md:block`) trên
+  desktop; dưới `md` chuyển sang danh sách thẻ (`md:hidden`, mỗi thẻ 3 dòng: tên/loại + badge trạng thái, camera/thời
+  gian, hành động) — không hiển thị checkbox chọn hàng loạt trên thẻ.
+- Ứng dụng cài được như PWA (`public/manifest.webmanifest`, `public/sw.js`): `theme_color`/`background_color` dùng
+  `--background` (`#0F172A`) để icon và thanh trạng thái khớp nền tối mặc định.
 
 ## Trợ năng
 - Mọi nút icon có `aria-label`; focus ring `ring-2 ring-[var(--primary)]`.
