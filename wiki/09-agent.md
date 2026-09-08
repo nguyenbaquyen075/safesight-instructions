@@ -42,6 +42,7 @@ thử với outcome nêu rõ.
 | `shift.report` | nghiên cứu | 200 | agent tự gieo theo `shiftReportAt` | 1 lần/ngày |
 | `weekly.report` | nghiên cứu | 150 | `ensureRecurring()` theo `AgentSettings.weeklyReportAt` (`"MON 08:00"`, giờ địa phương) | 1 lần/tuần |
 | `camera.digest` | nghiên cứu | 50 | `ensureRecurring()` cho mỗi camera ONLINE có subagent bật; agent cũng tự hẹn qua `schedule_followup` | `lastDigestAt + digestEveryMin` (mặc định 30 phút; lần đầu `now + digestEveryMin`) |
+| `camera.instruction` | nghiên cứu | 60 | tool `dispatch_to_camera` từ phiên toàn hệ thống (agent trưởng) | ngay hoặc sau `minutes`; **không** qua cổng `hasActivitySince` |
 | `followup` | nghiên cứu | 0 | tool `schedule_followup` | theo lý do agent nêu |
 
 `claimDue()` thuê task bằng `updateMany` có điều kiện `leasedUntil` cũ nên **đúng cả khi
@@ -191,6 +192,11 @@ cùng hàng đợi.
   không có event `health` mới thì task đóng với outcome `không có hoạt động mới từ digest
   trước`, ghi `AgentEvent action { action: 'camera.digest.skipped' }`, dời `lastDigestAt` và
   **không tốn token**. Có hoạt động thì chạy phiên rồi mới dời `lastDigestAt`.
+- **Điều phối (agent trưởng):** phiên toàn hệ thống (`ask`, `shift.report`, `weekly.report`, `ops.escalate`) được
+  preamble nhắc vai trò agent trưởng và có `list_camera_agents` (trạng thái + 3 ghi chú mới nhất mỗi camera) và
+  `dispatch_to_camera` (giao việc → task `camera.instruction` chạy dưới subagent camera đó với chỉ dẫn làm "Lý do",
+  không qua cổng hoạt động; chỉ dẫn cũng được ghi vào trí nhớ camera). Chỉ dẫn đang chờ cho cùng camera bị thay
+  bằng chỉ dẫn mới (`scheduleTask` gộp theo kind+camera).
 - **Song song:** vì mỗi lượt chỉ nhận một task/camera, ba phiên nghiên cứu chạy đồng thời
   không bao giờ là hai phiên của cùng một camera.
 
@@ -209,12 +215,15 @@ cùng hàng đợi.
 | `schedule_followup` | ghi | `kind ("followup"\|"camera.digest"), subjectType, subjectId, minutes (5..1440), reason (≥10 ký tự)` | `{ dueAt }` |
 | `write_note` | ghi | `subjectType, subjectId, note` | `{ ok }` |
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
+| `list_camera_agents` | đọc | — | `{ cameras: [{ cameraId, name, status, siteId, isEnabled, tokensUsedToday, dailyTokenCap, lastDigestAt, notes (3 ghi chú mới nhất), openViolations }] }` — chỉ trong phiên toàn hệ thống |
+| `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryTotal }` hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
-`ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ; phiên thuộc một camera
-được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
+`camera.instruction` = như `camera.digest`; `ask` = tất cả. Các kind toàn hệ thống (`ask`, `shift.report`, `weekly.report`,
+`ops.escalate`) có thêm `list_camera_agents` + `dispatch_to_camera` ở cuối. Tool set cố định theo kind để cache prompt không vỡ;
+phiên thuộc một camera được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
 
 ## Skill (`agent/skills/<name>/SKILL.md`, nạp vào system prompt)
 

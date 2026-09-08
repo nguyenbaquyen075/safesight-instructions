@@ -5,13 +5,13 @@ import { cameraIdOf } from './camera-agent';
 export type Lane = 'direct' | 'research';
 
 export const DIRECT_KINDS = ['health.sweep', 'health.probe', 'snapshot.cleanup'] as const;
-export const RESEARCH_KINDS = ['ask', 'violation.review', 'ops.escalate', 'shift.report', 'weekly.report', 'camera.digest', 'followup'] as const;
+export const RESEARCH_KINDS = ['ask', 'violation.review', 'ops.escalate', 'shift.report', 'weekly.report', 'camera.digest', 'camera.instruction', 'followup'] as const;
 export const KINDS = [...DIRECT_KINDS, ...RESEARCH_KINDS] as const;
 export type TaskKind = (typeof KINDS)[number];
 
 export const PRIORITY = {
   'health.sweep': 900, 'health.probe': 800, 'ask': 500, 'violation.review': 300,
-  'ops.escalate': 250, 'shift.report': 200, 'weekly.report': 150, 'snapshot.cleanup': 100, 'camera.digest': 50, 'followup': 0,
+  'ops.escalate': 250, 'shift.report': 200, 'weekly.report': 150, 'snapshot.cleanup': 100, 'camera.instruction': 60, 'camera.digest': 50, 'followup': 0,
 } as const satisfies Record<TaskKind, number>;
 
 export const MAX_ATTEMPTS = 3;

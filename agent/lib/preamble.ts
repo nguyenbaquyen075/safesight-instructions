@@ -21,8 +21,11 @@ async function neighbours(task: LeasedTask): Promise<string> {
   return `Toàn hệ thống. Công trường: ${sites.map(s => `\`${s.id}\` (${s.name})`).join(', ')}. Bắt đầu bằng read_system_health hoặc read_agent_activity.`;
 }
 
+const ORCHESTRATING_KINDS = new Set(['ask', 'shift.report', 'weekly.report', 'ops.escalate']);
+
 const OPENING: Record<string, string> = {
   'violation.review': 'Đây là một lượt review tự động có ngân sách: nhìn ảnh, đọc lịch sử nếu cần, record_verdict, leo thang nếu đủ điều kiện, rồi kết luận ngắn.',
+  'camera.instruction': 'Đây là CHỈ DẪN từ agent trưởng cho subagent camera này. Làm đúng việc được giao (lý do ở dưới): đọc lịch sử/vi phạm liên quan, kết luận bằng write_note, leo thang nếu đủ điều kiện, remember_camera nếu học được điều bền. Không record_verdict.',
   'camera.digest': 'Đây là lượt tổng hợp camera: đọc lịch sử 24h/7 ngày, nhận xét xu hướng (write_note), hẹn xem lại nếu cần. Không record_verdict.',
   'shift.report': 'Viết báo cáo ca cho nhóm quản lý: vi phạm thật / báo oan theo camera, sự cố vận hành đã tự xử lý, việc cần người làm. Gửi bằng escalate (không violationId) rồi trả lời lại nội dung báo cáo.',
   'weekly.report': 'Viết báo cáo TUẦN (7 ngày gần nhất) cho ban chỉ huy: theo công trường và camera — vi phạm thật, báo oan, camera báo oan nhiều nhất, việc còn mở, sự cố vận hành đáng chú ý. Dùng search_violations và read_agent_activity để lấy số liệu, gửi bằng escalate (không violationId), rồi trả lời lại bằng bản báo cáo markdown ngắn gọn.',
@@ -46,6 +49,13 @@ export async function preambleFor(task: LeasedTask, opts: { userMessage?: string
       'Bạn chỉ chịu trách nhiệm cho camera này. Điều gì BỀN học được về nó (góc máy, giờ ngược sáng, khu vực hay báo oan, việc cần theo dõi) thì ghi bằng remember_camera để phiên sau dùng lại.',
       '', '## Trí nhớ camera',
       ...(notes.length ? notes.map((n, i) => `- #${i} [${n.at.slice(0, 10)}] ${n.text}`) : ['(chưa có ghi chú)']),
+    );
+  }
+  // Phiên toàn hệ thống của các kind điều phối: biết có subagent theo camera và hai tool để xem/giao việc.
+  if (!opts.cameraId && ORCHESTRATING_KINDS.has(task.kind)) {
+    parts.push(
+      '', '## Subagent theo camera',
+      'Mỗi camera có một subagent riêng (trí nhớ, trần token, bật/tắt). Bạn là agent trưởng: list_camera_agents để xem trạng thái và ghi chú của từng camera; dispatch_to_camera để giao một việc cụ thể cho subagent của một camera (chỉ dẫn được ghi vào trí nhớ camera đó). Chỉ giao việc khi có lý do rõ ràng, tối đa 3 lần/phiên.',
     );
   }
   // Thread hỏi đáp: nhắc lại tối đa 10 lượt trước đó (không tính câu hỏi hiện tại) để phiên mới có ngữ cảnh.

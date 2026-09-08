@@ -59,6 +59,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AGENT-07 | AgentEvent | Agent | Xem dòng thời gian và hàng đợi | S | Basic | Audit mọi tool call, verdict, action | v0.6 |
 | F-AGENT-08 | CameraAgent | Agent | Bật / tắt subagent camera, đặt nhịp tổng hợp và trần token riêng | M | Basic | Thẻ camera trên `/agent`; nhịp 5–1440 phút; trần camera kiểm sau kill switch và trần toàn cục | v0.8 |
 | F-AGENT-09 | CameraAgent | Agent | Trí nhớ theo camera | M | Advanced | Tool `remember_camera` ghi tối đa 20 ghi chú × 300 ký tự; hiện trên thẻ và panel camera; xoá có xác nhận | v0.8 |
+| F-AGENT-10 | CameraAgent | Agent | Agent trưởng điều phối subagent | M | Advanced | Tool `list_camera_agents` và `dispatch_to_camera` trong phiên toàn hệ thống; giao việc thành task `camera.instruction` chạy dưới subagent camera, chỉ dẫn ghi vào trí nhớ camera | v0.10 |
 | F-AGENT-10 | AgentTask | Agent | Tổng hợp ngay theo camera | S | Workflow | Xếp `camera.digest` (gộp với lượt đang chờ) + poke; trả `taskId` | v0.8 |
 | F-RF-01 | — | Kiểm thử Roboflow | Đối chiếu model cloud trên ảnh tĩnh | S | Other | Kéo thả ảnh, 2 workflow, mỗi lần 1 credit | v0.6 |
 | F-USER-01 | User | Người dùng | Xem danh sách người dùng | S | Basic | | v0.6 |
