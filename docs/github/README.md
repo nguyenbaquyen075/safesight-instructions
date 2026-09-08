@@ -1,11 +1,11 @@
 # Issue và Pull Request cho lộ trình v0.9
 
-Mỗi tính năng có một nhánh `feat/<slug>`, một issue (`issues/<slug>.md`: dòng đầu là tiêu đề) và một PR (`prs/feat-<slug>.md` theo `PR_TEMPLATE.md`, có `Closes #<n>` để script điền số issue).
+Mỗi tính năng có một nhánh (mặc định `feat/<slug>`; dòng 2 của issue có thể ghi `branch: fix/<slug>` hoặc `chore/<slug>`), một issue (`issues/<slug>.md`: dòng đầu là tiêu đề) và một PR (`prs/<nhánh với "/" → "-">.md` theo `PR_TEMPLATE.md`, có `Closes #<n>` để script điền số issue). Nhãn phiên bản qua `RELEASE_LABEL` (mặc định `v0.11`). **Luôn truyền danh sách slug của đợt hiện tại** — chạy không tham số sẽ duyệt cả slug của các đợt cũ (issue đã đóng nên script sẽ tạo trùng).
 
 Tạo trên GitHub (chỉ cần token có scope `repo`; script tự push nhánh bằng token, không cần git credential):
 
 ```bash
-GH_TOKEN=ghp_xxx scripts/github-open-issues-prs.sh            # tất cả slug có trong issues/
+GH_TOKEN=ghp_xxx scripts/github-open-issues-prs.sh restricted-zones speaker-announce agent-feedback corrective-actions agent-ops-alert-channels engine-requirements   # đợt v0.11
 GH_TOKEN=ghp_xxx scripts/github-open-issues-prs.sh zone-roi    # một slug
 INTEGRATION_BRANCH=integration/v0.9 GH_TOKEN=ghp_xxx scripts/github-open-issues-prs.sh   # thêm PR tổng (prs/integration-v0.9.md)
 ```
