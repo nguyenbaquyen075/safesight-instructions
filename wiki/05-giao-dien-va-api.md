@@ -51,6 +51,8 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/cameras/[id]/zones` | GET, PUT | Vùng nhận diện (Zone `type=MONITORING`) của camera; `assertSiteAccess`. PUT thay TOÀN BỘ danh sách (`{ zones: [{ name?, points: [{x,y}] }] }`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. AI engine tự đọc lại bảng `Zone` mỗi 60s |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`); POST ghi `AuditLog` |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma); PATCH/DELETE ghi `AuditLog` |
+| `/api/observations` | POST | Chỉ cho AI engine (header `X-AI-Engine-Secret`, không session): `{ observations: [{ cameraId, minute (ISO phút), persons, personSeconds }] }` tối đa 200 dòng; upsert `ObservationStat` theo `(cameraId, minute)` nên gửi lại cùng một phút không nhân đôi mẫu số; `siteId` suy từ Camera, camera đã xoá thì bỏ qua dòng đó. Trả 201 `{ upserted }` |
+| `/api/stats/compliance` | GET | Cần session; `?siteId&from&to` (mặc định 30 ngày, trần 366 ngày) → mảng theo ngày `{ day, personMinutes, violations, complianceRate }`; `complianceRate` = `1 − vi_phạm / max(phút_người, 1)` (0–1), `null` khi ngày đó chưa có quan sát. Hàm thuần `complianceByDay()` ở `src/lib/compliance-shape.ts` |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
 | `/api/users`, `/api/users/[id]` | GET, POST · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`). POST: zod `createUserSchema` (`src/lib/user-shape.ts`: `name`, `email`, `password` ≥ 8, `role` enum, `assignedSites`), băm mật khẩu bằng `bcryptjs`, `orgId` lấy theo tổ chức của người tạo (fallback tổ chức đầu tiên cho tài khoản dev cứng không có dòng User), 409 khi email trùng. POST/PATCH/DELETE đều ghi `AuditLog` |
@@ -85,7 +87,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |
 | `useTelegramSettings` + mutation | `use-telegram-settings.ts` | `/api/settings/telegram` |
 | `useZaloSettings` + mutation | `use-zalo-settings.ts` | `/api/settings/zalo` |
-| `useDashboardKPIs`, `useComplianceTrend`, `useViolationBreakdown` | `use-dashboard.ts` | Tính từ `useViolations` (không có API riêng); số camera online lấy từ `src/data/mock-cameras.ts` |
+| `useDashboardKPIs`, `useComplianceTrend`, `useViolationBreakdown`, `useComplianceStats` | `use-dashboard.ts` | `useViolations` + `/api/stats/compliance` (tỉ lệ tuân thủ thật; ngày chưa có quan sát mới rơi về ước lượng `rateFromCount` và KPI hiện nhãn "ước tính"); số camera online đếm từ `useCameras()` |
 | `useRealSitesFromCameras` | `use-real-sites.ts` | Gom site từ roster camera + vi phạm thật |
 | `useYolo` | `useYolo.ts` | Socket.IO → YOLO Bridge (`NEXT_PUBLIC_YOLO_SERVER_URL`) |
 | `useVoiceRecorder` | `useVoiceRecorder.ts` | `MediaRecorder` cho nút mic |
@@ -108,7 +110,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 
 ## Dữ liệu mock còn lại
 
-`src/data/mock-cameras.ts` và `mock-violations.ts` vẫn được dùng làm **roster camera demo** (tên/site cho ô camera, KPI camera online) và dữ liệu mẫu cho một vài modal. Vi phạm hiển thị là dữ liệu thật từ DB.
+`src/data/mock-cameras.ts` và `mock-violations.ts` vẫn được dùng làm **roster camera demo** (tên/site cho ô camera) và dữ liệu mẫu cho một vài modal. Vi phạm hiển thị là dữ liệu thật từ DB; KPI camera online của bảng điều khiển đã chuyển sang `useCameras()` (dữ liệu thật).
 
 ## Stack UI
 

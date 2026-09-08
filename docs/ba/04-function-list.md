@@ -9,7 +9,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AUTH-03 | User | Xác thực | Đổi mật khẩu | S | Basic | Trang `/profile`; `PATCH /api/users/me/password` xác minh mật khẩu cũ bằng bcrypt | v0.9 |
 | F-AUTH-04 | User | Xác thực | Quên mật khẩu | M | Basic | Cần kênh email, chưa nối | P3 |
 | F-AUTH-05 | User | Xác thực | Chặn trang theo vai trò | S | Workflow | `PAGE_ROLES`: Sidebar ẩn menu, layout chặn URL trực tiếp | v0.6 |
-| F-DASH-01 | Violation | Trang chủ | Xem KPI tuân thủ | M | Advanced | KPI, xu hướng tuân thủ, donut theo loại vi phạm, dòng thời gian cảnh báo tính từ vi phạm thật | v0.6 |
+| F-DASH-01 | Violation | Trang chủ | Xem KPI tuân thủ | M | Advanced | KPI, xu hướng tuân thủ, donut theo loại vi phạm, dòng thời gian cảnh báo tính từ vi phạm thật. Từ v0.9 tỉ lệ tuân thủ = `1 − vi phạm / phút-người quan sát được` (`ObservationStat` + `GET /api/stats/compliance`); ngày chưa có quan sát mới rơi về ước lượng cũ và KPI ghi rõ "ước tính". Số camera online đếm từ camera thật | v0.6 → v0.9 |
 | F-DASH-02 | Site | Trang chủ | Xem trạng thái công trường | S | Basic | Lưới công trường + số camera / cảnh báo | v0.6 |
 | F-SITE-01 | Site | Công trường | Xem danh sách công trường | S | Basic | Lọc theo trạng thái | v0.6 |
 | F-SITE-02 | Site | Công trường | Xem chi tiết công trường | S | Basic | Modal + tab Agent | v0.6 |

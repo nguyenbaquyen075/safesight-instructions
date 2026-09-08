@@ -20,9 +20,11 @@ load_dotenv_local()
 # Configuration
 BRIDGE_URL = "http://localhost:4001/detections"
 NEXT_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/violations"
+OBSERVATIONS_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/observations"
 AI_ENGINE_SECRET = os.environ.get("AI_ENGINE_SECRET", "")
 # HTTP status của bridge đã cảnh báo rồi — chỉ in 1 lần/status, khỏi spam log mỗi frame.
 _bridge_warned_statuses = set()
+_observation_warned_statuses = set()
 SNAPSHOT_DIR = "public/snapshots"
 # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
 HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
@@ -170,6 +172,28 @@ def report_violation(cam_id, detection):
         }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
     except requests.exceptions.RequestException:
         pass
+
+def minute_iso(ts):
+    """Mốc PHÚT dạng ISO UTC (giây = 0) — khoá upsert của ObservationStat."""
+    return time.strftime("%Y-%m-%dT%H:%M:00.000Z", time.gmtime(ts))
+
+
+def post_observations(rows):
+    """Gửi số người quan sát được của phút vừa xong (POST /api/observations).
+
+    Mỗi phút MỘT lần cho toàn bộ luồng, nên timeout 2s vẫn không ảnh hưởng fps đáng
+    kể; lỗi mạng thì bỏ qua phút đó (mẫu số thiếu 1 phút, không sao) và chỉ in cảnh
+    báo 1 lần cho mỗi HTTP status như POST sang bridge.
+    """
+    try:
+        resp = session.post(OBSERVATIONS_API_URL, json={"observations": rows},
+                            headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=2.0)
+        if not resp.ok and resp.status_code not in _observation_warned_statuses:
+            _observation_warned_statuses.add(resp.status_code)
+            print(f"⚠️ dashboard từ chối số liệu quan sát: HTTP {resp.status_code} — kiểm tra AI_ENGINE_SECRET trong .env.local")
+    except requests.exceptions.RequestException:
+        pass
+
 
 # NGUỒN DUY NHẤT gán video cho từng camera — DÙNG CHUNG với dashboard
 # (src/data/camera-videos.json). Sửa 1 file này là cả YOLO lẫn frontend cùng đổi,
@@ -482,6 +506,8 @@ def run_inference():
 
     zones_by_camera = load_zones()
     _zones_last = time.time()
+    # Phút đang gom số liệu quan sát; sang phút mới -> gửi hết mọi luồng rồi đếm lại.
+    _obs_minute = minute_iso(time.time())
     if zones_by_camera:
         print(f"🔷 Vùng làm việc: {', '.join(f'{c} ({len(z)} vùng)' for c, z in zones_by_camera.items())}")
 
@@ -490,6 +516,19 @@ def run_inference():
         if time.time() - _zones_last >= ZONE_REFRESH_INTERVAL:
             zones_by_camera = load_zones()
             _zones_last = time.time()
+
+        # Hết một phút đồng hồ -> chốt số người quan sát được của mọi luồng và gửi 1 lô.
+        _minute_now = minute_iso(time.time())
+        if _minute_now != _obs_minute:
+            rows = [{"cameraId": cam_id, "minute": _obs_minute,
+                     "persons": st.get("obs_persons", 0),
+                     "personSeconds": round(st.get("obs_seconds", 0.0), 1)}
+                    for st in streams for cam_id in st["cams"]]
+            for st in streams:
+                st["obs_persons"], st["obs_seconds"] = 0, 0.0
+            _obs_minute = _minute_now
+            if rows:
+                post_observations(rows)
 
         for st in streams:
             cap = st["cap"]
@@ -534,6 +573,16 @@ def run_inference():
                 frame, zones=zones_for_stream(st["cams"], zones_by_camera))
 
             violations = [d for d in detections if d.get('isViolation')]
+
+            # "Người × giây" cho tỉ lệ tuân thủ: số người CỦA KHUNG NÀY (đã lọc vùng làm
+            # việc) nhân khoảng thời gian từ khung trước của chính luồng này. Chặn dt ở 1s
+            # để một lần khựng dài (nạp model, RTSP reconnect) không thổi phồng mẫu số.
+            _obs_now = time.time()
+            _obs_dt = min(_obs_now - st.get("obs_last", _obs_now), 1.0)
+            st["obs_last"] = _obs_now
+            _obs_persons = getattr(st["tracker"], "last_person_count", 0)
+            st["obs_seconds"] = st.get("obs_seconds", 0.0) + _obs_persons * _obs_dt
+            st["obs_persons"] = max(st.get("obs_persons", 0), _obs_persons)
 
             # Gửi toạ độ detections sang bridge cho CÁC camera dùng video này
             for cam_id in st["cams"]:

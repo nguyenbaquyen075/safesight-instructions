@@ -19,7 +19,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 
 | File | Vai trò |
 |---|---|
-| `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB |
+| `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB, gửi số người quan sát được mỗi phút |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
 | `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
@@ -60,6 +60,35 @@ phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
 - Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
   vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
 - `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
+
+## Đếm người quan sát được (mẫu số của tỉ lệ tuân thủ)
+
+Chỉ đếm vi phạm thì không biết "nhiều" là bao nhiêu: 5 vi phạm ở công trường 200 người
+khác hẳn 5 vi phạm ở tổ 3 người. Engine vì vậy đếm luôn **số người nó thực sự nhìn thấy**
+và gửi về dashboard làm mẫu số.
+
+```
+process_frame() lọc vùng xong  ->  tracker.last_person_count (số người của khung này)
+   │  mỗi khung: person_seconds += số_người × dt   (dt = giờ thật từ khung trước, chặn ≤ 1s)
+   ▼
+hết một phút đồng hồ (UTC)  ->  gom MỌI luồng thành 1 mảng
+   ▼
+POST /api/observations  ->  upsert ObservationStat(cameraId, minute, persons, personSeconds)
+```
+
+- `last_person_count` là số người **sau khi lọc vùng làm việc**, nên người ngoài vùng
+  không làm phồng mẫu số. Để ở thuộc tính của tracker thay vì đổi kiểu trả về của
+  `process_frame` → không nơi gọi nào phải sửa.
+- `dt` bị chặn ở **1 giây/khung**: một lần khựng dài (nạp model, RTSP reconnect) không
+  biến thành hàng chục phút-người ảo.
+- POST chạy **1 lần/phút cho toàn bộ luồng**, timeout 2s, lỗi thì bỏ qua phút đó và chỉ
+  in cảnh báo một lần cho mỗi HTTP status — vòng lặp nhận diện không bao giờ bị chặn lâu.
+  Upsert theo `(cameraId, minute)` nên gửi trùng cũng không nhân đôi.
+- Một luồng video phục vụ nhiều camera demo → mỗi camera trong nhóm nhận cùng con số
+  (detections vốn tính một lần rồi gửi chung).
+- Dashboard đọc lại qua `GET /api/stats/compliance`: `tỉ lệ = 1 − vi_phạm / phút_người`.
+  Ngày chưa có dòng `ObservationStat` nào thì API trả `null` và giao diện hiện nhãn
+  **"ước tính"** (rơi về cách tính cũ theo số vi phạm) thay vì bịa ra 100%.
 
 ## Các lớp phát hiện (model `ppe_multiclass.pt` hiện tại)
 

@@ -194,6 +194,7 @@ class PPEViolationTracker:
         self.min_height_ratio = min_height_ratio
         self.required_ppe = [p.lower() for p in required_ppe]
         self.imgsz = imgsz  # kích thước xử lý nhỏ hơn -> model chạy nhanh -> khung cập nhật dày hơn
+        self.last_person_count = 0  # số người của khung gần nhất (sau khi lọc vùng làm việc)
 
         # Đọc TÊN LỚP trực tiếp từ model → tự khớp mọi model (4 lớp cũ hoặc 11 lớp mới:
         # Person, helmet, vest, gloves, boots, goggles + biến thể no_*)
@@ -352,6 +353,11 @@ class PPEViolationTracker:
             persons = filter_persons_in_zones(persons, zones, frame.shape[1], frame.shape[0])
             if len(persons) < _truoc:
                 print(f"[ZONE] bỏ qua {_truoc - len(persons)} người ngoài vùng làm việc")
+
+        # Số người ĐANG XÉT của khung vừa rồi (đã lọc vùng). yolo_inference.py cộng dồn
+        # thành "người × giây" mỗi phút -> mẫu số của tỉ lệ tuân thủ. Để ở thuộc tính
+        # thay vì đổi kiểu trả về, giữ nguyên chữ ký process_frame cho mọi nơi gọi.
+        self.last_person_count = len(persons)
 
         # Thay khung GĂNG/GIÀY bằng kết quả model phụ (nếu có). Chỉ đụng đúng
         # những lớp trong parts_classes — người/mũ/áo giữ nguyên của model chính.
