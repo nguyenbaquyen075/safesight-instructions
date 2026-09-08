@@ -39,7 +39,12 @@ function exportCsv(rows: Violation[], from: string, to: string) {
     STATUS_LABELS[v.status] ?? v.status,
     `${Math.round(v.confidence * 100)}%`,
   ]);
-  const csv = [header, ...lines].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  // Excel/Sheets coi ô mở đầu bằng = + - @ là công thức -> thêm nháy đơn dẫn đầu.
+  const cell = (c: string | number) => {
+    const text = String(c);
+    return `"${(/^[=+\-@]/.test(text) ? `'${text}` : text).replace(/"/g, '""')}"`;
+  };
+  const csv = [header, ...lines].map(r => r.map(cell).join(',')).join('\n');
   // BOM để Excel bản tiếng Việt không đọc hỏng dấu.
   const url = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8;' }));
   const a = document.createElement('a');

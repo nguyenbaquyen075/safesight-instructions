@@ -8,6 +8,11 @@ import { UserRole } from '@/types/enums';
 
 export const ORG_WIDE_ROLES: string[] = [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN];
 
+// Tạo / sửa / xoá / bật tắt quy tắc cảnh báo (docs/ba/05-permission-matrix.md):
+// quản trị hệ thống, quản trị tổ chức và quản lý công trường (O* — vẫn phải qua
+// assertSiteAccess theo site được gán). Cán bộ an toàn và giám sát viên chỉ xem.
+export const ALERT_RULE_WRITE_ROLES: string[] = [...ORG_WIDE_ROLES, UserRole.SITE_MANAGER];
+
 // Cổng đăng nhập chung cho route handler: middleware (src/proxy.ts) bỏ qua /api,
 // nên mọi handler đọc dữ liệu phải tự gọi hàm này.
 // Trả về NextResponse 401 khi chưa đăng nhập, ngược lại trả session để dùng tiếp.

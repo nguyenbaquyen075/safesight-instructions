@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 import { useState } from 'react';
+import { useSession } from 'next-auth/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Shield, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserRole, SiteStatus } from '@/types/enums';
+import { assignableRoles } from '@/lib/auth/permissions';
 import { useSites } from '@/hooks/use-sites';
 import { useCreateUser } from '@/hooks/use-users';
 import { toast } from '@/lib/toast';
@@ -19,6 +21,9 @@ const initialForm = { name: '', email: '', password: '', role: UserRole.SUPERVIS
 
 export function AddUserDialog({ isOpen, onClose }: AddUserDialogProps) {
   const { data: sites } = useSites();
+  const { data: session } = useSession();
+  // ORG_ADMIN không được cấp SUPER_ADMIN — API chặn, danh sách ở đây khớp theo.
+  const roles = assignableRoles(session?.user?.role);
   const createUser = useCreateUser();
   const [form, setForm] = useState(initialForm);
 
@@ -102,7 +107,7 @@ export function AddUserDialog({ isOpen, onClose }: AddUserDialogProps) {
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">Vai trò</label>
               <div className="grid grid-cols-2 gap-2">
-                {Object.values(UserRole).map((role) => (
+                {roles.map((role) => (
                   <button
                     key={role}
                     type="button"

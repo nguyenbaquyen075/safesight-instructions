@@ -29,18 +29,20 @@ export async function POST(request: NextRequest) {
   });
   const siteByCamera = new Map(cameras.map(c => [c.id, c.siteId]));
 
-  let upserted = 0;
-  for (const row of rows) {
+  // Một $transaction cho cả lô: trên SQLite mỗi upsert rời là một giao dịch ghi
+  // riêng, tranh file với API, agent và engine (xem src/lib/prisma.ts).
+  const writes = rows.flatMap(row => {
     const siteId = siteByCamera.get(row.cameraId);
-    if (!siteId) continue;
+    if (!siteId) return [];
+    const minute = new Date(row.minute);
     const data = { persons: row.persons, personSeconds: Math.round(row.personSeconds) };
-    await prisma.observationStat.upsert({
-      where: { cameraId_minute: { cameraId: row.cameraId, minute: new Date(row.minute) } },
+    return [prisma.observationStat.upsert({
+      where: { cameraId_minute: { cameraId: row.cameraId, minute } },
       update: data,
-      create: { cameraId: row.cameraId, siteId, minute: new Date(row.minute), ...data },
-    });
-    upserted++;
-  }
+      create: { cameraId: row.cameraId, siteId, minute, ...data },
+    })];
+  });
+  if (writes.length) await prisma.$transaction(writes);
 
-  return NextResponse.json({ upserted }, { status: 201 });
+  return NextResponse.json({ upserted: writes.length }, { status: 201 });
 }

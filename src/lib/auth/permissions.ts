@@ -29,3 +29,12 @@ export function canAccessPath(role: UserRole | undefined, pathname: string): boo
   if (!role) return true; // session chưa tải xong -> không chặn nhầm, chờ vòng render sau
   return rolesForPath(pathname).includes(role);
 }
+
+/**
+ * Vai trò mà người gọi được phép cấp cho người khác: chỉ SUPER_ADMIN mới cấp được
+ * SUPER_ADMIN (docs/ba/05-permission-matrix.md). Dùng chung cho `/api/users`
+ * (POST/PATCH) và cho danh sách vai trò trong dialog người dùng.
+ */
+export function assignableRoles(callerRole: UserRole | undefined): UserRole[] {
+  return callerRole === UserRole.SUPER_ADMIN ? ALL_ROLES : ALL_ROLES.filter(r => r !== UserRole.SUPER_ADMIN);
+}
