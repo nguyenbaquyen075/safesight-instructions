@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { prisma } from './db';
+import { cameraIdOf } from './camera-agent';
 
 export type Lane = 'direct' | 'research';
 
@@ -82,7 +83,9 @@ export async function ensureTask(input: {
 
 // ponytail: SQLite không có FOR UPDATE SKIP LOCKED — thiết kế cho MỘT worker.
 // Nhiều worker/Postgres thì thay bằng UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED) như CRM lib/tasks.ts.
-export async function claimDue(limit: number, lane: Lane, now = new Date()): Promise<LeasedTask[]> {
+// opts.onePerCamera: mỗi lượt chỉ nhận MỘT task cho mỗi camera — subagent của một camera không
+// chạy hai phiên song song với chính nó; task thứ hai của camera đó chờ lượt sau.
+export async function claimDue(limit: number, lane: Lane, now = new Date(), opts: { onePerCamera?: boolean } = {}): Promise<LeasedTask[]> {
   const kinds = lane === 'direct' ? [...DIRECT_KINDS] : [...RESEARCH_KINDS];
   const due = await prisma.agentTask.findMany({
     where: {
@@ -94,7 +97,15 @@ export async function claimDue(limit: number, lane: Lane, now = new Date()): Pro
   });
   const leased: LeasedTask[] = [];
   const until = new Date(now.getTime() + LEASE_MS);
+  const claimedCameras = new Set<string>();
   for (const task of due) {
+    if (opts.onePerCamera) {
+      const cameraId = await cameraIdOf(task);
+      if (cameraId) {
+        if (claimedCameras.has(cameraId)) continue;
+        claimedCameras.add(cameraId);
+      }
+    }
     const { count } = await prisma.agentTask.updateMany({
       where: { id: task.id, OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }] },
       data: { leasedUntil: until, startedAt: task.startedAt ?? now, attempts: { increment: 1 } },

@@ -3,6 +3,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { prisma } from '../lib/db';
 import { claimDue, completeTask, ensureTask, laneOf, MAX_ATTEMPTS, releaseTask, retireExhausted, scheduleTask } from '../lib/tasks';
+import { ensureRecurring } from '../lib/recurring';
 
 test.beforeEach(async () => { await prisma.agentTask.deleteMany(); });
 
@@ -115,4 +116,46 @@ test('retireExhausted closes tasks that exceed MAX_ATTEMPTS', async () => {
   const row = await prisma.agentTask.findUnique({ where: { id } });
   assert.ok(row?.finishedAt);
   assert.match(row!.outcome ?? '', /3 lần/);
+});
+
+test('claimDue with onePerCamera leases at most one research task per camera', async () => {
+  await prisma.organization.upsert({ where: { id: 'org-one' }, update: {}, create: { id: 'org-one', name: 'One Org' } });
+  await prisma.site.upsert({ where: { id: 'site-one' }, update: {}, create: { id: 'site-one', orgId: 'org-one', name: 'Site One', address: 'x', lat: 0, lng: 0 } });
+  await prisma.camera.upsert({ where: { id: 'cam-one-a' }, update: {}, create: { id: 'cam-one-a', siteId: 'site-one', name: 'Cam A', rtspUrl: 'video:samples1.mp4', location: 'gate', status: 'ONLINE' } });
+  await prisma.camera.upsert({ where: { id: 'cam-one-b' }, update: {}, create: { id: 'cam-one-b', siteId: 'site-one', name: 'Cam B', rtspUrl: 'video:samples1.mp4', location: 'yard', status: 'ONLINE' } });
+  await prisma.violation.deleteMany({ where: { id: { in: ['v-one-a1', 'v-one-a2', 'v-one-b1'] } } });
+  await prisma.violation.createMany({ data: [
+    { id: 'v-one-a1', cameraId: 'cam-one-a', siteId: 'site-one', type: 'hard_hat', severity: 'critical', confidence: 0.9, bboxData: '[]', snapshotUrl: '/snapshots/a1.jpg' },
+    { id: 'v-one-a2', cameraId: 'cam-one-a', siteId: 'site-one', type: 'hard_hat', severity: 'critical', confidence: 0.9, bboxData: '[]', snapshotUrl: '/snapshots/a2.jpg' },
+    { id: 'v-one-b1', cameraId: 'cam-one-b', siteId: 'site-one', type: 'hard_hat', severity: 'critical', confidence: 0.9, bboxData: '[]', snapshotUrl: '/snapshots/b1.jpg' },
+  ] });
+  const now = new Date();
+  const past = new Date(now.getTime() - 1000);
+  for (const id of ['v-one-a1', 'v-one-a2', 'v-one-b1']) {
+    await scheduleTask({ kind: 'violation.review', subjectType: 'violation', subjectId: id, reason: 'review', dueAt: past });
+  }
+  const claimed = await claimDue(3, 'research', now, { onePerCamera: true });
+  assert.equal(claimed.length, 2, 'hai task cùng camera thì chỉ một cái được nhận trong lượt này');
+  const cameras = await Promise.all(claimed.map(async t => (await prisma.violation.findUnique({ where: { id: t.subjectId! }, select: { cameraId: true } }))!.cameraId));
+  assert.deepEqual([...cameras].sort(), ['cam-one-a', 'cam-one-b']);
+  const pending = await prisma.agentTask.findMany({ where: { leasedUntil: null, finishedAt: null } });
+  assert.equal(pending.length, 1, 'task còn lại vẫn chờ lượt sau');
+});
+
+test('ensureRecurring queues one digest per ONLINE camera whose subagent is enabled', async () => {
+  await prisma.organization.upsert({ where: { id: 'org-rec' }, update: {}, create: { id: 'org-rec', name: 'Rec Org' } });
+  await prisma.site.upsert({ where: { id: 'site-rec' }, update: {}, create: { id: 'site-rec', orgId: 'org-rec', name: 'Site Rec', address: 'x', lat: 0, lng: 0 } });
+  await prisma.camera.upsert({ where: { id: 'cam-rec-on' }, update: { status: 'ONLINE' }, create: { id: 'cam-rec-on', siteId: 'site-rec', name: 'Cam On', rtspUrl: 'video:samples1.mp4', location: 'gate', status: 'ONLINE' } });
+  await prisma.camera.upsert({ where: { id: 'cam-rec-off' }, update: { status: 'ONLINE' }, create: { id: 'cam-rec-off', siteId: 'site-rec', name: 'Cam Off', rtspUrl: 'video:samples1.mp4', location: 'yard', status: 'ONLINE' } });
+  await prisma.cameraAgent.deleteMany({ where: { id: { in: ['cam-rec-on', 'cam-rec-off'] } } });
+  await prisma.cameraAgent.create({ data: { id: 'cam-rec-off', isEnabled: false } });
+
+  const now = new Date();
+  await ensureRecurring(now);
+
+  const digest = await prisma.agentTask.findFirst({ where: { kind: 'camera.digest', subjectId: 'cam-rec-on', finishedAt: null } });
+  assert.ok(digest, 'camera ONLINE có subagent bật phải có task camera.digest');
+  const expected = now.getTime() + 30 * 60_000;
+  assert.ok(Math.abs(digest!.dueAt.getTime() - expected) < 60_000, `dueAt phải quanh now + 30 phút, nhận ${digest!.dueAt.toISOString()}`);
+  assert.equal(await prisma.agentTask.count({ where: { kind: 'camera.digest', subjectId: 'cam-rec-off', finishedAt: null } }), 0, 'subagent tắt thì không tạo digest');
 });

@@ -24,7 +24,10 @@ chứng quyết định hành động (xem "Bằng chứng và band").
 
 `claimDue(limit, lane)` lấy các `AgentTask` `finishedAt IS NULL AND dueAt <= now AND
 (leasedUntil IS NULL OR leasedUntil < now) AND attempts < 3`, sắp theo `priority DESC, dueAt
-ASC`. Lane trực tiếp lấy 20 row/vòng, nghiên cứu 2 row/vòng, chạy tuần tự.
+ASC`. Lane trực tiếp lấy 20 row/vòng và chạy tuần tự; lane nghiên cứu lấy 3 row/vòng với
+`{ onePerCamera: true }` (mỗi camera nhiều nhất một task/lượt, task thứ hai của cùng camera
+chờ lượt sau) rồi chạy **song song** bằng `Promise.allSettled` — một phiên hỏng không kéo
+theo phiên khác.
 `scheduleTask()` gộp trùng theo `kind + subject`; `retireExhausted()` đóng task hết 3 lần
 thử với outcome nêu rõ.
 
@@ -37,7 +40,7 @@ thử với outcome nêu rõ.
 | `violation.review` | nghiên cứu | 300 | `POST /api/violations` | mỗi vi phạm chốt |
 | `ops.escalate` | nghiên cứu | 250 | `health.sweep` khi không tự xử được | theo nhu cầu |
 | `shift.report` | nghiên cứu | 200 | agent tự gieo theo `shiftReportAt` | 1 lần/ngày |
-| `camera.digest` | nghiên cứu | 50 | `violation.review` qua `schedule_followup` | agent tự hẹn, 5–1440 phút |
+| `camera.digest` | nghiên cứu | 50 | `ensureRecurring()` cho mỗi camera ONLINE có subagent bật; agent cũng tự hẹn qua `schedule_followup` | `lastDigestAt + digestEveryMin` (mặc định 30 phút; lần đầu `now + digestEveryMin`) |
 | `followup` | nghiên cứu | 0 | tool `schedule_followup` | theo lý do agent nêu |
 
 `// ponytail: SQLite không có FOR UPDATE SKIP LOCKED; một worker duy nhất. Nhiều worker
@@ -180,6 +183,14 @@ cùng hàng đợi.
   `replaceIndex`).
 - **Cộng token:** cuối phiên (kể cả khi phiên lỗi giữa chừng) `input + output` được cộng vào
   `tokensUsedToday` của camera; `session.started.data` ghi thêm `cameraId`.
+- **Nhịp tổng hợp:** `ensureRecurring()` (`agent/lib/recurring.ts`, tách khỏi `main.ts` để test
+  được) hẹn một `camera.digest` cho mỗi camera ONLINE có subagent bật. Trước khi mở phiên,
+  `runResearch` gọi `hasActivitySince(cameraId, lastDigestAt)` — không có vi phạm mới và
+  không có event `health` mới thì task đóng với outcome `không có hoạt động mới từ digest
+  trước`, ghi `AgentEvent action { action: 'camera.digest.skipped' }`, dời `lastDigestAt` và
+  **không tốn token**. Có hoạt động thì chạy phiên rồi mới dời `lastDigestAt`.
+- **Song song:** vì mỗi lượt chỉ nhận một task/camera, ba phiên nghiên cứu chạy đồng thời
+  không bao giờ là hai phiên của cùng một camera.
 
 ## Tool (`agent/tools/*.ts`, mỗi file một tool)
 

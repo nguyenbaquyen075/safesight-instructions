@@ -2,16 +2,17 @@
 import './lib/env';
 import { logCapabilities } from './lib/capabilities';
 import { claimDue, completeTask, ensureTask, releaseTask, retireExhausted, type LeasedTask } from './lib/tasks';
+import { ensureRecurring } from './lib/recurring';
 import { emit, newSessionId } from './lib/audit';
 import { runDirect } from './direct/index';
 import { runResearch, SessionError } from './research/index';
 import { startHttp } from './channels/http';
-import { applyModelDefault, getAgentSettings } from './lib/settings';
+import { applyModelDefault } from './lib/settings';
 import { prisma } from './lib/db';
 
 const TICK_MS = 20_000;
 const DIRECT_BATCH = 20;
-const RESEARCH_BATCH = 2;
+const RESEARCH_BATCH = 3;
 
 let lastSweepAt: Date | null = null;
 let stopping = false;
@@ -52,19 +53,10 @@ async function runOne(task: LeasedTask, run: (t: LeasedTask) => Promise<string>)
 async function tick(): Promise<void> {
   await retireExhausted();
   for (const task of await claimDue(DIRECT_BATCH, 'direct')) await runOne(task, runDirect);
-  for (const task of await claimDue(RESEARCH_BATCH, 'research')) await runOne(task, t => runResearch(t));
+  // Mỗi camera nhiều nhất một task/lượt (onePerCamera) nên các phiên nghiên cứu chạy song song được.
+  const research = await claimDue(RESEARCH_BATCH, 'research', new Date(), { onePerCamera: true });
+  await Promise.allSettled(research.map(t => runOne(t, task => runResearch(task))));
   await ensureRecurring();
-}
-
-// Lưới an toàn mỗi vòng: nếu vì lý do gì (crash giữa chừng, task bị retire) không còn sweep/báo cáo đang chờ thì tạo lại.
-// ensureTask không đổi dueAt của task đang chờ, nên không làm sweep chạy dày hơn 60s.
-async function ensureRecurring(): Promise<void> {
-  await ensureTask({ kind: 'health.sweep', subjectType: 'system', reason: 'Quét sức khoẻ định kỳ', dueAt: new Date(Date.now() + 60_000) });
-  const settings = await getAgentSettings();
-  const [hh, mm] = settings.shiftReportAt.split(':').map(Number);
-  const due = new Date(); due.setHours(hh, mm, 0, 0);
-  if (due.getTime() <= Date.now()) due.setDate(due.getDate() + 1);
-  await ensureTask({ kind: 'shift.report', subjectType: 'system', reason: `Báo cáo ca lúc ${settings.shiftReportAt}`, dueAt: due });
 }
 
 async function seed(): Promise<void> {
