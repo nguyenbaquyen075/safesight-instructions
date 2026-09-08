@@ -8,8 +8,10 @@ import { AlertChannel } from '@/types/enums';
 import type { SendableChannel } from '@/lib/validation/alert-rule';
 
 export interface AlertSendInput {
-  violation: Violation;
-  camera: Camera;
+  /** Không có với cảnh báo vận hành (sendOpsAlert) — không gắn Violation cụ thể. */
+  violation?: Violation;
+  /** Không có với cảnh báo vận hành. */
+  camera?: Camera;
   /** Người nhận đã bỏ tiền tố kênh (chat_id, Zalo user id hoặc URL webhook). */
   recipient: string;
   /** Nội dung cảnh báo dạng HTML tối giản của Telegram; kênh khác tự chuyển đổi. */

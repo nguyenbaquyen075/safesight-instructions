@@ -27,11 +27,13 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AI-04 | Violation | AI Engine | Báo lại vi phạm kéo dài | S | Workflow | Mỗi 60s / người, tăng `occurrenceCount` | v0.6 |
 | F-AI-05 | Zone | AI Engine | Lọc theo vùng nhận diện | M | Advanced | Vùng `MONITORING` (3–20 điểm, tỉ lệ 0–1); người có điểm chân ngoài mọi vùng bị bỏ trước khi xét PPE; engine đọc lại DB mỗi 60s | v0.9 |
 | F-AI-06 | — | AI Engine | Nghiệm thu model | M | Other | `eval_ppe_decision.py` (báo oan / bỏ sót), `sweep_threshold.py` | v0.6 |
+| F-AI-07 | Zone | AI Engine | Xâm nhập vùng cấm | M | Advanced | Vùng `RESTRICTED` / `WARNING` / `SUSPENDED_LOAD`; người có điểm chân trong vùng liên tục ≥ 3s → vi phạm `zone_intrusion` / `suspended_load` kèm `zoneId` và ảnh khoanh đỏ, còn đứng thì báo lại mỗi 60s | v0.11 |
 | F-VIO-01 | Violation | Vi phạm | Xem danh sách vi phạm | S | Basic | Lọc theo loại, mức, trạng thái, camera | v0.6 |
 | F-VIO-02 | Violation | Vi phạm | Xem chi tiết vi phạm | S | Basic | Ảnh bằng chứng, bbox, tab Agent | v0.6 |
 | F-VIO-03 | Violation | Vi phạm | Cập nhật trạng thái vi phạm | S | Workflow | open → under_review → resolved / false_positive | v0.6 |
 | F-VIO-04 | Violation | Vi phạm | Xoá vi phạm | S | Basic | Có xác nhận, không hoàn tác | v0.6 |
 | F-VIO-05 | Violation | Vi phạm | Tiếp nhận vi phạm từ AI | S | Workflow | `POST /api/violations`, header `X-AI-Engine-Secret` | v0.6 |
+| F-VIO-06 | CorrectiveAction | Vi phạm | Giao và theo dõi việc khắc phục | M | Workflow | Nút "Giao xử lý" trong modal vi phạm (người xử lý, mô tả, hạn mặc định +24 h); nút "Đã khắc phục" kèm ghi chú bằng chứng; mục "Việc khắc phục" ở `/reports`; agent leo thang việc quá hạn một lần (`capa.overdue`) | v0.11 |
 | F-ALR-01 | Alert | Thông báo | Xem danh sách cảnh báo | S | Basic | Sinh từ vi phạm thật | v0.6 |
 | F-ALR-02 | Alert | Thông báo | Xác nhận cảnh báo | S | Workflow | new → acknowledged | v0.6 |
 | F-ALR-03 | Alert | Thông báo | Đánh dấu đã đọc tất cả | S | Other | Chưa có | P2 |
@@ -45,6 +47,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-TG-06 | Alert | Cảnh báo | Gửi cảnh báo SMS / Email | M | Other | Enum có, chưa nối | P3 |
 | F-VOICE-01 | Camera | Cảnh báo giọng nói | Ghi âm và phát tới loa công trường | M | Workflow | Mic trên camera đang vi phạm và trong modal vi phạm | v0.6 |
 | F-VOICE-02 | Camera | Cảnh báo giọng nói | Nhận và phát audio tại loa | S | Workflow | Trang `/site-speaker` theo camera | v0.6 |
+| F-VOICE-03 | Camera | Loa tự động | Phát câu nhắc an toàn qua loa công trường: nút "Phát loa" trong modal vi phạm và tool `announce` của agent (chỉ sau phán quyết VERIFIED vi phạm thật) | S | Workflow | `POST /api/cameras/[id]/announce` → bridge `POST /announce` → sự kiện `voice-announce`, trang `/site-speaker` đọc bằng `speechSynthesis` | v0.11 |
 | F-AN-01 | Violation | Phân tích | Xem xu hướng tuân thủ | M | Advanced | Recharts | v0.6 |
 | F-AN-02 | Violation | Phân tích | Xem phân bố vi phạm theo loại | S | Advanced | Donut | v0.6 |
 | F-AN-03 | Violation | Phân tích | Xem bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí | M | Advanced | Lưới 7×24 tô theo `--danger`; canvas chấm mờ trên ảnh xem trước camera | v0.9 |
@@ -61,6 +64,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AGENT-09 | CameraAgent | Agent | Trí nhớ theo camera | M | Advanced | Tool `remember_camera` ghi tối đa 20 ghi chú × 300 ký tự; hiện trên thẻ và panel camera; xoá có xác nhận | v0.8 |
 | F-AGENT-10 | CameraAgent | Agent | Agent trưởng điều phối subagent | M | Advanced | Tool `list_camera_agents` và `dispatch_to_camera` trong phiên toàn hệ thống; giao việc thành task `camera.instruction` chạy dưới subagent camera, chỉ dẫn ghi vào trí nhớ camera | v0.10 |
 | F-AGENT-10 | AgentTask | Agent | Tổng hợp ngay theo camera | S | Workflow | Xếp `camera.digest` (gộp với lượt đang chờ) + poke; trả `taskId` | v0.8 |
+| F-AGENT-11 | Violation | Agent | Phản hồi phán quyết của agent và thống kê độ chính xác | M | Workflow | Người chấm "Đúng"/"Sai" (kèm ghi chú ≤ 300 ký tự) ngay trong tab Agent của modal vi phạm (`PATCH /api/violations/[id]/feedback`, lưu `Violation.reviewFeedback`, ghi `AuditLog`); thẻ "Độ chính xác của agent" 7/30 ngày trên `/agent` (`GET /api/stats/agent-accuracy`, bảng theo camera và theo loại); nút "Xuất phản hồi agent (CSV)" trên `/reports` (`GET /api/reports/agent-feedback`) làm bộ dữ liệu train lại; `read_camera_history` trả `agentFeedback.wrongRate` 7 ngày để agent dè dặt hơn ở camera hay bị lật phán quyết | v0.11 |
 | F-RF-01 | — | Kiểm thử Roboflow | Đối chiếu model cloud trên ảnh tĩnh | S | Other | Kéo thả ảnh, 2 workflow, mỗi lần 1 credit | v0.6 |
 | F-USER-01 | User | Người dùng | Xem danh sách người dùng | S | Basic | | v0.6 |
 | F-USER-02 | User | Người dùng | Sửa vai trò và công trường được gán | S | Basic | `role`, `assignedSites` | v0.6 |

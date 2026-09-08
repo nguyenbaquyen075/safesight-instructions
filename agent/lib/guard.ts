@@ -12,6 +12,7 @@ export const LIMITS = {
   escalatePerSession: 2,
   followupPerSession: 3,
   rememberPerSession: 3,
+  announcePerSession: 2,
 } as const;
 
 export async function checkPaused(): Promise<Blocked | null> {

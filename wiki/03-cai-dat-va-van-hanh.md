@@ -7,7 +7,8 @@
 
 **Python** (chỉ cần khi chạy AI)
 - Python >= 3.9 (venv của dự án đang là 3.14)
-- Thư viện: `ultralytics`, `opencv-python`, `requests` (torch được ultralytics kéo theo)
+- Thư viện: `ultralytics`, `opencv-python`, `requests` (torch được ultralytics kéo theo); phiên bản ghim trong `ai-engine/requirements.txt`
+- `pip-audit` chưa được cài trong `.venv`; kiểm tra lỗ hổng cho các gói ghim thì chạy tay: `.venv/bin/pip install pip-audit && .venv/bin/pip-audit -r ai-engine/requirements.txt`
 
 ## Cài đặt
 
@@ -36,7 +37,8 @@ npm run db:seed
 | `DATABASE_URL` | ✅ | Dev: `file:./dev.db` (SQLite, chạy ở chế độ WAL — xem ghi chú bên dưới) |
 | `NEXTAUTH_SECRET` | ✅ | NextAuth v5 |
 | `NEXT_PUBLIC_YOLO_SERVER_URL` | ✅ | `http://localhost:4001` — thiếu thì UI không nối bridge |
-| `AI_ENGINE_SECRET` | ✅ | `POST /api/violations` từ chối request thiếu header `X-AI-Engine-Secret` khớp giá trị này (`openssl rand -base64 24`) |
+| `AI_ENGINE_SECRET` | ✅ | `POST /api/violations` từ chối request thiếu header `X-AI-Engine-Secret` khớp giá trị này (`openssl rand -base64 24`). Bridge dùng cùng giá trị cho `POST /detections` và `POST /announce`; dashboard + agent gửi kèm header này khi phát loa |
+| `YOLO_BRIDGE_URL` | — | Địa chỉ bridge phía **máy chủ** (mặc định `http://127.0.0.1:4001`) cho `announce()` và agent; chỉ cần đặt khi bridge không cùng máy với dashboard |
 | `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram **và** access token Zalo OA trong DB (32 byte base64) |
 | `WEBHOOK_SECRET` | bắt buộc nếu dùng kênh webhook | Ký body JSON (HMAC-SHA256) gửi ở header `X-SafeSight-Signature`; thiếu thì kênh webhook bỏ qua, không gửi bản chưa ký |
 | `PUBLIC_BASE_URL` | tuỳ chọn | URL công khai của dashboard; có thì Zalo gửi kèm ảnh snapshot và webhook nhận `snapshotUrl` tuyệt đối, không có thì Zalo chỉ gửi chữ |
@@ -146,7 +148,7 @@ SQLITE_URL=file:./data/dev.db POSTGRES_URL="$POSTGRES_URL" npm run db:pg:migrate
 npm run db:pg:generate
 ```
 
-`scripts/sqlite-to-postgres.mjs` chép **16 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
+`scripts/sqlite-to-postgres.mjs` chép **17 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `CorrectiveAction` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
 
 Với Docker, `.env` cần thêm (xem `.env.docker.example`):
 

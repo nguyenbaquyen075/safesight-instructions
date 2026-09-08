@@ -21,7 +21,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 |---|---|
 | `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB, gửi số người quan sát được mỗi phút |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
-| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
+| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân, `intrusions`/`IntrusionTracker` cho vùng cấm) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
 | `clips.py` | Clip bằng chứng: `FrameRing` (đệm 20 khung gần nhất), `ClipWriter` (bọc `cv2.VideoWriter`), `PendingClip`/`start_clip` — chỉ `ClipWriter` cần cv2 nên test được bằng `python3 -m unittest ai-engine/test_clips.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
 | `src/hooks/useYolo.ts` | Hook WebSocket phía frontend |
@@ -42,13 +42,21 @@ dưới khung người) nằm ngoài **mọi** vùng thì bị loại TRƯỚC k
 vi phạm và không tính là người quan sát. Camera không khai vùng nào = xét cả khung.
 
 ```
-Zone (isActive, type=MONITORING, polygonData = [{x,y}] tỉ lệ 0–1)
-   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s
-   ▼
-ppe_tracker.process_frame(frame, zones=[...])
-   │  zones.filter_persons_in_zones() — ray casting, bỏ người ngoài vùng
-   ▼
-phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
+Zone (isActive, polygonData = [{x,y}] tỉ lệ 0–1)
+   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s,
+   │  tách {cameraId: {'monitoring': [...], 'danger': [DangerZone(id, type, poly)]}}
+   ├─ monitoring ─────────────────────────────────────────────┐
+   ▼                                                          │
+ppe_tracker.process_frame(frame, zones=[...])                 │
+   │  zones.filter_persons_in_zones() — ray casting           │
+   ▼                                                          │
+PPE, vi phạm, snapshot (giữ nguyên)                           │
+   │                                                          │
+   └─ persons của khung ──► zones.intrusions() ◄─ danger ─────┘
+                                │  IntrusionTracker: đủ 3s liên tục mới chốt,
+                                │  còn đứng thì báo lại mỗi 60s (occurrenceCount++)
+                                ▼
+                     snapshot "VÙNG CẤM"/"TẢI TREO" + POST /api/violations (kèm zoneId)
 ```
 
 - Vẽ vùng ở **Cài đặt > Giám sát > sửa camera > "Vùng nhận diện"** (`ZoneEditor.tsx`),
@@ -59,8 +67,27 @@ phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
   thread phụ nên không làm chậm vòng lặp). Chưa chạy engine thì chưa có ảnh và trình
   vẽ hiện trạng thái rỗng.
 - Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
-  vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
-- `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
+  vùng làm việc là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
+- Tập GIỮ người của một luồng = vùng làm việc **hợp** vùng nguy hiểm của các camera đó
+  (`zones_for_stream` trong `zones.py`, có test riêng). Nếu không hợp vào thì người đứng
+  trong vùng cấm bị lọc mất ngay ở `process_frame` và `intrusions()` không bao giờ thấy họ.
+  Hệ quả (cố ý): người **chỉ** đứng trong vùng nguy hiểm cũng bị xét PPE và được tính vào
+  `ObservationStat` — họ đang ở trong phạm vi công trường nên đây là điều mong muốn.
+- Vùng **nguy hiểm** (`RESTRICTED`/`WARNING`/`SUSPENDED_LOAD`) không lọc ai cả: chỉ cần
+  điểm chân nằm trong vùng **liên tục 3 giây** là ghi vi phạm (`zone_intrusion` /
+  `suspended_load`, xem bảng `ZONE_VIOLATION_MAP` ở wiki/04), kèm `zoneId` và ảnh
+  khoanh đỏ `violation_<cam>_<giờ>_<track>-zone.jpg`. Còn đứng trong vùng thì báo lại
+  mỗi 60 giây với `occurrenceCount` tăng dần; rời vùng thì đếm lại từ đầu.
+- Vùng nguy hiểm xét theo **từng camera** (không gộp theo luồng như vùng làm việc) vì
+  `zoneId` ghi vào vi phạm phải thuộc đúng camera đó.
+- Người được lấy từ kết quả `process_frame` (không sửa `ppe_tracker.py`). Vùng cấm nằm
+  ngoài vùng làm việc vẫn bắt được nhờ phép hợp ở trên.
+- "Liên tục 3 giây" có **ân hạn 3 giây**: model trượt người vài khung (engine chỉ ~4 fps)
+  không làm đồng hồ đếm lại từ đầu; vắng mặt lâu hơn ân hạn mới coi là đã rời vùng.
+- Giới hạn đã biết: nếu BoT-SORT cấp lại một `trackId` cũ cho người khác trong cùng vùng,
+  người mới thừa hưởng mốc thời gian của người cũ và có thể bị chốt sớm.
+- Nhãn vẽ lên ảnh bằng chứng là ASCII (`VUNG CAM` / `TAI TREO`) vì `cv2.putText` chỉ có
+  font Hershey không dấu; nhãn tiếng Việt có dấu nằm trong `bboxData[].label` của vi phạm.
 
 ## Clip bằng chứng cho mỗi vi phạm
 

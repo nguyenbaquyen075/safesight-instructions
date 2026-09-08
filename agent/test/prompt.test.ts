@@ -9,7 +9,7 @@ import { preambleFor } from '../lib/preamble';
 import type { ToolContext } from '../lib/tool-context';
 import { prisma } from '../lib/db';
 
-const ctx: ToolContext = { sessionId: 's', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() } };
+const ctx: ToolContext = { sessionId: 's', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set() } };
 
 // Nguồn sự thật là thư mục skill, không phải một danh sách chép tay trong test: thêm skill mới
 // thì test tự bao luôn thay vì lặng lẽ bỏ sót.

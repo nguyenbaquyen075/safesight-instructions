@@ -5,7 +5,6 @@ import { prisma } from '@/lib/prisma';
 import { ORG_WIDE_ROLES, assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 import { logAudit } from '@/lib/audit-log';
 import {
-  MONITORING_ZONE_TYPE,
   defaultZoneName,
   serializeZonePolygon,
   toZoneDTO,
@@ -23,7 +22,7 @@ async function loadCamera(id: string) {
 
 async function listZones(cameraId: string) {
   const rows = await prisma.zone.findMany({
-    where: { cameraId, type: MONITORING_ZONE_TYPE, isActive: true },
+    where: { cameraId, isActive: true },
     orderBy: { createdAt: 'asc' },
   });
   // polygonData hỏng (sửa tay trong DB) -> bỏ qua vùng đó thay vì làm hỏng cả trang.
@@ -38,9 +37,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
   return NextResponse.json({ zones: await listZones(id) });
 }
 
-// PUT thay TOÀN BỘ danh sách vùng MONITORING của camera (gửi zones: [] = xoá hết ->
-// AI xét lại cả khung hình). AI engine đọc thẳng bảng Zone mỗi 60s nên không cần
-// báo cho tiến trình nào cả.
+// PUT thay TOÀN BỘ danh sách vùng của camera, MỌI loại (gửi zones: [] = xoá hết ->
+// AI xét lại cả khung hình và không còn vùng cấm nào). AI engine đọc thẳng bảng
+// Zone mỗi 60s nên không cần báo cho tiến trình nào cả.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   // Sửa vùng = đổi phạm vi AI được phép nhìn -> chỉ quản trị, khớp PAGE_ROLES['/settings']
   // (lối vào duy nhất trên giao diện). GET giữ nguyên để trình sửa vùng đọc được.
@@ -59,14 +58,19 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  // Xoá-rồi-tạo-lại: mỗi lần lưu vùng sinh một bộ Zone.id MỚI. Violation.zoneId khai
+  // `onDelete: SetNull` nên vi phạm zone_intrusion cũ mất liên kết vùng (về null) — thống kê
+  // theo vùng chỉ đúng cho vi phạm sinh sau lần lưu gần nhất. Chấp nhận: hình vùng đã đổi thì
+  // vi phạm cũ cũng không còn thuộc vùng đó nữa. Muốn giữ lịch sử thì phải cập nhật theo id
+  // thay vì thay cả danh sách (đổi hợp đồng của PUT).
   await prisma.$transaction([
-    prisma.zone.deleteMany({ where: { cameraId: id, type: MONITORING_ZONE_TYPE } }),
+    prisma.zone.deleteMany({ where: { cameraId: id } }),
     ...parsed.data.zones.map((zone, i) => prisma.zone.create({
       data: {
         siteId: camera.siteId,
         cameraId: id,
         name: zone.name?.trim() || defaultZoneName(i),
-        type: MONITORING_ZONE_TYPE,
+        type: zone.type,
         polygonData: serializeZonePolygon(zone.points),
       },
     })),

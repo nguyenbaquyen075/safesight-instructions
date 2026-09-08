@@ -23,6 +23,7 @@ image actually shows, item by item, and to know which items the detector gets wr
 - `occurrenceCount ≥ 2` means the tracker saw this person missing the item for at least 60 s → strong evidence, add `track.confirmed-repeat`.
 - The snapshot is a downscaled 640 px frame: do not guess details you cannot see; say `snapshot.occluded-or-backlit` instead.
 - Check the item that was REPORTED missing first; note other items only if clearly relevant.
+- `agentFeedback.wrongRate` (from `read_camera_history`) at or above 0.3 with at least 3 pieces of feedback means people keep overturning your verdicts on this camera: prefer PROBABLE over VERIFIED there.
 
 ## When you cannot conclude
 `record_verdict` with the non-primary kinds you did observe (e.g. `snapshot.occluded-or-backlit`,

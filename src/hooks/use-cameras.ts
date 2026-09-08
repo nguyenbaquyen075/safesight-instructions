@@ -72,7 +72,7 @@ export function useUpdateCamera() {
   });
 }
 
-/** Vùng nhận diện (Zone MONITORING) của 1 camera — nền cho trình vẽ trong CameraEditDialog. */
+/** Vùng của 1 camera (mọi loại: làm việc + vùng cấm) — nền cho trình vẽ trong CameraEditDialog. */
 export function useCameraZones(id: string | undefined) {
   return useQuery<ZoneDTO[]>({
     queryKey: ['cameras', id, 'zones'],
@@ -99,6 +99,21 @@ export function useSaveCameraZones(id: string | undefined) {
       return (await res.json()).zones as ZoneDTO[];
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cameras', id, 'zones'] }),
+  });
+}
+
+/** Phát một câu qua loa của camera (không text thì server dựng câu từ vi phạm). */
+export function useAnnounceCamera() {
+  return useMutation({
+    mutationFn: async ({ cameraId, text, violationId }: { cameraId: string; text?: string; violationId?: string }) => {
+      const res = await fetch(`/api/cameras/${cameraId}/announce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, violationId }),
+      });
+      if (!res.ok) { const err = (await res.json().catch(() => ({}))).error; throw new Error(typeof err === 'string' ? err : 'Không phát được loa'); }
+      return res.json() as Promise<{ ok: boolean; listeners?: number; error?: string; text: string }>;
+    },
   });
 }
 

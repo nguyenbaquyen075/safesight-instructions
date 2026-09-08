@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { askProgress, toChatItems } from '@/lib/chat-shape';
 import type { AgentEventView, AgentSettingsView, AgentTaskView, CameraAgentUpdate, CameraAgentView } from '@/types/agent';
+import type { AgentAccuracy } from '@/lib/agent-accuracy-shape';
 
 const qs = (o: Record<string, string | number | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
 
@@ -109,5 +110,19 @@ export function useDigestCamera() {
       return r.json() as Promise<{ taskId: string }>;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['agent-tasks'] }),
+  });
+}
+
+// Độ chính xác của agent trong N ngày gần nhất (thẻ ở /agent). Chỉ gửi `from`: route tự
+// lấy đến hết hôm nay.
+export function useAgentAccuracy(days: number) {
+  return useQuery<AgentAccuracy>({
+    queryKey: ['agent-accuracy', days],
+    queryFn: async () => {
+      const from = new Date(Date.now() - (days - 1) * 86_400_000).toISOString().slice(0, 10);
+      const r = await fetch(`/api/stats/agent-accuracy?${qs({ from })}`);
+      if (!r.ok) throw new Error('Không tải được độ chính xác của agent');
+      return r.json();
+    },
   });
 }

@@ -28,9 +28,10 @@ export const zaloSender: AlertSender = {
 
     const client = new ZaloClient(decrypt(settings.accessTokenEncrypted));
     const text = stripHtml(caption);
-    // Zalo tự tải ảnh nên chỉ gửi kèm được khi hệ thống có URL công khai.
+    // Zalo tự tải ảnh nên chỉ gửi kèm được khi có Violation gắn ảnh và hệ thống có URL công khai;
+    // cảnh báo vận hành (sendOpsAlert) không có Violation nên luôn là văn bản.
     const base = process.env.PUBLIC_BASE_URL;
-    const result = base
+    const result = violation && base
       ? await client.sendImage(recipient, new URL(violation.snapshotUrl, base).toString(), text)
       : await client.sendText(recipient, text);
     return result.ok ? { ok: true } : { ok: false, error: result.error };

@@ -105,6 +105,7 @@ model Violation {
   status      String   @default("OPEN")
   occurrenceCount Int  @default(1) // lần vi phạm liên tục thứ mấy của người này (reset khi rời khung hình)
   agentReview String?  // JSON: { verdict, band, observations, note, sessionId, reviewedAt }
+  reviewFeedback String? // JSON: { correct, note, userId, at } — người xác nhận phán quyết của agent đúng hay sai
   detectedAt  DateTime @default(now())
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -113,6 +114,32 @@ model Violation {
   camera Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
   zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
   alerts Alert[]
+  actions CorrectiveAction[]
+}
+
+// Việc khắc phục (CAPA) giao cho người cụ thể sau một vi phạm: ai làm, làm gì, hạn bao giờ.
+// Trực vận hành tự động quét việc OPEN đã quá hạn và leo thang MỘT lần duy nhất — escalatedAt
+// là dấu "đã leo thang", vòng quét sau bỏ qua việc đã có dấu này thay vì báo lại mỗi phút.
+model CorrectiveAction {
+  id           String    @id @default(cuid())
+  violationId  String
+  siteId       String
+  assigneeId   String?   // null khi người xử lý không có tài khoản trong hệ thống (chỉ nhập tên)
+  assigneeName String
+  description  String
+  dueAt        DateTime
+  status       String    @default("OPEN") // OPEN | DONE | CANCELLED
+  evidenceNote String?
+  completedAt  DateTime?
+  escalatedAt  DateTime?
+  createdById  String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  violation Violation @relation(fields: [violationId], references: [id], onDelete: Cascade)
+
+  @@index([violationId])
+  @@index([siteId, status, dueAt])
 }
 
 // Số người AI QUAN SÁT ĐƯỢC theo từng phút của từng camera — mẫu số để tính tỉ lệ

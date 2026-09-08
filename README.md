@@ -83,7 +83,7 @@ npm install
 
 # 2. Dependencies Python (trong .venv)
 python3 -m venv .venv
-.venv/bin/pip install ultralytics opencv-python requests
+.venv/bin/pip install -r ai-engine/requirements.txt
 
 # 3. Biến môi trường — tạo .env.local (KHÔNG commit, đã gitignore)
 cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_YOLO_SERVER_URL,
@@ -109,6 +109,11 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # ROBOFLOW_API_KEY (tuỳ chọn — chỉ cần nếu dùng Roboflow Workflow để
                       # đối chiếu kết quả trên ảnh tĩnh, xem mục "Đối chiếu bằng Roboflow
                       # Workflow" bên dưới; lấy ở app.roboflow.com/settings/api)
+                      #
+                      # YOLO_BRIDGE_URL (tuỳ chọn — địa chỉ bridge phía máy chủ cho loa tự động,
+                      # mặc định http://127.0.0.1:4001; chỉ cần khi bridge chạy máy khác. Câu loa
+                      # được gửi kèm header X-AI-Engine-Secret nên bridge và dashboard phải dùng
+                      # chung AI_ENGINE_SECRET)
                       #
                       # AGENT_BRIDGE_SECRET (bắt buộc để Next đánh thức agent và gửi câu hỏi từ
                       # panel; thiếu thì agent vẫn chạy theo chu kỳ 20s, sinh bằng
@@ -175,7 +180,7 @@ Lần chạy đầu container tự tạo `dev.db` đã seed (Organization/Site/C
 này và `./public/snapshots` là bind mount dùng chung với AI engine/agent chạy trên host (cần
 `DATABASE_URL=file:./data/dev.db` khi trỏ vào Docker). AI engine (Python, cần model `.pt`, webcam/GPU) và
 agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`, trỏ `NEXT_PUBLIC_YOLO_SERVER_URL`
-và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` của bridge, không
+và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` và `POST /announce` của bridge, không
 chỉ `POST /api/violations`. Tag image: `latest` (main), `0.6.0` / `0.6` (release), `main`, mã commit ngắn.
 
 **PostgreSQL (tuỳ chọn).** Ngăn xếp mặc định chạy SQLite. Cần nhiều worker agent hoặc nhiều bản dashboard

@@ -3,6 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Violation } from '@/types/models';
 import type { ViolationStatus } from '@/types/enums';
+import type { ActionStatus, CorrectiveActionDTO } from '@/lib/corrective-action-shape';
 
 // Không có kênh đẩy realtime cho ghi DB (AI engine là process riêng, ghi qua POST
 // /api/violations) -> polling định kỳ. React Query gộp chung 1 poll cho mọi trang
@@ -78,5 +79,96 @@ export function useUpdateViolationStatus() {
       return res.json();
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['violations'] }),
+  });
+}
+
+// --- Việc khắc phục (CAPA) ---------------------------------------------------
+// Cùng file với vi phạm vì mọi việc khắc phục đều treo dưới một vi phạm; key nằm dưới
+// tiền tố ['actions'] để mutation làm mới cả modal lẫn mục "Việc khắc phục" ở /reports.
+
+export function useViolationActions(violationId: string) {
+  return useQuery<CorrectiveActionDTO[]>({
+    queryKey: ['actions', 'violation', violationId],
+    queryFn: async () => {
+      const res = await fetch(`/api/violations/${violationId}/actions`);
+      if (!res.ok) throw new Error('Không tải được danh sách việc khắc phục');
+      return (await res.json()).actions;
+    },
+    enabled: !!violationId,
+  });
+}
+
+export function useOpenCorrectiveActions(filters?: { siteId?: string; status?: 'open' | 'overdue'; limit?: number }) {
+  return useQuery<CorrectiveActionDTO[]>({
+    queryKey: ['actions', 'list', filters],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (filters?.siteId) params.append('siteId', filters.siteId);
+      if (filters?.status) params.append('status', filters.status);
+      // Không truyền limit thì route trả mặc định 100 việc — trang báo cáo cần trần rõ ràng.
+      if (filters?.limit) params.append('limit', String(filters.limit));
+      const res = await fetch(`/api/actions?${params.toString()}`);
+      if (!res.ok) throw new Error('Không tải được việc khắc phục');
+      return (await res.json()).actions;
+    },
+  });
+}
+
+export function useCreateCorrectiveAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ violationId, ...body }: { violationId: string; assigneeId?: string; assigneeName: string; description: string; dueAt?: string }) => {
+      const res = await fetch(`/api/violations/${violationId}/actions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Không giao được việc khắc phục');
+      return res.json() as Promise<CorrectiveActionDTO>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['actions'] });
+      queryClient.invalidateQueries({ queryKey: ['violations'] });
+    },
+  });
+}
+
+export function useUpdateCorrectiveAction() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; status: ActionStatus; evidenceNote?: string }) => {
+      const res = await fetch(`/api/actions/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Không cập nhật được việc khắc phục');
+      return res.json() as Promise<CorrectiveActionDTO>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['actions'] });
+      queryClient.invalidateQueries({ queryKey: ['violations'] });
+    },
+  });
+}
+
+// Người chấm phán quyết của agent đúng/sai (G3). Làm mới ['violations'] để danh sách và
+// modal cùng thấy phản hồi mới, và ['agent-accuracy'] để thẻ độ chính xác ở /agent cập nhật.
+export function useSubmitReviewFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; correct: boolean; note?: string }) => {
+      const res = await fetch(`/api/violations/${id}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Không gửi được đánh giá phán quyết');
+      return res.json() as Promise<Violation>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['violations'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-accuracy'] });
+    },
   });
 }

@@ -23,7 +23,7 @@ const SESSION = 's-orch';
 
 const ctx = (): ToolContext => ({
   sessionId: SESSION, taskId: null, taskKind: 'ask', budget: 6, cameraId: null,
-  spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() },
+  spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set() },
 });
 const list = async () => JSON.parse((await makeListCameraAgents(ctx()).run({})) as string);
 const dispatch = async (input: { cameraId: string; instruction: string; minutes?: number }, c: ToolContext = ctx()) =>

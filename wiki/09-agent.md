@@ -103,6 +103,31 @@ kèm `snapshotUrl` và truyền cờ `closed` cho từng file. Không còn luậ
 engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0 file
 và `disk.pressure` lặp lại mỗi sweep dù đĩa đang đầy thật.
 
+### Việc khắc phục quá hạn (`capa.overdue`)
+
+`collectSignals()` đọc thêm `overdueActionIds` (`findOverdueActionIds`): id của các
+`CorrectiveAction` còn `OPEN`, đã qua `dueAt` và **chưa từng leo thang** (`escalatedAt = null`),
+tối đa 50. Có ít nhất một id thì `decide()` sinh **một** finding `capa.overdue`
+(`subjectType: 'system'`, `detail = { count, ids }`) — gộp chung chứ không phải mỗi việc một
+finding, vì đây là một việc leo thang duy nhất cho trực vận hành.
+
+`detail` cố ý chỉ mang số đếm và id: nó được ghi nguyên vào `AgentEvent`, nên tên người xử lý
+được `applyFindings()` đọc lại từ DB đúng lúc dựng lý do. Hàm này xếp một
+`AgentTask kind=ops.escalate` **với khoá gộp riêng `subjectType: 'capa', subjectId: 'overdue'`** —
+leo thang vận hành (`bridge.down`/`engine.stalled`/`model.missing`) dùng `subjectType: 'system'`,
+dùng chung khoá thì `scheduleTask` coi là một task và ghi đè lý do của nhau. Lý do nêu tên
+**tối đa 5** việc quá hạn lâu nhất (phần còn lại chỉ đếm); tên người xử lý là chữ người dùng
+tự nhập nên được gộp khoảng trắng và cắt còn **40 ký tự**, và lý do ghi rõ "(tên do người dùng
+nhập)" trước danh sách để phiên nghiên cứu không đọc nhầm phần đó là chỉ dẫn. Sau đó `updateMany({ id: { in: ids }, escalatedAt: null })` đặt `escalatedAt` cho **toàn
+bộ** việc trong finding — điều kiện `escalatedAt: null` làm bước này idempotent khi cùng một
+finding chạy lại. Đó là dấu "đã báo người rồi": vòng quét sau (60s) không còn thấy chúng nữa,
+nên mỗi việc chỉ leo thang một lần thay vì báo lại mỗi phút.
+
+`capa.overdue` **không** đi qua khối leo thang theo số lần lặp (`repeats === 3`) như các phát
+hiện khác: nó đã tự leo thang ngay ở lần đầu và tự dập bằng `escalatedAt`, cho nó lặp tiếp sẽ
+tạo thêm một `ops.escalate` thứ hai và bắn `JSON.stringify(detail)` (tới 50 id) qua mọi kênh
+cảnh báo. Agent **không** tự đóng hay tự làm việc khắc phục — đó là việc của người; nó chỉ nhắc.
+
 ## Bằng chứng và band
 
 `ObservationKind` là danh sách đóng, mỗi kind có `weight`, `primary`, `label`:
@@ -150,7 +175,8 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
   chỉ ghi event và `snapshot.cleanup` không xoá file nào. `write_note` **vẫn chạy**: nó chỉ
   ghi nhận vào nhật ký agent, không đụng tới dữ liệu vận hành.
 - **Tần suất:** `escalate` theo AlertRule cooldown; `record_verdict` 1 lần/vi phạm/phiên;
-  `schedule_followup` tối đa 3/phiên; `remember_camera` tối đa 3/phiên; sweep: đổi trạng thái camera 1/5 phút/camera,
+  `schedule_followup` tối đa 3/phiên; `remember_camera` tối đa 3/phiên; `announce` tối đa 2/phiên
+  (`LIMITS.announcePerSession`) và 60 giây/camera; sweep: đổi trạng thái camera 1/5 phút/camera,
   SIGTERM engine 3/giờ.
 - **Không bao giờ:** không có tool xoá bản ghi, sửa User/role/AlertRule/TelegramSettings,
   đổi `rtspUrl`, sửa ngưỡng nhận diện, đọc/ghi file ngoài `public/snapshots`, gọi mạng ngoài
@@ -204,19 +230,37 @@ cùng hàng đợi.
 
 | Tool | Loại | Input | Trả về |
 |---|---|---|---|
-| `read_violation` | đọc | `violationId` | ảnh snapshot, bbox, type, severity, confidence, occurrenceCount, status, `agentReview` cũ, **cameraId, siteId** |
-| `read_camera_history` | đọc | `cameraId, hours (24/168)` | vi phạm (id, type, status, detectedAt), tỉ lệ `false_positive`, giờ cao điểm, sức khoẻ gần nhất, **siteId** |
+| `read_violation` | đọc | `violationId` | ảnh snapshot, bbox, type, severity, confidence, occurrenceCount, status, `agentReview` cũ, **cameraId, siteId**, `actions[]` (`assigneeName`, `dueAt`, `status`, `overdue`) — việc khắc phục đã giao cho người |
+| `read_camera_history` | đọc | `cameraId, hours (24/168)` | vi phạm (id, type, status, detectedAt), tỉ lệ `false_positive`, giờ cao điểm, sức khoẻ gần nhất, **siteId**, `agentFeedback: { total, wrong, wrongRate }` — phản hồi của người về phán quyết agent trong **7 ngày** của camera đó (khung cố định, không theo `hours`); `wrongRate = wrong / max(total, 1)` làm tròn 2 chữ số |
 | `read_site_context` | đọc | `siteId` | site, camera (id, name, status), AlertRule bật, số người nhận Telegram |
 | `search_violations` | đọc | `cameraId?/siteId?/type?/status?/from?/to?/limit` | danh sách id + tóm tắt; không fuzzy |
-| `read_agent_activity` | đọc | `hours` | task đã xong/đang chờ, phán quyết gần đây, sweep gần nhất |
+| `read_agent_activity` | đọc | `hours` | task đã xong/đang chờ, phán quyết gần đây, sweep gần nhất, `openActions`/`overdueActions` (số việc khắc phục còn mở / quá hạn) |
 | `read_system_health` | đọc | — | kết quả `health.sweep` gần nhất, capabilities |
 | `record_verdict` | ghi | `violationId, observations: ObservationKind[], note` | `{ band, applied: bool, statusNow }` |
 | `escalate` | ghi | `violationId, caption` | `{ sent, blockedReason? }` |
 | `schedule_followup` | ghi | `kind ("followup"\|"camera.digest"), subjectType, subjectId, minutes (5..1440), reason (≥10 ký tự)` | `{ dueAt }` |
 | `write_note` | ghi | `subjectType, subjectId, note` | `{ ok }` |
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
+| `announce` | ghi | `cameraId, text (10..200)` | `{ ok, listeners? }` hoặc `blockedReason` — phát câu nhắc qua loa công trường của camera (`announce()` trong `src/lib/announce.ts` → `POST /announce` của bridge). Chỉ có trong kind `violation.review`, `followup`, `camera.instruction`, `ask`. Điều kiện: phiên review/followup phải đã `record_verdict` **VERIFIED + vi phạm thật** cho vi phạm của chính camera đó (`ctx.spent.verdicts`); các kind khác cần một phán quyết VERIFIED thật của camera đó trong 10 phút gần nhất. Tối đa 2 lần/phiên (`LIMITS.announcePerSession`), mỗi camera cách nhau 60 giây (`rateLimit('announce:<cameraId>', 1, 60_000)`), kill switch chặn |
 | `list_camera_agents` | đọc | — | `{ cameras: [{ cameraId, name, status, siteId, isEnabled, tokensUsedToday, dailyTokenCap, lastDigestAt, notes (3 ghi chú mới nhất), openViolations }] }` — chỉ trong phiên toàn hệ thống |
 | `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryWritten, memoryTotal }` (task đã xếp thì ghi trí nhớ lỗi cũng không đổi thành lỗi) hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
+
+`escalate` không có `violationId` (leo thang vận hành, kind `ops.escalate`) đi qua
+`sendOpsAlert` (`agent/lib/notify.ts`), không phải chỉ Telegram: `opsTargets(rules)` (thuần,
+có test riêng) chọn rule `AlertRule` đang bật có `violationTypes` rỗng (không có thì rule bật
+đầu tiên), rồi trải ra **mọi kênh** của rule đó đã có sender nối thật (`senderFor`, cùng
+`src/lib/alert-channels/*` mà `notifyViolation` dùng cho vi phạm) — Telegram/Zalo/Webhook,
+mỗi kênh mỗi người nhận. `sent = true` nếu ít nhất một kênh gửi được, kèm `perChannel` (kênh,
+người nhận, ok/error) để agent ghi vào `AgentEvent`. Cảnh báo vận hành **không** ghi bảng
+`Alert` (khác với `notifyViolation`) vì `Alert.violationId` bắt buộc và ở đây không có vi phạm
+nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`action: 'escalate.ops'` /
+`'ops.alert'`), không ở trang `/alerts`.
+
+`announce` nằm ở **cuối** bộ tool của `violation.review`, `followup`, `camera.instruction` và `ask`
+(thứ tự các tool trước đó không đổi để cache prompt còn dùng lại được). OPENING của
+`violation.review` trong `agent/lib/preamble.ts` nhắc: "Vi phạm VERIFIED thật và camera có loa →
+announce một câu ngắn". OPENING của `shift.report` và `weekly.report` nhắc thêm phần "việc khắc
+phục còn mở / quá hạn" và chỉ tới `read_agent_activity` (`openActions`, `overdueActions`).
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
@@ -240,6 +284,8 @@ Skill hiện có:
 - `evidence` — từng `ObservationKind`, khi nào dùng, vì sao không có confidence.
 - `ppe-review` — mũ chỉ tính khi ở vùng đầu; găng/giày là lớp yếu (oan 6–9%) nên cần
   bằng chứng primary mới kết luận; model không có lớp `no_vest`; người nền; ngược sáng.
+  Thêm: `agentFeedback.wrongRate` ≥ 0.3 với ít nhất 3 phản hồi nghĩa là người hay lật
+  phán quyết ở camera này → chọn PROBABLE thay vì VERIFIED.
 - `escalation` — lần 1 là nhắc nhở, từ lần 2 là vi phạm; không spam; caption ngắn có
   camera, món thiếu, lần thứ mấy.
 - `data-boundaries` — không suy đoán danh tính người, không mô tả đặc điểm cá nhân ngoài
@@ -282,7 +328,8 @@ UI:
   (bật/tắt, model, trần token, giờ báo cáo ca, giờ báo cáo tuần), ô hỏi toàn hệ thống, capabilities.
 - Trang `/reports` đọc `GET /api/agent/events?type=report&limit=1` để hiện bản báo cáo tuần mới
   nhất: cuối phiên `weekly.report`, `runSession` phát thêm `AgentEvent report { text }` bên cạnh
-  `session.ended` (agent vẫn gửi Telegram bằng `escalate` không `violationId` như `shift.report`).
+  `session.ended` (agent vẫn leo thang bằng `escalate` không `violationId` như `shift.report`,
+  qua `sendOpsAlert` — mọi kênh AlertRule đã cấu hình, không chỉ Telegram).
   `weekly.report` cũng chạy với `effort: 'high'` giống `shift.report`.
 - Hook React Query `src/hooks/use-agent.ts`: `useAgentTasks`, `useAgentEvents` (poll khi
   thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent`.
@@ -364,6 +411,10 @@ Kiểm thử (`agent/test/*.test.ts`), file mới thêm để lấp khoảng tr�
 - `escalate.test.ts` — `makeEscalate()` (`agent/tools/escalate.ts`): chặn khi chưa VERIFIED,
   chưa đủ nghiêm trọng, hết lượt leo thang trong phiên, agent tạm dừng; và đường vận hành
   (không có `violationId`) gọi `sendOpsAlert` + tăng `ctx.spent.escalations`.
+- `ops-alert.test.ts` — `opsTargets()` (thuần) chọn đúng rule và trải ra mọi kênh/người nhận
+  có prefix `zalo:`/`webhook:`, bỏ kênh chưa nối sender; `sendOpsAlert()` với sender giả tiêm
+  qua tham số `senders` (không đụng mạng): gửi qua nhiều kênh, coi là `sent` khi ít nhất một
+  kênh ok, và báo lý do khi không có rule/kênh nào bật.
 - `agent-bridge.test.ts` — `enqueueAgentTask()` (`src/lib/agent-bridge.ts`): gộp task trùng
   đang chờ, không gộp vào task đang lease hoặc đã xong.
 - `violation-status.test.ts` — bất biến status viết HOA (route `PATCH

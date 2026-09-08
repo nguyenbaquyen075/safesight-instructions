@@ -13,7 +13,7 @@ const { Server } = require('socket.io');
 const PORT = 4001;
 const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
 if (!AI_ENGINE_SECRET) {
-  console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections KHÔNG xác thực (chỉ dùng cho dev).');
+  console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections và POST /announce KHÔNG xác thực (chỉ dùng cho dev).');
 }
 
 const app = express();
@@ -45,6 +45,22 @@ app.post('/detections', (req, res) => {
     io.to(targets).emit('new-violation', { cameraId, ...violation });
   }
   res.sendStatus(200);
+});
+
+// Loa công trường: dashboard/agent đẩy một câu, bridge phát cho thiết bị đang mở
+// /site-speaker của camera đó. Trả về số thiết bị đang nghe để người gọi biết có ai nghe không.
+app.post('/announce', (req, res) => {
+  if (AI_ENGINE_SECRET && req.headers['x-ai-engine-secret'] !== AI_ENGINE_SECRET) {
+    return res.sendStatus(401);
+  }
+  const { cameraId, text } = req.body || {};
+  // Bridge là ranh giới tin cậy cuối trước loa: kiểm kiểu và độ dài ở đây, không tin route/tool phía trên.
+  if (typeof cameraId !== 'string' || !cameraId.trim() || typeof text !== 'string' || !text.trim() || text.length > 200) {
+    return res.status(400).json({ ok: false, error: 'cameraId và text (1–200 ký tự) là bắt buộc' });
+  }
+  const room = `camera-${cameraId}`;
+  io.to(room).emit('voice-announce', { cameraId, text, at: new Date().toISOString() });
+  res.json({ ok: true, listeners: io.sockets.adapter.rooms.get(room)?.size ?? 0 });
 });
 
 // Sức khoẻ cho agent/direct/health.ts: camera nào còn gửi detection, bao nhiêu client đang xem

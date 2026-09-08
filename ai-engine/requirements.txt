@@ -1,0 +1,11 @@
+# Ghim từ .venv của operator (pip freeze), ngày 2026-09-08.
+# Chỉ liệt kê các gói ai-engine/*.py import trực tiếp và phụ thuộc chạy rõ ràng của chúng.
+# Cập nhật khi nâng cấp: kiểm tra bằng
+#   .venv/bin/python -m pip freeze | grep -iE '^(torch|torchvision|ultralytics|opencv-python|numpy|requests)=='
+# rồi thay các dòng dưới đây.
+torch==2.14.0
+torchvision==0.29.0
+ultralytics==8.4.142
+opencv-python==5.0.0.93
+numpy==2.5.3
+requests==2.34.2

@@ -6,7 +6,7 @@ import { applyVerdict } from '../tools/record_verdict';
 import { AGENT_SETTINGS_ID } from '../lib/settings';
 import type { ToolContext } from '../lib/tool-context';
 
-const ctx = (): ToolContext => ({ sessionId: 's-test', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() } });
+const ctx = (): ToolContext => ({ sessionId: 's-test', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set() } });
 
 test.before(async () => {
   // Tự tạo dữ liệu, không phụ thuộc file test khác (mỗi file test chạy trong tiến trình riêng).
