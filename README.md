@@ -83,7 +83,7 @@ npm install
 
 # 2. Dependencies Python (trong .venv)
 python3 -m venv .venv
-.venv/bin/pip install ultralytics opencv-python requests
+.venv/bin/pip install -r ai-engine/requirements.txt
 
 # 3. Biến môi trường — tạo .env.local (KHÔNG commit, đã gitignore)
 cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_YOLO_SERVER_URL,
