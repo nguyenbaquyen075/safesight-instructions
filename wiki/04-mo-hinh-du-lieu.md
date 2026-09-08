@@ -14,6 +14,7 @@ Organization (tổ chức / tenant)
                     └── Violation (vi phạm)
                           └── Alert (cảnh báo đã gửi)
 AuditLog (nhật ký thao tác)   ·   TelegramSettings (1 dòng: bot token đã mã hoá)
+ObservationStat (số người quan sát được mỗi phút của từng camera)
 AgentTask (hàng đợi)   ·   AgentEvent (audit + chat)   ·   AgentSettings (1 dòng: kill switch, model, trần token)
 CameraAgent (1 dòng/camera: subagent riêng của camera)
 ```
@@ -27,6 +28,7 @@ CameraAgent (1 dòng/camera: subagent riêng của camera)
 | `Camera` | Camera giám sát | `rtspUrl` lưu nguồn theo quy ước `webcam:0` / `rtsp://...` / `video:ten.mp4`; `status` khác `ONLINE` thì AI bỏ qua |
 | `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string; chưa dùng trong pipeline AI |
 | `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung; GET `/api/violations` và `/api/violations/[id]` trả về trường này), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
+| `ObservationStat` | Số người AI quan sát được mỗi phút của một camera | `minute` (mốc phút), `persons` (đông nhất trong phút), `personSeconds` ("người × giây"), `@@unique([cameraId, minute])`; AI engine ghi qua `POST /api/observations`, là MẪU SỐ của tỉ lệ tuân thủ thật (`GET /api/stats/compliance`). Cố ý không khai quan hệ Prisma tới Camera/Site — chỉ đọc theo `siteId` + `minute` |
 | `Alert` | Cảnh báo sinh từ vi phạm | `channel`, `recipient`, `errorMessage` (null = gửi thành công, dùng tính cooldown) |
 | `AlertRule` | Quy tắc cảnh báo | `violationTypes`/`channels`/`recipients` JSON array, `threshold`, `cooldownSec` |
 | `User` | Người dùng | `role`, `assignedSites` JSON array, `passwordHash` (Credentials login) |

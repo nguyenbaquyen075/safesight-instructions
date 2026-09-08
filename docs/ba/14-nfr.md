@@ -27,6 +27,7 @@ Trạng thái: ✅ đã đáp ứng ở v0.6.0 · 🟡 một phần · 🔲 chư
 | NFR-14 | Nền tảng: Node ≥ 20 (khuyến nghị 24), Python 3.9–3.14, Linux; trình duyệt Chrome / Edge / Safari mới; máy tính bảng cho trang loa | ✅ | |
 | NFR-15 | Agent: sweep 60s, tick 20s, lease 10 phút, tối đa 3 lần thử / việc | ✅ | |
 | NFR-16 | Dung lượng snapshot có trần `SNAPSHOT_MAX_MB`, agent tự dọn | ✅ | |
+| NFR-25 | Số liệu quan sát: AI engine gửi `ObservationStat` **1 lần/phút cho toàn bộ luồng** (timeout 2s, lỗi thì bỏ qua phút đó) — không được chặn vòng lặp nhận diện; mỗi camera tối đa 1.440 dòng/ngày, upsert theo `(cameraId, minute)` nên gửi trùng không nhân đôi | ✅ | Kiểm bằng unit test + `py_compile`; chưa đo trên camera thật |
 
 ## 3. Yêu cầu khác
 

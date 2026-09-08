@@ -180,6 +180,7 @@ export interface DashboardKPIs {
   violationsTrend: number; // percentage change from yesterday
   complianceRate: number;
   complianceTrend: number;
+  complianceEstimated: boolean; // true = ước lượng theo số vi phạm, chưa có dữ liệu quan sát
   activeAlerts: number;
   alertsTrend: number;
   activeCameras: number;

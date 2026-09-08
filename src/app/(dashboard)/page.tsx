@@ -30,10 +30,11 @@ interface KPICardProps {
   icon: React.ElementType;
   iconBg: string;
   suffix?: string;
+  note?: string;
   isLoading?: boolean;
 }
 
-function KPICard({ title, value, trend, icon: Icon, iconBg, suffix, isLoading }: KPICardProps) {
+function KPICard({ title, value, trend, icon: Icon, iconBg, suffix, note, isLoading }: KPICardProps) {
   const isPositive = trend >= 0;
   const trendIsGood = title === 'Compliance Rate' ? isPositive : !isPositive;
 
@@ -58,7 +59,14 @@ function KPICard({ title, value, trend, icon: Icon, iconBg, suffix, isLoading }:
 
       <div className="flex items-start justify-between">
         <div className="space-y-2">
-          <p className="text-sm text-[var(--text-muted)]">{title}</p>
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="text-sm text-[var(--text-muted)]">{title}</p>
+            {note && (
+              <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--warning-muted)] text-[var(--warning)]">
+                {note}
+              </span>
+            )}
+          </div>
           <div className="flex items-baseline gap-1">
             <span className="text-3xl font-bold text-[var(--text-primary)] animate-count-up">
               {value}
@@ -154,6 +162,8 @@ export default function DashboardPage() {
           trend={kpis?.complianceTrend ?? 0}
           icon={ShieldCheck}
           iconBg="success"
+          // Chưa có dữ liệu quan sát của hôm nay -> con số là ước lượng theo số vi phạm.
+          note={kpis?.complianceEstimated ? 'ước tính' : undefined}
           isLoading={kpisLoading}
         />
         <KPICard
