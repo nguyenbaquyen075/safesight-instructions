@@ -28,10 +28,10 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, Zalo OA, quy tắc cảnh báo |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo, tab "Nhật ký" (`AuditLogCard`, đọc `GET /api/audit-log`) |
-| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), ô hỏi toàn hệ thống dạng bong bóng chat (`AskAgentBox`), capabilities |
+| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), thẻ "Độ chính xác của agent" (chọn 7/30 ngày, nguồn `GET /api/stats/agent-accuracy`: đã phán quyết / có phản hồi / tỉ lệ sai, bảng theo camera và theo loại vi phạm), ô hỏi toàn hệ thống dạng bong bóng chat (`AskAgentBox`), capabilities |
 | *(mọi trang)* | `components/agent/AgentChatWidget.tsx` (gắn ở `(dashboard)/layout.tsx`) | như trang đang xem | Widget **Trợ lý SafeSight** nổi góc phải dưới: nút tròn mở panel chat toàn hệ thống (`useAskSession` + `ChatThread`/`ChatComposer`, gửi qua `POST /api/agent/ask`, poll `/api/agent/events?sessionId`), ẩn trên `/agent` và khi in |
 | `/profile` | `(dashboard)/profile/page.tsx` | tất cả (không có trong `PAGE_ROLES` → mở cho mọi vai trò) | Xem tên/email/vai trò (chỉ đọc) + form đổi mật khẩu (`PATCH /api/users/me/password`); vào từ menu avatar ở Header |
-| `/reports` | `(dashboard)/reports/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Lọc công trường/camera/khoảng ngày (mặc định 7 ngày), 4 ô số tổng, bảng tổng hợp theo camera, bảng chi tiết (200 dòng mới nhất), "Xuất CSV" (Blob UTF-8 có BOM, đủ số dòng API trả), "In / PDF" (`window.print()`), mục "Việc khắc phục" (việc còn mở/quá hạn gộp theo công trường + 20 việc quá hạn đầu, nguồn `GET /api/actions`), báo cáo tuần mới nhất của agent |
+| `/reports` | `(dashboard)/reports/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Lọc công trường/camera/khoảng ngày (mặc định 7 ngày), 4 ô số tổng, bảng tổng hợp theo camera, bảng chi tiết (200 dòng mới nhất), "Xuất CSV" (Blob UTF-8 có BOM, đủ số dòng API trả), "In / PDF" (`window.print()`), nút "Xuất phản hồi agent (CSV)" (link mở tab mới tới `GET /api/reports/agent-feedback` kèm bộ lọc đang chọn), mục "Việc khắc phục" (việc còn mở/quá hạn gộp theo công trường + 20 việc quá hạn đầu, nguồn `GET /api/actions`), báo cáo tuần mới nhất của agent |
 
 Bản in của `/reports` dùng khối `@media print` ở cuối `src/app/globals.css`: đổi token màu sang nền sáng (giao diện nền tối in ra giấy sẽ mất chữ), ẩn `aside`/`header`/`.no-print`, bỏ `margin-left` của khung nội dung (`print:ml-0` trong `(dashboard)/layout.tsx`).
 
@@ -49,6 +49,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session), nhận thêm `clipUrl` tuỳ chọn (clip bằng chứng ~8s) rồi gọi `notifyViolation()` (Telegram / Zalo OA / webhook ký HMAC) |
 | `/api/violations/count` | GET | Cần session; `{ open, openIds }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
+| `/api/violations/[id]/feedback` | PATCH | Người chấm phán quyết của agent; cần session + `assertSiteAccess` theo site của vi phạm. Body zod `{ correct: boolean, note?: ≤ 300 }` (`reviewFeedbackSchema` trong `src/lib/agent-accuracy-shape.ts`); vi phạm chưa có `agentReview` → **409**. Lưu kèm `userId` + `userName` (tên hoặc email người chấm, `buildReviewFeedback()`); ghi đè phản hồi cũ (chỉ giữ lần chấm mới nhất), ghi `AuditLog` `violation.review.feedback`, trả DTO vi phạm |
 | `/api/violations/[id]/actions` | GET, POST | Việc khắc phục của một vi phạm; cả 2 cần session + `assertSiteAccess` theo site của vi phạm. POST: zod `createActionSchema` (`src/lib/corrective-action-shape.ts`: `assigneeId?`, `assigneeName` 2–80, `description` 5–500, `dueAt` ISO **ở tương lai**, thiếu thì mặc định +24 h); vi phạm đang `OPEN` được chuyển sang `UNDER_REVIEW`; ghi `AuditLog` `violation.action.create`, trả 201 `CorrectiveActionDTO` |
 | `/api/actions/[id]` | PATCH | Cần session + `assertSiteAccess` theo site của việc; zod `updateActionSchema` (`status` `OPEN`/`DONE`/`CANCELLED`, `evidenceNote?` ≤ 500). `DONE` ghi `completedAt`; khi vi phạm không còn việc `OPEN` nào và đã có ít nhất một việc `DONE` thì vi phạm chuyển `RESOLVED`. Ghi `AuditLog` `violation.action.update` |
 | `/api/actions` | GET | Cần session; `?siteId&status=open\|overdue&limit` (mặc định 100, kẹp trong 1–200). Luôn chỉ trả việc `OPEN`; `overdue` lọc thêm `dueAt < now`. Không có `siteId` thì lọc theo `allowedSiteIds()`; xin site ngoài phạm vi → 403. Nguồn của mục "Việc khắc phục" ở `/reports` |
@@ -58,6 +59,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`); POST ghi `AuditLog` |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma); PATCH/DELETE ghi `AuditLog` |
 | `/api/observations` | POST | Chỉ cho AI engine (header `X-AI-Engine-Secret`, không session): `{ observations: [{ cameraId, minute (ISO phút), persons, personSeconds }] }` tối đa 200 dòng; upsert `ObservationStat` theo `(cameraId, minute)` trong **một** `$transaction` cho cả lô nên gửi lại cùng một phút không nhân đôi mẫu số; `siteId` suy từ Camera, camera đã xoá thì bỏ qua dòng đó. Trả 201 `{ upserted }` |
+| `/api/stats/agent-accuracy` | GET | Cần session; `?siteId&from&to` (mặc định 30 ngày, trần 366 ngày, `siteId` ngoài phạm vi → 403) → `{ totals, byCamera, byType }` với mỗi ô là `{ reviewed, withFeedback, wrong }`; chỉ đếm vi phạm agent ĐÃ phán quyết, tối đa `MAX_FEEDBACK_ROWS` = 20.000 dòng mới nhất. Hàm thuần `agentAccuracy()` ở `src/lib/agent-accuracy-shape.ts` (sắp xếp tất định: sai nhiều → review nhiều → tên/loại tăng dần); tỉ lệ sai do giao diện tính `wrong / withFeedback` |
 | `/api/stats/compliance` | GET | Cần session; `?siteId&from&to` (mặc định 30 ngày, trần 366 ngày) → mảng theo ngày `{ day, personMinutes, violations, complianceRate }`; `complianceRate` = `1 − vi_phạm / max(phút_người, 1)` (0–1), `null` khi ngày đó chưa có quan sát. Hàm thuần `complianceByDay()` ở `src/lib/compliance-shape.ts` |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
@@ -71,6 +73,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt; POST ghi `AuditLog` (không log token thô) |
 | `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
+| `/api/reports/agent-feedback` | GET | Cần session; `?siteId&from&to` (cùng cách hiểu khoảng ngày với `/api/stats/agent-accuracy`) → CSV `text/csv; charset=utf-8` có BOM + `Content-Disposition: attachment`, cột `violationId,cameraId,type,detectedAt,snapshotUrl,clipUrl,agentVerdict,band,humanCorrect,note`, tối đa `MAX_FEEDBACK_ROWS` = 20.000 dòng mới nhất — chạm trần thì thêm header `X-Truncated: true` và tên file có đuôi `-partial`. Chỉ vi phạm đã có phản hồi của người — bộ dữ liệu retrain, xem [Train model](08-train-model-them-ppe.md) |
 | `/api/reports/violations` | GET | Cần session; `?siteId&cameraId&from&to` (mặc định 7 ngày, biên ngày tính theo UTC như `/api/stats/compliance`, `siteId` ngoài phạm vi → 403) → `{ range, byCamera, rows }`, `rows` tối đa 2.000 dòng mới nhất. Gộp theo camera bằng `buildReportSummary` trong `src/lib/report-shape.ts` |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
@@ -84,7 +87,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 
 | Hook | File | Nguồn |
 |---|---|---|
-| `useViolations`, `useOpenViolationCount`, `useViolationActions`, `useOpenCorrectiveActions`, `useCreateCorrectiveAction`, `useUpdateCorrectiveAction` | `use-violations.ts` | `/api/violations`, `/api/violations/count`, `/api/violations/[id]/actions`, `/api/actions` |
+| `useViolations`, `useOpenViolationCount`, `useViolationActions`, `useOpenCorrectiveActions`, `useCreateCorrectiveAction`, `useUpdateCorrectiveAction`, `useSubmitReviewFeedback` | `use-violations.ts` | `/api/violations`, `/api/violations/count`, `/api/violations/[id]/actions`, `/api/actions`, `/api/violations/[id]/feedback` |
 | `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones`, `useAnnounceCamera` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones`, `/api/cameras/[id]/announce` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
 | `useViolationReport` | `use-reports.ts` | `/api/reports/violations` |
@@ -99,6 +102,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useVoiceRecorder` | `useVoiceRecorder.ts` | `MediaRecorder` cho nút mic |
 | `useAgentTasks`, `useAgentEvents` (poll khi thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent` | `use-agent.ts` | `/api/agent/*` |
 | `useCameraAgents` (poll 15s), `useSaveCameraAgent`, `useDigestCamera` | `use-agent.ts` | `/api/agent/cameras*` |
+| `useAgentAccuracy(days)` | `use-agent.ts` | `/api/stats/agent-accuracy?from=` (thẻ "Độ chính xác của agent" ở `/agent`) |
 
 ## Component chính (`src/components/`)
 

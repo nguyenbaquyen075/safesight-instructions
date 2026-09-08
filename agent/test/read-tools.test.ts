@@ -36,6 +36,17 @@ test('cameraHistory computes the false-positive rate and returns siteId', async 
   assert.equal(h?.total, 2); assert.equal(h?.falsePositive, 1); assert.equal(h?.falsePositiveRate, 0.5); assert.equal(h?.siteId, 'site-t');
 });
 
+// Phản hồi của người về phán quyết agent (G3): camera hay bị agent đánh sai thì subagent phải
+// dè dặt hơn, nên cameraHistory trả luôn tỉ lệ sai 7 ngày.
+test('cameraHistory summarises the human feedback of the last 7 days', async () => {
+  assert.deepEqual((await cameraHistory('cam-t', 24))?.agentFeedback, { total: 0, wrong: 0, wrongRate: 0 });
+
+  await prisma.violation.update({ where: { id: 'v-a' }, data: { reviewFeedback: JSON.stringify({ correct: false, note: 'người có mũ', userId: 'u-1', at: new Date().toISOString() }) } });
+  await prisma.violation.update({ where: { id: 'v-b' }, data: { reviewFeedback: JSON.stringify({ correct: true, userId: 'u-1', at: new Date().toISOString() }) } });
+
+  assert.deepEqual((await cameraHistory('cam-t', 24))?.agentFeedback, { total: 2, wrong: 1, wrongRate: 0.5 });
+});
+
 test('siteContext lists cameras with their id; searchViolations filters by status', async () => {
   const s = await siteContext('site-t');
   assert.deepEqual(s?.cameras.map(c => c.id), ['cam-t']);

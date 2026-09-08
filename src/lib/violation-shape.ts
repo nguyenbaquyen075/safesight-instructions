@@ -27,6 +27,7 @@ export function toViolationDTO(v: ViolationRow & { camera: { name: string }; sit
     clipUrl: v.clipUrl ?? undefined,
     status: v.status.toLowerCase() as Violation['status'],
     agentReview: parseJsonOr(v.agentReview, null),
+    reviewFeedback: parseJsonOr(v.reviewFeedback, null),
     detectedAt: v.detectedAt.toISOString(),
     createdAt: v.createdAt.toISOString(),
   };
