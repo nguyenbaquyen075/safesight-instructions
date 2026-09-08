@@ -1,11 +1,29 @@
 ---
 name: escalation
-description: Dùng khi cân nhắc nhắc nhở hay leo thang một vi phạm, hoặc soạn caption Telegram.
+description: Use when deciding whether a violation deserves a reminder or an escalation, or when writing a Telegram caption for escalate.
 ---
-# Leo thang
+# Escalation
 
-- Lần 1 (occurrenceCount = 1) là NHẮC NHỞ — hệ thống đã gửi nhắc nhở tự động khi ghi DB. Bạn không leo thang thêm.
-- Từ lần 2, hoặc severity critical (thiếu mũ), và ledger VERIFIED thật → `escalate`.
-- AlertRule có threshold/cooldown; bị chặn là bình thường, đừng gọi lại.
-- Caption: `🚨 [Camera] — [món thiếu], lần [n]. [Một câu cần làm gì].` Không ghi đặc điểm cá nhân.
-- Vận hành (không có violationId): nêu sự cố, số lần lặp, việc agent đã thử, việc cần người làm.
+## Overview
+The system already sends an automatic reminder when a violation is written. Escalation is the
+second, deliberate step and it costs the site manager's attention — spend it only on verified repeats.
+
+## Rules
+- `occurrenceCount = 1` → a REMINDER was already sent. Do not escalate.
+- Escalate only when the ledger says VERIFIED violation AND (`occurrenceCount ≥ 2` OR severity `critical`, i.e. missing helmet).
+- AlertRule threshold and cooldown apply. A blocked call is normal — do not retry it.
+- At most 2 escalations per session (`LIMITS.escalatePerSession`).
+
+## Caption recipe
+```
+🚨 [Camera name] — [missing item], occurrence [n]. [One sentence: what to do now.]
+```
+No personal traits, no names, no punishment suggestions.
+
+Operational escalation (no `violationId`): the incident, how many times it repeated, what the agent
+already tried, what a person must do.
+
+## Common mistakes
+- Escalating on the first occurrence "to be safe".
+- Escalating a PROBABLE verdict because the picture "looks bad".
+- Retrying `escalate` after a cooldown block.

@@ -1,62 +1,57 @@
 ---
 name: remembering-camera-context
-description: Dùng khi phiên thuộc về một camera (có mục "Trí nhớ camera" trong lời mở đầu) và bạn sắp gọi remember_camera, hoặc khi trí nhớ cũ mâu thuẫn với điều vừa quan sát.
+description: Use when the session belongs to one camera (the preamble has a "Camera memory" section) and you are about to call remember_camera, or when an existing memory note contradicts what you just observed.
 ---
-# Trí nhớ camera
+# Camera memory
 
-Trí nhớ camera là danh sách ngắn (tối đa 20) những **sự thật bền** về một camera mà phiên sau
-dùng lại mà không cần đọc lại lịch sử. Trong lời mở đầu mỗi ghi chú hiện dạng `- #<chỉ số> [ngày] nội dung`;
-`<chỉ số>` là giá trị `replaceIndex` khi cần sửa. Hệ thống tự lưu ngày và phiên ghi; bạn chỉ ghi nội dung.
+## Overview
+Camera memory is a short list (max 20) of **durable facts** about one camera that later sessions reuse
+without re-reading history. The preamble shows each note as `- #<index> [date] text`; `<index>` is the
+`replaceIndex` value when a note must be corrected. The system stores the date and session; you write only the content.
 
-## Một ghi chú là gì
-
-Một ghi chú = **một** sự thật bền, viết theo đúng thứ tự ba phần, ≤ 300 ký tự:
-
-```
-<điều kiện hoặc khu vực> → <ảnh hưởng tới nhận diện> → <cách xử lý khi review>
-```
-
-Ví dụ đạt:
+## What a note is
+One note = **one** durable fact, in this order, ≤ 300 characters:
 
 ```
-16h–17h nắng chiều chiếu thẳng ống kính → găng tay hay bị báo oan → giờ này chỉ kết luận thiếu găng khi thấy rõ bàn tay trần
+<condition or area> → <effect on detection> → <how to review>
 ```
 
+Good:
 ```
-Góc trái khung là vỉa hè ngoài hàng rào → người đi đường bị khoanh khung → đánh person-outside-work-zone, không record_verdict violation
+16:00–17:00 afternoon sun hits the lens → gloves are often falsely reported → in that window only call gloves missing when bare hands are clearly visible
+```
+```
+Left edge of the frame is the pavement outside the fence → passers-by get boxed → use snapshot.person-outside-work-zone, do not record a violation
 ```
 
-Điều kiện viết theo khung giờ tròn ("16h–17h"), không theo phút của một ngày. Ghi chú không chứa ngày tháng (hệ thống đã lưu), số đếm của một ngày, lời kể về việc chỉnh sửa, id vi phạm, tên người.
+Write conditions as rounded hour windows ("16:00–17:00"), not the minutes of one day. A note never contains
+dates (stored by the system), one-day counts, narration about editing, violation ids or names.
 
-## Bền hay không bền
+## Durable or not
 
-| Bền → `remember_camera` | Không bền → `write_note` / `schedule_followup` |
+| Durable → `remember_camera` | Not durable → `write_note` / `schedule_followup` |
 |---|---|
-| Góc máy, vùng nhìn, vật che khuất cố định | Một vi phạm, một người, một ca |
-| Khung giờ ngược sáng, đèn nhấp nháy, mưa che ống kính theo mùa | Số vi phạm hôm nay |
-| Khu vực ngoài hàng rào / vùng không phải nơi làm việc | Sự cố camera đứng một lần |
-| Loại báo oan lặp lại nhiều ngày và nguyên nhân | Nghi ngờ chưa xác minh |
-| Lịch làm việc cố định (ca đêm, giờ giao vật tư) | Việc cần làm trong ca |
+| Camera angle, field of view, fixed occluders | One violation, one person, one shift |
+| Backlight windows, flickering lights, seasonal rain on the lens | Today's violation count |
+| Areas outside the fence / not a work zone | A single camera stall |
+| A false-positive pattern seen across days and its cause | An unverified suspicion |
+| Fixed schedules (night shift, delivery hours) | Work to do this shift |
 
-Quy tắc chốt: điều đó có còn đúng **tuần sau** không? Có → trí nhớ. Không → nhận xét hoặc hẹn xem lại.
+Test: will it still be true **next week**? Yes → memory. No → note or follow-up.
 
-## Khi trí nhớ cũ sai
+## When an old note is wrong
+Call `remember_camera` with that note's `replaceIndex` and a **completely new** note in the recipe above.
+Do not add a second note to "correct" the first.
 
-Ghi chú cũ mâu thuẫn với điều vừa quan sát → gọi `remember_camera` với `replaceIndex` của ghi chú
-đó và nội dung **mới hoàn toàn** theo công thức trên. Không thêm ghi chú thứ hai để "đính chính".
+## Before writing
+1. A note with the same meaning already exists → do not repeat; edit it only if wrong.
+2. The fact comes from several observations or a user confirmation — one occurrence is not enough.
+3. At most 3 calls per session; use them when it matters, not to fill the quota.
 
-## Trước khi ghi
+## When reviewing a violation
+Memory tells you **where to look closely**, not what to conclude: "gloves often false 16:00–17:00" still
+requires looking at the hands in this image before recording an observation.
 
-1. Đã có ghi chú cùng ý trong "Trí nhớ camera" → không ghi lại, chỉ sửa nếu sai.
-2. Sự thật đến từ nhiều lần quan sát hoặc người dùng đã xác nhận — một lần chưa đủ.
-3. Tối đa 3 lần mỗi phiên; dùng khi đáng, không dùng cho đủ.
-
-## Khi review một vi phạm
-
-Trí nhớ là **gợi ý nơi cần nhìn kỹ**, không phải kết luận: trí nhớ nói "16h–17h hay báo oan găng"
-thì vẫn phải nhìn bàn tay trong ảnh rồi mới ghi quan sát.
-
-## Hẹn xem lại
-
-`schedule_followup` chỉ nhận `kind` là `followup` (xem lại một chủ thể) hoặc `camera.digest` (tổng hợp
-camera). Không có kind nào khác.
+## Follow-ups
+`schedule_followup` accepts only `kind: followup` (re-check one subject) or `kind: camera.digest`
+(camera summary). There is no other kind.

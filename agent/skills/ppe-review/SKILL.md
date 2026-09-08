@@ -1,15 +1,35 @@
 ---
 name: ppe-review
-description: Dùng khi đọc ảnh vi phạm PPE (mũ, áo, găng, giày) để kết luận vi phạm hay báo oan.
+description: Use when reading a PPE violation snapshot (helmet, hi-vis vest, gloves, boots) to decide whether the report is a real violation or a false positive.
 ---
-# Review PPE
+# PPE review
 
-- **Mũ** chỉ tính khi ở TRÊN ĐẦU. Mũ cầm tay, treo, để đất = thiếu mũ (đúng, không phải oan).
-- **Áo phản quang**: model không có lớp "không áo"; thiếu áo là suy ra khi không thấy áo. Áo bị che
-  bởi ba lô, người quay lưng, ngược sáng → hay oan. Cần thấy rõ thân người.
-- **Găng / giày** là lớp yếu nhất (báo oan đo được 6–9%). Chỉ kết luận thiếu khi thấy rõ bàn
-  tay / bàn chân trần; bàn tay ngoài khung, tay trong túi, chân bị che → `occluded-or-backlit`.
-- Người đi đường phía nền, người ngoài hàng rào: `person-outside-work-zone`.
-- Khung đỏ quanh cột, bóng, xe, manơcanh, poster có hình người: `no-person`.
-- `occurrenceCount ≥ 2` nghĩa là AI đã thấy người này thiếu liên tục ≥ 60s trước — bằng chứng thật mạnh.
-- Ảnh 640px đã thu nhỏ; đừng đoán chi tiết không nhìn được.
+## Overview
+The detector draws a red box around a person it believes lacks PPE. Your job is to say what the
+image actually shows, item by item, and to know which items the detector gets wrong most often.
+
+## Quick reference
+
+| Item | Counts as present only when | Frequent false positives |
+|---|---|---|
+| Helmet | It is ON THE HEAD. Held, hung, on the ground = missing (real, not false). | Bending down, hood over helmet |
+| Hi-vis vest | The torso is clearly visible with the vest on it. The model has no "no vest" class — missing is inferred from not seeing one. | Backpack, person facing away, backlight |
+| Gloves | Bare hands clearly visible. Weakest class (6–9 % measured false positives). | Hand out of frame, hand in pocket, holding an object |
+| Boots | Bare feet clearly visible. Weakest class with gloves. | Feet occluded, low resolution |
+
+## Decision rules
+- Passer-by in the background or outside the fence → `snapshot.person-outside-work-zone`.
+- Red box around a post, shadow, vehicle, mannequin, poster → `snapshot.no-person`.
+- `occurrenceCount ≥ 2` means the tracker saw this person missing the item for at least 60 s → strong evidence, add `track.confirmed-repeat`.
+- The snapshot is a downscaled 640 px frame: do not guess details you cannot see; say `snapshot.occluded-or-backlit` instead.
+- Check the item that was REPORTED missing first; note other items only if clearly relevant.
+
+## When you cannot conclude
+`record_verdict` with the non-primary kinds you did observe (e.g. `snapshot.occluded-or-backlit`,
+`history.camera-false-positive-prone`) plus a short note, then `schedule_followup` with
+`kind: followup` (the only kinds are `followup` and `camera.digest`). Inconclusive is a valid outcome.
+
+## Common mistakes
+- Calling a helmet "present" because it is in the picture — it must be on the head.
+- Concluding "no gloves" from a hand that is holding something or is outside the frame.
+- Treating a high camera false-positive rate as proof this report is false — it is context, not observation.

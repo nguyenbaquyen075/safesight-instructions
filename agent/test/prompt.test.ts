@@ -30,8 +30,8 @@ test('systemBlocks returns instructions plus one cached skills block with an ind
 test('systemBlocks strips SKILL.md frontmatter and prepends an index table built from it', async () => {
   const a = await systemBlocks();
   assert.ok(!a[1].text.includes('---\nname:'), 'frontmatter phải bị bỏ khỏi nội dung ghép vào prompt');
-  assert.match(a[1].text, /\| Skill \| Dùng khi \|/);
-  for (const name of await skillNames()) assert.match(indexLineFor(a[1].text, name)!, /Dùng khi/);
+  assert.match(a[1].text, /\| Skill \| Use when \|/);
+  for (const name of await skillNames()) assert.match(indexLineFor(a[1].text, name)!, /Use when/);
 });
 
 test('toolsFor: review includes record_verdict, digest does not; ask includes everything', () => {

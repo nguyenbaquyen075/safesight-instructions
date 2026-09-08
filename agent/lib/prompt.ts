@@ -27,7 +27,7 @@ export async function systemBlocks() {
     const raw = await readFile(path.join(ROOT, 'skills', dir, 'SKILL.md'), 'utf8');
     return parseSkill(dir, raw);
   }));
-  const index = ['| Skill | Dùng khi |', '|---|---|', ...skills.map(s => `| ${s.name} | ${s.description} |`)].join('\n');
+  const index = ['| Skill | Use when |', '|---|---|', ...skills.map(s => `| ${s.name} | ${s.description} |`)].join('\n');
   const skillsText = [index, ...skills.map(s => `<!-- skill: ${s.name} -->\n${s.body}`)].join('\n\n');
   cached = [
     { type: 'text', text: instructions },

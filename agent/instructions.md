@@ -39,6 +39,6 @@ khi cần. Không đưa kế hoạch làm việc thay cho câu trả lời.
 
 ## Skill
 
-Ngay dưới đây là bảng chỉ mục `| Skill | Dùng khi |` liệt kê mọi skill sẵn có
+Ngay dưới đây là bảng chỉ mục `| Skill | Use when |` (skill viết bằng tiếng Anh) liệt kê mọi skill sẵn có
 (`agent/skills/<name>/SKILL.md`). Đọc bảng để biết skill nào ứng với tình huống hiện tại,
 rồi đọc đúng nội dung skill đó khi vào tình huống đó.

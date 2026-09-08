@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thay đổi
+- 5 skill của agent (`agent/skills/*/SKILL.md`) viết lại hoàn toàn bằng tiếng Anh theo chuẩn writing-skills (frontmatter "Use when…", Overview, Quick reference, Common mistakes); kiểm bằng kịch bản review vi phạm không skill → có skill (quan sát đúng kind chuẩn, không bịa `kind` cho `schedule_followup`, leo thang đúng luật).
+
 ## [0.8.0] - 2026-09-08
 
 ### Thêm

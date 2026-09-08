@@ -217,11 +217,11 @@ Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_act
 ## Skill (`agent/skills/<name>/SKILL.md`, nạp vào system prompt)
 
 Mỗi skill là một thư mục con của `agent/skills/` chứa duy nhất `SKILL.md`, mở đầu bằng
-frontmatter YAML `name: <name>` (chữ thường, gạch nối) và `description: Dùng khi …` (ngôi
+frontmatter YAML `name: <name>` (chữ thường, gạch nối) và `description: Use when …` (tiếng Anh, ngôi
 thứ ba, chỉ nêu điều kiện kích hoạt, ≤ 500 ký tự, tiếng Việt), theo sau là nội dung skill.
 `systemBlocks()` (`agent/lib/prompt.ts`) đọc mọi `agent/skills/*/SKILL.md` theo thứ tự tên
 thư mục, bỏ frontmatter khỏi nội dung ghép vào prompt, và dựng một bảng chỉ mục
-`| Skill | Dùng khi |` từ frontmatter đặt trước toàn bộ nội dung skill — `agent/instructions.md`
+`| Skill | Use when |` từ frontmatter đặt trước toàn bộ nội dung skill — `agent/instructions.md`
 chỉ tham chiếu bảng này, không lặp lại nội dung skill.
 
 Skill hiện có:
