@@ -7,9 +7,9 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSession, signOut } from 'next-auth/react';
-import { UserRole, ViolationStatus } from '@/types/enums';
+import { UserRole } from '@/types/enums';
 import { canAccessPath } from '@/lib/auth/permissions';
-import { useViolations } from '@/hooks/use-violations';
+import { useOpenViolationCount } from '@/hooks/use-violations';
 import {
   LayoutDashboard,
   Building2,
@@ -54,11 +54,11 @@ export function Sidebar() {
   const pathname = usePathname();
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole;
-  const { data: violations = [] } = useViolations();
+  const { data: openViolations } = useOpenViolationCount();
 
   const filteredNavItems = navItems.filter(item => canAccessPath(userRole, item.href));
 
-  const openAlertCount = violations.filter(v => v.status === ViolationStatus.OPEN).length;
+  const openAlertCount = openViolations?.open ?? 0;
 
   return (
     <aside

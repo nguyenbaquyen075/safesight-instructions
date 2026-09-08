@@ -5,39 +5,32 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { notifyViolation } from '@/lib/alert-notifier';
 import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
-import type { Violation } from '@/types/models';
-import { toViolationDTO } from '@/lib/violation-shape';
-
-async function getRealViolations(): Promise<Violation[]> {
-  const rows = await prisma.violation.findMany({
-    include: { camera: true, site: true },
-    orderBy: { detectedAt: 'desc' },
-  });
-  return rows.map(toViolationDTO);
-}
+import { buildViolationWhere, toViolationDTO } from '@/lib/violation-shape';
+import { allowedSiteIds, requireSession } from '@/lib/auth/site-access';
 
 export async function GET(request: NextRequest) {
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+
   const searchParams = request.nextUrl.searchParams;
-  const siteId = searchParams.get('siteId');
-  const type = searchParams.get('type');
-  const severity = searchParams.get('severity');
-  const status = searchParams.get('status');
+  const where = buildViolationWhere(
+    {
+      siteId: searchParams.get('siteId'),
+      type: searchParams.get('type'),
+      severity: searchParams.get('severity'),
+      status: searchParams.get('status'),
+    },
+    await allowedSiteIds(gate.session),
+  );
+  if (!where) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  let violations = await getRealViolations();
-
-  if (siteId) {
-    violations = violations.filter(v => v.siteId === siteId);
-  }
-  if (type) {
-    violations = violations.filter(v => v.type === type);
-  }
-  if (severity) {
-    violations = violations.filter(v => v.severity === severity);
-  }
-  if (status) {
-    violations = violations.filter(v => v.status === status);
-  }
-  return NextResponse.json(violations);
+  const rows = await prisma.violation.findMany({
+    where,
+    // Chỉ lấy name của camera/site — toViolationDTO không cần cột nào khác.
+    include: { camera: { select: { name: true } }, site: { select: { name: true } } },
+    orderBy: { detectedAt: 'desc' },
+  });
+  return NextResponse.json(rows.map(toViolationDTO));
 }
 
 const violationInputSchema = z.object({

@@ -5,19 +5,25 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { toCameraDTO, DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { isValidCameraSource } from '@/lib/camera-source';
-import { assertSiteAccess } from '@/lib/auth/site-access';
+import { assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+
   const { id } = await params;
   const camera = await prisma.camera.findUnique({ where: { id }, include: { site: true } });
 
   if (!camera) {
     return NextResponse.json({ error: 'Camera not found' }, { status: 404 });
   }
+
+  const authError = await assertSiteAccess(camera.siteId);
+  if (authError) return authError;
 
   return NextResponse.json(toCameraDTO(camera, camera.site.name));
 }

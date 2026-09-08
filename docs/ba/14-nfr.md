@@ -7,7 +7,7 @@ Trạng thái: ✅ đã đáp ứng ở v0.6.0 · 🟡 một phần · 🔲 chư
 | ID | Yêu cầu | Trạng thái | Ghi chú |
 |---|---|---|---|
 | NFR-01 | Chế độ xác thực: đăng nhập bằng email + mật khẩu (bcrypt), session JWT có vai trò; mọi trang và API (trừ `/login`, `/api/auth`) yêu cầu đăng nhập | ✅ | NextAuth v5 Credentials |
-| NFR-02 | Phân quyền theo vai trò cho trang (`PAGE_ROLES`) và theo công trường cho API quy tắc cảnh báo (`assertSiteAccess`) | ✅ | Xoá vi phạm chưa giới hạn vai trò |
+| NFR-02 | Phân quyền theo vai trò cho trang (`PAGE_ROLES`) và theo công trường cho API (`requireSession`/`allowedSiteIds`/`assertSiteAccess`): vi phạm, camera, công trường, quy tắc cảnh báo đều cần session và lọc theo `assignedSites`; `/api/users` chỉ SUPER_ADMIN/ORG_ADMIN | ✅ | Xoá vi phạm chưa giới hạn vai trò trong cùng site |
 | NFR-03 | AI Engine ghi vi phạm bằng bí mật dùng chung `X-AI-Engine-Secret`; sai thì 401 | ✅ | |
 | NFR-04 | Bí mật (bot token Telegram) mã hoá AES-256-GCM khi lưu, không trả lại client | ✅ | Khoá `TELEGRAM_ENCRYPT_KEY` |
 | NFR-05 | Khoá API bên thứ ba (Roboflow, Anthropic) chỉ ở server, không lộ ra trình duyệt | ✅ | |

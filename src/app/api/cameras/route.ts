@@ -5,18 +5,27 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { toCameraDTO, DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { isValidCameraSource } from '@/lib/camera-source';
-import { assertSiteAccess } from '@/lib/auth/site-access';
+import { allowedSiteIds, assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 
 export async function GET(request: NextRequest) {
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+
   const searchParams = request.nextUrl.searchParams;
   const siteId = searchParams.get('siteId');
   const status = searchParams.get('status');
   const includeDemo = searchParams.get('includeDemo') === 'true';
 
+  // null = vai trò toàn tổ chức; ngược lại chỉ thấy camera thuộc site được giao.
+  const allowed = await allowedSiteIds(gate.session);
+  if (siteId && allowed && !allowed.includes(siteId)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const rows = await prisma.camera.findMany({
     where: {
       ...(includeDemo ? {} : { id: { notIn: Array.from(DEMO_CAMERA_IDS) } }),
-      ...(siteId ? { siteId } : {}),
+      ...(siteId ? { siteId } : allowed ? { siteId: { in: allowed } } : {}),
       ...(status ? { status: status.toUpperCase() } : {}), // DB lưu chữ HOA, xem toCameraDTO
     },
     include: { site: true },

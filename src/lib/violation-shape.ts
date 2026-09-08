@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-import type { Violation as ViolationRow } from '@prisma/client';
+import type { Prisma, Violation as ViolationRow } from '@prisma/client';
 import type { Violation } from '@/types/models';
 
 // JSON lưu trong cột text có thể hỏng (ghi dở, sửa tay): trả fallback thay vì làm 500 cả danh sách.
@@ -29,5 +29,35 @@ export function toViolationDTO(v: ViolationRow & { camera: { name: string }; sit
     agentReview: parseJsonOr(v.agentReview, null),
     detectedAt: v.detectedAt.toISOString(),
     createdAt: v.createdAt.toISOString(),
+  };
+}
+
+export interface ViolationFilters {
+  siteId?: string | null;
+  type?: string | null;
+  severity?: string | null;
+  status?: string | null;
+}
+
+// Dựng where cho GET /api/violations: lọc ngay trong SQL thay vì tải cả bảng rồi lọc bằng JS.
+// allowedSites = null nghĩa là vai trò toàn tổ chức (không giới hạn site).
+// Trả null khi user xin một site ngoài phạm vi được giao -> caller trả 403.
+// Chỉ status được viết HOA (DB lưu HOA, API dùng chữ thường); type/severity lưu
+// đúng chữ thường như src/types/enums.ts nên giữ nguyên.
+export function buildViolationWhere(
+  filters: ViolationFilters,
+  allowedSites: string[] | null,
+): Prisma.ViolationWhereInput | null {
+  if (filters.siteId && allowedSites && !allowedSites.includes(filters.siteId)) return null;
+
+  return {
+    ...(filters.siteId
+      ? { siteId: filters.siteId }
+      : allowedSites
+        ? { siteId: { in: allowedSites } }
+        : {}),
+    ...(filters.type ? { type: filters.type } : {}),
+    ...(filters.severity ? { severity: filters.severity } : {}),
+    ...(filters.status ? { status: filters.status.toUpperCase() } : {}),
   };
 }
