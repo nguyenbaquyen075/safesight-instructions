@@ -21,6 +21,15 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ### Sửa
 - Ghi Violation/Alert không còn văng `P1008 SocketTimeout` khi nhiều camera cùng báo vi phạm: `src/lib/prisma.ts` (dùng chung cho Next.js và agent) đặt `PRAGMA busy_timeout=5000` + `PRAGMA journal_mode=WAL` ngay khi mở connection SQLite, nên tiến trình đọc (AI engine) không còn chặn tiến trình ghi. Kèm test `agent/test/db-pragma.test.ts`; `dev.db-wal`/`dev.db-shm` đã thêm vào `.gitignore`.
+- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt và hệ điều hành cấp lại
+  pid cũ cho tiến trình khác: kiểm `/proc/<pid>/cmdline` phải chứa `yolo_inference.py` trước
+  khi coi là engine, và heartbeat quá cũ (>5 phút) luôn bị coi là "engine đã mất". Pid không
+  hợp lệ không còn tiêu mất suất `engine-restart` (3 lần/giờ). `yolo_inference.py` xoá
+  `.heartbeat.json` khi thoát thay vì để lại file cũ.
+- `health.probe` (đổi nguồn/trạng thái camera) không còn đẩy lùi lịch `health.sweep` định kỳ
+  đang chờ 60s mỗi lần chạy.
+- `snapshot.cleanup` bỏ luật giữ ảnh 30 ngày (không bao giờ khớp vì engine xoá sạch ảnh mỗi
+  lần khởi động) — chỉ còn giữ ảnh mới hơn 24h, nên đĩa đầy thật sự được dọn.
 
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).

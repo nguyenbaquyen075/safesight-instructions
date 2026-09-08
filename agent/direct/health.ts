@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
-import { readdir, stat } from 'node:fs/promises';
+import { readdir, readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
 import { env } from '../lib/env';
 import { prisma } from '../lib/db';
 import { readHeartbeat } from '../lib/capabilities';
 
-export const THRESHOLDS = { cameraStalledMs: 90_000, cameraOfflineMs: 600_000, heartbeatStaleMs: 30_000, bridgeFailStreak: 3 } as const;
+export const THRESHOLDS = { cameraStalledMs: 90_000, cameraOfflineMs: 600_000, heartbeatStaleMs: 30_000, heartbeatGoneMs: 300_000, bridgeFailStreak: 3 } as const;
 
 export const MODEL_FILES = [
   { file: 'ppe_multiclass.pt', required: true },
@@ -27,9 +27,29 @@ export interface HealthSignals {
 export type FindingCode = 'camera.stalled' | 'camera.recovered' | 'engine.stalled' | 'bridge.down' | 'disk.pressure' | 'model.missing';
 export interface Finding { code: FindingCode; subjectType: 'camera' | 'system'; subjectId: string | null; detail: Record<string, unknown> }
 
-function pidAlive(pid: number): boolean {
+function processAlive(pid: number): boolean {
   try { process.kill(pid, 0); return true; }
   catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; } // có tiến trình nhưng không đủ quyền gửi tín hiệu = vẫn sống
+}
+
+let loggedNonLinuxIdentityCheck = false;
+
+// "Còn sống" không đủ: pid có thể đã bị hệ điều hành tái sử dụng cho tiến trình khác sau khi
+// engine đã tắt. Đọc /proc/<pid>/cmdline để chắc pid đó thật sự là yolo_inference.py trước khi
+// coi nó là "engine đang chạy" — false trên mọi lỗi và trên hệ ngoài Linux (không có /proc).
+async function isEngineProcess(pid: number): Promise<boolean> {
+  if (!processAlive(pid)) return false;
+  if (process.platform !== 'linux') {
+    if (!loggedNonLinuxIdentityCheck) {
+      console.warn('[health] không kiểm được danh tính tiến trình ngoài Linux — coi pid như engine đã mất');
+      loggedNonLinuxIdentityCheck = true;
+    }
+    return false;
+  }
+  try {
+    const cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf8');
+    return cmdline.includes('yolo_inference.py');
+  } catch { return false; }
 }
 
 async function dirBytes(dir: string): Promise<number> {
@@ -64,7 +84,7 @@ export async function collectSignals(): Promise<HealthSignals> {
     now: Date.now(),
     bridge,
     heartbeat,
-    pidAlive: heartbeat ? pidAlive(heartbeat.pid) : false,
+    pidAlive: heartbeat ? await isEngineProcess(heartbeat.pid) : false,
     snapshotBytes: await dirBytes(env.snapshotDir),
     modelFiles: await Promise.all(MODEL_FILES.map(async m => ({ file: m.file, required: m.required, present: await exists(m.file) }))),
     cameras,
@@ -94,8 +114,11 @@ export function decide(s: HealthSignals, opts: { snapshotMaxMb: number; bridgeFa
   if (s.heartbeat) {
     const parsedAt = Date.parse(s.heartbeat.at);
     const age = Number.isNaN(parsedAt) ? Number.POSITIVE_INFINITY : s.now - parsedAt;
-    if (age > THRESHOLDS.heartbeatStaleMs || !s.pidAlive) {
-      out.push({ code: 'engine.stalled', subjectType: 'system', subjectId: null, detail: { pid: s.heartbeat.pid, heartbeatAgeMs: age, pidAlive: s.pidAlive } });
+    // Heartbeat quá cũ (>5 phút) -> engine coi như đã mất dù bước kiểm danh tính pid nói khác
+    // (phòng hờ trùng hợp pid cũ được cấp lại đúng cho một tiến trình yolo_inference.py mới).
+    const pidAlive = age > THRESHOLDS.heartbeatGoneMs ? false : s.pidAlive;
+    if (age > THRESHOLDS.heartbeatStaleMs || !pidAlive) {
+      out.push({ code: 'engine.stalled', subjectType: 'system', subjectId: null, detail: { pid: s.heartbeat.pid, heartbeatAgeMs: age, pidAlive } });
     }
   }
 

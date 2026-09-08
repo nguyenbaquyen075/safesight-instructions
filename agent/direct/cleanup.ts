@@ -8,13 +8,15 @@ import { checkPaused } from '../lib/guard';
 import type { LeasedTask } from '../lib/tasks';
 
 const DAY = 86_400_000;
-export const KEEP_DAYS = 30;
 
-// Thuần: chọn file xoá tới khi giải phóng đủ targetBytes. Chỉ file > 30 ngày VÀ đã có Violation tham chiếu
-// (ảnh chưa tham chiếu có thể đang được ghi; ảnh < 24h là bằng chứng mới, không bao giờ đụng).
+// Thuần: chọn file xoá tới khi giải phóng đủ targetBytes. Chỉ file đã có Violation tham chiếu
+// (ảnh chưa tham chiếu có thể đang được ghi) và > 24h (bằng chứng mới, không bao giờ đụng).
+// Không giữ thêm theo tuổi (từng là 30 ngày): yolo_inference.py xoá sạch violation_*.jpg mỗi
+// lần engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0
+// file và disk.pressure lặp lại mỗi sweep.
 export function pickCleanup(files: { name: string; mtimeMs: number; referenced: boolean }[], now: number, targetBytes: number, sizes: Record<string, number>): string[] {
   const eligible = files
-    .filter(f => f.referenced && now - f.mtimeMs > KEEP_DAYS * DAY && now - f.mtimeMs > DAY)
+    .filter(f => f.referenced && now - f.mtimeMs > DAY)
     .sort((a, b) => a.mtimeMs - b.mtimeMs);
   const out: string[] = []; let freed = 0;
   for (const f of eligible) { if (freed >= targetBytes) break; out.push(f.name); freed += sizes[f.name] ?? 0; }

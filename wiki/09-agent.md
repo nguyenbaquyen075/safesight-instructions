@@ -43,6 +43,43 @@ thử với outcome nêu rõ.
 `// ponytail: SQLite không có FOR UPDATE SKIP LOCKED; một worker duy nhất. Nhiều worker
 hoặc Postgres thì thay claimDue bằng câu SQL của CRM lib/tasks.ts.`
 
+### Heartbeat và kiểm danh tính trước khi SIGTERM
+
+`ai-engine/yolo_inference.py` ghi `public/snapshots/.heartbeat.json` (`{pid, at, streams,
+fps}`) mỗi 5s và xoá file này khi thoát (Ctrl+C/kill/hết chương trình, cùng `atexit` đã dùng
+để dọn `violation_*.jpg`). `health.sweep` đọc file này (`readHeartbeat`,
+`agent/lib/capabilities.ts`); nếu heartbeat cũ hơn `heartbeatStaleMs` (30s) → nghi
+`engine.stalled`.
+
+Chỉ "còn tiến trình mang pid đó" là chưa đủ: hệ điều hành có thể cấp lại pid đã chết cho một
+tiến trình khác hoàn toàn (dev khác, bridge, editor…). Trước khi tin `pid` trong heartbeat là
+engine, `agent/direct/health.ts` đọc `/proc/<pid>/cmdline` và đòi có `yolo_inference.py`
+trong đó (`isEngineProcess`) — sai bất kỳ bước nào (không phải Linux, không đọc được, không
+khớp) đều coi là **không phải engine**. Heartbeat quá cũ (> `heartbeatGoneMs` = 5 phút) cũng
+luôn bị coi là "engine đã mất" (`detail.pidAlive = false`) dù bước kiểm danh tính nói khác —
+phòng hờ trường hợp hiếm pid cũ vừa được cấp lại đúng cho một `yolo_inference.py` mới.
+
+`agent/direct/actions.ts` xử lý `engine.stalled`: kiểm `detail.pidAlive === true` **trước**
+khi gọi `rateLimit('engine-restart', …)` — pid chết/không phải engine thì không SIGTERM và
+**không tiêu suất** hạn ngạch 3 lần/giờ (trước đây `rateLimit` được gọi trước, một pid vô
+hiệu vẫn ăn mất một suất restart thật).
+
+### Probe vs sweep
+
+`health.probe` (do `PATCH /api/cameras/[id]` xếp lịch khi đổi nguồn/trạng thái) và
+`health.sweep` (định kỳ 60s) dùng chung logic quét (`runProbe` gọi thẳng `runSweep`), nhưng
+chỉ `health.sweep` mới tự hẹn vòng kế tiếp (`task.kind === 'health.sweep'`) — trước đây
+`runProbe` cũng hẹn/gộp vào `health.sweep` đang chờ, mỗi lần đổi camera lại đẩy lùi lịch quét
+định kỳ thêm 60s.
+
+### Luật dọn snapshot
+
+`snapshot.cleanup` (`agent/direct/cleanup.ts`, `pickCleanup`) chỉ giữ lại ảnh **chưa có
+Violation tham chiếu** (có thể đang được ghi) hoặc **mới hơn 24h** (bằng chứng gần, không bao
+giờ đụng). Không còn luật giữ 30 ngày: `yolo_inference.py` xoá sạch `violation_*.jpg` mỗi lần
+engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0 file
+và `disk.pressure` lặp lại mỗi sweep dù đĩa đang đầy thật.
+
 ## Bằng chứng và band
 
 `ObservationKind` là danh sách đóng, mỗi kind có `weight`, `primary`, `label`:

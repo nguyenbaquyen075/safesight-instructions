@@ -17,8 +17,11 @@ export async function runSweep(task: LeasedTask): Promise<string> {
   const findings = decide(signals, { snapshotMaxMb: env.snapshotMaxMb, bridgeFailStreak });
   const paused = await checkPaused();
   const actions = await applyFindings(findings, { sessionId, taskId: task.id, repeats, paused: paused !== null });
-  // Lặp: task mới, không cron.
-  await scheduleTask({ kind: 'health.sweep', subjectType: 'system', reason: 'Quét sức khoẻ định kỳ', dueAt: new Date(Date.now() + SWEEP_EVERY_MS) }, { excludeId: task.id });
+  // Lặp: task mới, không cron. Chỉ sweep định kỳ mới tự hẹn lần sau — probe (task.kind ===
+  // 'health.probe') chạy xen giữa hai vòng sweep, không được đẩy lùi lần hẹn định kỳ đang chờ.
+  if (task.kind === 'health.sweep') {
+    await scheduleTask({ kind: 'health.sweep', subjectType: 'system', reason: 'Quét sức khoẻ định kỳ', dueAt: new Date(Date.now() + SWEEP_EVERY_MS) }, { excludeId: task.id });
+  }
   return `${findings.length} phát hiện, ${actions.length} hành động${paused ? ' (đang tạm dừng, chỉ ghi nhận)' : ''}`;
 }
 

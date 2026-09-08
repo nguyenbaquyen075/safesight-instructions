@@ -21,6 +21,8 @@ BRIDGE_URL = "http://localhost:4001/detections"
 NEXT_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/violations"
 AI_ENGINE_SECRET = os.environ.get("AI_ENGINE_SECRET", "")
 SNAPSHOT_DIR = "public/snapshots"
+# Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
+HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
 
 def _open_db_readonly():
     """Mở file SQLite của Next.js (prisma/dev.db) chỉ để ĐỌC. Đọc THẲNG file thay vì
@@ -274,6 +276,11 @@ def clear_snapshots():
                 pass
     if removed:
         print(f"🧹 Đã xoá {removed} ảnh vi phạm.")
+    # Xoá heartbeat để agent biết ngay engine đã tắt, không đợi pid cũ bị hệ điều hành tái sử dụng.
+    try:
+        os.remove(HEARTBEAT_PATH)
+    except OSError:
+        pass
 
 
 # Khi TẮT dự án (Ctrl+C / kill / thoát) -> tự dọn ảnh
@@ -376,8 +383,6 @@ def run_inference():
     last_reported = {}    # (cameraId, trackId) -> lúc ghi DB gần nhất, để biết khi nào báo lại
     violation_count = {}  # (cameraId, trackId) -> số lần đã báo liên tục (hiện "vi phạm lần N")
 
-    # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
-    HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
     _hb_last = time.time()
     _hb_frames = 0
 

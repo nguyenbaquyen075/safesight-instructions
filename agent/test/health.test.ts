@@ -46,6 +46,18 @@ test('stale heartbeat or dead pid yields engine.stalled', () => {
   assert.deepEqual(decide(base({ heartbeat: null }), opts), [], 'chưa từng có heartbeat = engine chưa bật, không phải treo');
 });
 
+test('pid sống nhưng không phải engine (pidAlive=false từ isEngineProcess) yields engine.stalled với detail.pidAlive=false', () => {
+  const f = decide(base({ pidAlive: false }), opts);
+  assert.deepEqual(codes(f), ['engine.stalled']);
+  assert.equal(f[0].detail.pidAlive, false);
+});
+
+test('heartbeat quá cũ (>5 phút) bị coi là engine đã mất dù bước kiểm danh tính nói pid còn sống', () => {
+  const f = decide(base({ heartbeat: { pid: 4242, at: iso(THRESHOLDS.heartbeatGoneMs + 1), streams: 1, fps: 0 }, pidAlive: true }), opts);
+  assert.deepEqual(codes(f), ['engine.stalled']);
+  assert.equal(f[0].detail.pidAlive, false, 'quá 5 phút thì không được dùng để SIGTERM dù cmdline vẫn khớp');
+});
+
 test('a broken timestamp is treated as never-seen for camera and as stalled for engine', () => {
   const f = decide(base({ bridge: { ok: true, lastDetectionAt: { 'cam-001': 'không-phải-ngày' } } }), opts);
   assert.deepEqual(codes(f), ['camera.stalled']);
