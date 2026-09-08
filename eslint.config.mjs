@@ -11,6 +11,9 @@ const eslintConfig = defineConfig([
   globalIgnores([
     // Default ignores of eslint-config-next:
     ".next/**",
+    // Worktree và venv nằm trong thư mục repo nhưng không phải mã nguồn của checkout này.
+    ".worktrees/**",
+    ".venv/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

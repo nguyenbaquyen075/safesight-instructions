@@ -4,51 +4,36 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
-### Sửa
-- Tài khoản dev cứng `admin@safesight.ai` chỉ còn hoạt động ngoài production (hoặc khi `ALLOW_DEV_LOGIN=true`).
-- API vi phạm trả thêm `occurrenceCount`; JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách; bỏ độ trễ giả 800ms ở `GET /api/violations`; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
-
 ### Thêm
 - README mới theo chuẩn dự án mã nguồn mở: logo, badge, mục tính năng, tài liệu, đóng góp.
 - `Dockerfile` hai target (`dashboard`, `bridge`), `docker-compose.yml`, `.env.docker.example`; workflow Docker build và đẩy image lên GHCR.
 - Workflow CI (lint, types, test agent) và workflow deploy landing page lên GitHub Pages (`landing-page/`).
 - `CONTRIBUTING.md`, logo `wiki/assets/safesight-logo.svg`, script `scripts/github-repo-metadata.sh` đặt description/topics cho repo.
-
-- Bộ tài liệu BA `docs/ba/` (15 sản phẩm phân tích nghiệp vụ + SRS, URD, BRD, HDSD, biên bản họp).
-- Test agent lấp khoảng trống: `agent/test/usage.test.ts` (`dailyTokensUsed`), `escalate.test.ts` (`makeEscalate`), `agent-bridge.test.ts` (`enqueueAgentTask` gộp/không gộp task), `violation-status.test.ts` (bất biến status viết HOA khi PATCH).
+- Bộ tài liệu BA `docs/ba/` (15 sản phẩm phân tích nghiệp vụ + SRS, URD, BRD, HDSD, biên bản họp), sơ đồ Excalidraw.
+- Báo cáo review `docs/review/` (health, change) và kế hoạch nhánh fix.
+- Lane nghiên cứu của agent chạy được trên endpoint tương thích OpenAI (`LLM_PROVIDER=openai`, `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_DEFAULT`, `LLM_IMAGE_INPUT`); trang `/agent` hiển thị đúng model đang dùng.
+- Test agent 45 → 66: hạn mức token ngày (`usage`), tool `escalate`, gộp task `enqueueAgentTask`, trạng thái vi phạm chữ hoa, PRAGMA SQLite, client OpenAI, kiểm danh tính pid, probe/sweep, cleanup.
 
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
+- API vi phạm trả thêm `occurrenceCount`; mapping DTO gom về `src/lib/violation-shape.ts`; bỏ độ trễ giả 800ms ở `GET /api/violations`.
+- Badge "Thông báo" ở Sidebar đếm vi phạm `open` từ DB thay vì `localStorage` + hằng 11; trang Công trường không ghi thông báo vào `safesight_alerts` nữa.
+- `docker-compose.yml` dùng bind mount `./data` và `./public/snapshots` để AI engine và agent chạy trên máy chủ dùng chung DB/ảnh với container.
+- `snapshot.cleanup` chỉ giữ ảnh mới hơn 24h (bỏ luật 30 ngày không bao giờ khớp vì engine xoá ảnh mỗi lần khởi động).
 
 ### Sửa
-- Ghi Violation/Alert không còn văng `P1008 SocketTimeout` khi nhiều camera cùng báo vi phạm: `src/lib/prisma.ts` (dùng chung cho Next.js và agent) đặt `PRAGMA busy_timeout=5000` + `PRAGMA journal_mode=WAL` ngay khi mở connection SQLite, nên tiến trình đọc (AI engine) không còn chặn tiến trình ghi. Kèm test `agent/test/db-pragma.test.ts`; `dev.db-wal`/`dev.db-shm` đã thêm vào `.gitignore`.
-- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt và hệ điều hành cấp lại
-  pid cũ cho tiến trình khác: kiểm `/proc/<pid>/cmdline` phải chứa `yolo_inference.py` trước
-  khi coi là engine, và heartbeat quá cũ (>5 phút) luôn bị coi là "engine đã mất". Pid không
-  hợp lệ không còn tiêu mất suất `engine-restart` (3 lần/giờ). `yolo_inference.py` xoá
-  `.heartbeat.json` khi thoát thay vì để lại file cũ.
-- `health.probe` (đổi nguồn/trạng thái camera) không còn đẩy lùi lịch `health.sweep` định kỳ
-  đang chờ 60s mỗi lần chạy.
-- `snapshot.cleanup` bỏ luật giữ ảnh 30 ngày (không bao giờ khớp vì engine xoá sạch ảnh mỗi
-  lần khởi động) — chỉ còn giữ ảnh mới hơn 24h, nên đĩa đầy thật sự được dọn.
-- Lane nghiên cứu của agent chạy được trên endpoint tương thích OpenAI (`LLM_PROVIDER=openai`): trước đây key dạng proxy `/chat/completions` làm mọi phiên hỏng với `Cannot read properties of undefined (reading 'filter')` vì luôn đi đường Anthropic Messages. Thêm `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_DEFAULT`, `LLM_IMAGE_INPUT`.
-- Trang `/agent` hiển thị đúng model đang dùng khi model không nằm trong hai lựa chọn Claude có sẵn.
+- Ghi Violation/Alert không còn văng `P1008 SocketTimeout` khi nhiều camera cùng báo vi phạm: `src/lib/prisma.ts` đặt `PRAGMA busy_timeout=5000` + `journal_mode=WAL` khi mở SQLite (tái hiện 8 writer × 30 ghi: 20/240 → 240/240 thành công).
+- Lane nghiên cứu không còn hỏng `Cannot read properties of undefined (reading 'filter')` khi key là proxy `/chat/completions`.
+- Tài khoản dev cứng `admin@safesight.ai` chỉ còn hoạt động ngoài production (hoặc khi `ALLOW_DEV_LOGIN=true`); trang đăng nhập ẩn gợi ý ở production.
+- `POST /detections` của YOLO Bridge yêu cầu header `X-AI-Engine-Secret` khi `AI_ENGINE_SECRET` được đặt; engine gửi kèm header; image bridge có `dotenv`.
+- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt: kiểm `/proc/<pid>/cmdline` chứa `yolo_inference.py`, heartbeat quá 5 phút coi là engine đã mất, pid không hợp lệ không tiêu suất `engine-restart`; `yolo_inference.py` xoá `.heartbeat.json` khi thoát.
+- `health.probe` không còn đẩy lùi lịch `health.sweep` định kỳ.
+- Chạm trần token trong ngày luôn phát `session.ended (stop: skipped)` để panel hỏi-đáp không treo; event `error` gắn đúng `sessionId` của task; vòng lặp agent thoát ngay khi nhận SIGTERM; `PATCH /api/cameras/[id]` đánh thức agent sau khi ghi task; hỏi tiếp vào task `ask` đã hết lượt thử reset `attempts`.
+- JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách vi phạm; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
+- Badge Sidebar không còn hiện số "0" rời khi không có vi phạm.
 
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
-
-### Sửa
-- Chạm trần token trong ngày giờ luôn phát `session.ended (stop: skipped)` trước khi báo lỗi, để panel hỏi-đáp (`AskAgentBox`) không treo poll mãi; event `error` từ vòng chính (`agent/main.ts`) gắn đúng `sessionId` của task thay vì tạo phiên rời rạc.
-- Vòng lặp agent thoát ngay khi nhận SIGTERM/SIGINT giữa lúc đang xử lý, không ngủ hết 20s rồi mới dừng.
-- `PATCH /api/cameras/[id]` chỉ đánh thức agent sau khi task `health.probe` đã ghi xong DB, không còn race trước khi task tồn tại.
-- Hỏi tiếp câu mới vào một task `ask` đã hết lượt thử không còn bị âm thầm bỏ qua: nối vào task cũ giờ reset `attempts` về 0.
-- `POST /detections` trên YOLO Bridge yêu cầu header `x-ai-engine-secret` khớp `AI_ENGINE_SECRET` (khi
-  đã cấu hình) — trước đây cổng 4001 publish ra ngoài mà endpoint này không xác thực, ai cũng bơm được
-  detection giả. Không cấu hình secret thì vẫn chạy (chỉ cảnh báo) để dev cục bộ không bị chặn.
-- `docker-compose.yml`: dashboard dùng bind mount `./data` và `./public/snapshots` thay vì named volume,
-  để AI engine/agent chạy trên host chia sẻ đúng `dev.db` và ảnh chụp vi phạm với container.
-- Badge số ở mục "Thông báo" trên Sidebar không còn cộng số ảo (`11 + localStorage`) mà đếm số vi phạm `status === 'open'` từ DB (`useViolations()`), cùng nguồn dữ liệu với trang `/violations`. Ẩn badge khi 0, hiển thị `99+` khi vượt 99.
-- Trang `/sites` không còn ghi bản ghi "công trường mới" vào `localStorage['safesight_alerts']` (đây không phải một vi phạm).
 
 ## [0.6.0] - 2026-09-07
 
