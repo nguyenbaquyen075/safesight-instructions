@@ -74,7 +74,13 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
   if (off) return skipped(`Claude bị tắt tới lần khởi động sau: ${off}`);
   if (!opts.client && !env.anthropicKey) return skipped('không có ANTHROPIC_API_KEY — lane nghiên cứu tạm dừng');
   // Chạm trần: hoàn lượt (refundAttempt) và hẹn lại sau nửa đêm, không tiêu lần thử của task.
-  if ((await dailyTokensUsed()) >= settings.dailyTokenCap) throw new SessionError('đã chạm trần token trong ngày', msUntilMidnight(), false, true);
+  // Vẫn phải phát session.ended trước khi throw — panel hỏi-đáp poll theo sessionId và chỉ dừng khi thấy event này.
+  if ((await dailyTokensUsed()) >= settings.dailyTokenCap) {
+    const reason = 'đã chạm trần token trong ngày';
+    const retryAfterMs = msUntilMidnight();
+    await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.ended', data: { stop: 'skipped', reason, retryAfterMs } });
+    throw new SessionError(reason, retryAfterMs, false, true);
+  }
 
   await prisma.agentTask.updateMany({ where: { id: task.id, finishedAt: null }, data: { sessionId } });
   const ctx = newToolContext(task, sessionId);

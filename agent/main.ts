@@ -38,7 +38,8 @@ async function runOne(task: LeasedTask, run: (t: LeasedTask) => Promise<string>)
     await completeTask(task.id, outcome);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await emit({ sessionId: newSessionId(), taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { kind: task.kind, message } });
+    // task.sessionId nếu task đã có thread (vd. 'ask' nối lại) — gắn lỗi vào đúng thread panel đang poll, không tạo phiên rời rạc.
+    await emit({ sessionId: task.sessionId ?? newSessionId(), taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { kind: task.kind, message } });
     if (error instanceof SessionError && error.fatal) { await completeTask(task.id, `lỗi không thử lại: ${message}`); return; }
     const delay = error instanceof SessionError && error.retryAfterMs ? error.retryAfterMs : 30_000 * task.attempts;
     await releaseTask(task.id, delay, `lỗi: ${message}`, { refundAttempt: error instanceof SessionError && error.refundAttempt });
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
   process.on('SIGINT', () => { stopping = true; wake?.(); });
   while (!stopping) {
     try { await tick(); } catch (error) { console.error('[agent] tick lỗi', error); }
+    if (stopping) break; // SIGTERM/SIGINT trong lúc tick chạy: đừng ngủ hết 20s rồi mới thoát.
     await sleep(TICK_MS);
   }
   console.log('[agent] dừng');

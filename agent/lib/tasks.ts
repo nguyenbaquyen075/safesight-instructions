@@ -20,6 +20,8 @@ export const RETIRED_OUTCOME = `Bỏ sau ${MAX_ATTEMPTS} lần: phiên không b�
 export interface LeasedTask {
   id: string; kind: string; subjectType: string | null; subjectId: string | null;
   reason: string; budget: number; attempts: number; priority: number; dueAt: Date;
+  // Chỉ có khi task đã từng chạy một phiên (vd. task 'ask' nối lại thread cũ) — dùng để gắn event lỗi vào đúng thread thay vì phiên mới.
+  sessionId?: string | null;
 }
 
 export function laneOf(kind: string): Lane {
@@ -101,6 +103,7 @@ export async function claimDue(limit: number, lane: Lane, now = new Date()): Pro
       leased.push({
         id: task.id, kind: task.kind, subjectType: task.subjectType, subjectId: task.subjectId,
         reason: task.reason, budget: task.budget, attempts: task.attempts + 1, priority: task.priority, dueAt: task.dueAt,
+        sessionId: task.sessionId,
       });
     }
   }
