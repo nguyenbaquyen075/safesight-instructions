@@ -21,7 +21,8 @@ export async function requireSession(): Promise<{ session: Session } | NextRespo
 
 // Danh sách site mà user được xem. null = xem toàn tổ chức (không lọc).
 export async function allowedSiteIds(session: Session): Promise<string[] | null> {
-  if (ORG_WIDE_ROLES.includes(session.user.role)) return null;
+  // Phòng session cũ còn role chữ HOA: so sánh không phân biệt hoa/thường.
+  if (ORG_WIDE_ROLES.includes(String(session.user.role).toLowerCase())) return null;
   const user = await prisma.user.findUnique({ where: { id: session.user.id } });
   return user ? (JSON.parse(user.assignedSites) as string[]) : [];
 }

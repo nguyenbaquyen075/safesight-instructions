@@ -23,6 +23,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - `snapshot.cleanup` chỉ giữ ảnh mới hơn 24h (bỏ luật 30 ngày không bao giờ khớp vì engine xoá ảnh mỗi lần khởi động).
 
 ### Sửa
+- Vai trò người dùng lưu chữ HOA trong DB (mặc định `SAFETY_OFFICER`) được chuẩn hoá về chữ thường khi đăng nhập; kiểm tra org-wide không còn phân biệt hoa/thường, nên user tạo qua DB không bị coi nhầm là bị giới hạn theo site.
 - API đọc dữ liệu không còn mở cho mọi người trong mạng: `GET /api/violations`, `/api/violations/[id]`, `/api/cameras`, `/api/cameras/[id]`, `/api/sites`, `/api/sites/[id]`, `/api/users` nay bắt buộc session (401) — middleware `src/proxy.ts` không chạy trên `/api` nên từng route tự kiểm bằng `requireSession()`. `POST /api/violations` giữ nguyên xác thực `X-AI-Engine-Secret` cho AI engine.
 - Danh sách vi phạm/camera/công trường lọc theo công trường được giao (`allowedSiteIds()` đọc `User.assignedSites`); xin `?siteId=` ngoài phạm vi trả 403; chi tiết vi phạm/camera/công trường kiểm `assertSiteAccess`; `/api/users` chỉ SUPER_ADMIN/ORG_ADMIN, khớp `PAGE_ROLES['/users']`.
 - `GET /api/violations` lọc bằng SQL (`buildViolationWhere`) thay vì tải cả bảng rồi lọc bằng JS, và chỉ `select` tên camera/công trường; badge Sidebar dùng endpoint mới `GET /api/violations/count` (`useOpenViolationCount`) nên mỗi 15s chỉ chạy một COUNT thay vì tải toàn bộ vi phạm kèm 2 join.

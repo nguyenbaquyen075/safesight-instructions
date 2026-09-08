@@ -58,7 +58,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
                 id: user.id,
                 name: user.name,
                 email: user.email,
-                role: user.role as string as UserRole,
+                // DB lưu role chữ HOA (default "SAFETY_OFFICER" trong schema.prisma) còn enum UserRole chữ thường:
+                // chuẩn hoá ngay khi đăng nhập để PAGE_ROLES và ORG_WIDE_ROLES so sánh đúng.
+                role: (user.role as string).toLowerCase() as UserRole,
               };
             }
           }
