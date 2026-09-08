@@ -72,5 +72,7 @@ Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghi
 
 Đầu `schema.prisma` ghi rõ: dev dùng `sqlite`, không enum/mảng native. `package.json` đã cài cả `@prisma/adapter-libsql` (dev) và `@prisma/adapter-pg` (prod). Khi lên Postgres cần đổi provider, khôi phục enum/array, và cập nhật `docs/ba/SRS.md` + wiki này.
 
+Dev có ba tiến trình cùng đụng vào một file SQLite: Next.js API (ghi Violation/Alert), agent worker (ghi `AgentEvent`/`AgentTask`) và AI engine Python (đọc bảng `Camera`). Mặc định libsql mở DB ở chế độ rollback-journal với `busy_timeout = 0` nên chỉ cần một tiến trình đang đọc là lệnh ghi văng ngay `SQLITE_BUSY` → Prisma `P1008`. Vì vậy `src/lib/prisma.ts` (dùng chung cho Next.js lẫn agent) đặt `PRAGMA busy_timeout=5000` rồi `PRAGMA journal_mode=WAL` ngay khi mở connection. Postgres không có hạn chế này nên khi lên prod hai PRAGMA đó chỉ còn tác dụng với nhánh SQLite.
+
 ---
 👉 Tiếp theo: [Giao diện & API](05-giao-dien-va-api.md)

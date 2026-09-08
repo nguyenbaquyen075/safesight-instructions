@@ -44,6 +44,8 @@ next-env.d.ts
 
 /src/generated/prisma
 dev.db
+dev.db-wal
+dev.db-shm
 
 # ===== Chống phồng repo (SafeSight) =====
 # Ảnh vi phạm tự sinh khi chạy YOLO — KHÔNG commit (giữ bộ demo 20260427)

@@ -27,11 +27,13 @@ npx prisma db push
 npm run db:seed
 ```
 
+> **SQLite chạy WAL.** `src/lib/prisma.ts` đặt `PRAGMA busy_timeout=5000` và `PRAGMA journal_mode=WAL` cho mọi connection (Next.js và agent dùng chung client này). Nhờ vậy AI engine đọc bảng `Camera` không chặn API ghi Violation nữa. Hệ quả: cạnh `dev.db` sẽ có thêm `dev.db-wal` và `dev.db-shm` — đây là file tạm của SQLite, đã gitignore, xoá được khi không tiến trình nào đang mở DB. Sao lưu/copy DB thì phải copy cả ba file (hoặc chạy `sqlite3 dev.db "PRAGMA wal_checkpoint(TRUNCATE);"` trước).
+
 ## Biến môi trường (`.env.local`)
 
 | Biến | Bắt buộc | Ghi chú |
 |---|---|---|
-| `DATABASE_URL` | ✅ | Dev: `file:./dev.db` (SQLite) |
+| `DATABASE_URL` | ✅ | Dev: `file:./dev.db` (SQLite, chạy ở chế độ WAL — xem ghi chú bên dưới) |
 | `NEXTAUTH_SECRET` | ✅ | NextAuth v5 |
 | `NEXT_PUBLIC_YOLO_SERVER_URL` | ✅ | `http://localhost:4001` — thiếu thì UI không nối bridge |
 | `AI_ENGINE_SECRET` | ✅ | `POST /api/violations` từ chối request thiếu header `X-AI-Engine-Secret` khớp giá trị này (`openssl rand -base64 24`) |
