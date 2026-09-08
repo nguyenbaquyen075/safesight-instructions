@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: MIT
 
+const path = require('path');
+// .env.local ghi đè .env — cùng thứ tự agent/lib/env.ts đọc. Trong container, biến
+// đã có sẵn từ env_file của compose nên 2 dòng dưới chỉ no-op (không tìm thấy file).
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env.local') });
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
+
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+
+const PORT = Number(process.env.BRIDGE_PORT ?? 4001);
+const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
+if (!AI_ENGINE_SECRET) {
+  console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections KHÔNG xác thực (chỉ dùng cho dev).');
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -19,6 +31,9 @@ const startedAt = Date.now();
 
 app.use(express.json());
 app.post('/detections', (req, res) => {
+  if (AI_ENGINE_SECRET && req.headers['x-ai-engine-secret'] !== AI_ENGINE_SECRET) {
+    return res.sendStatus(401);
+  }
   const { cameraId, detections, videoPos } = req.body;
   lastDetectionAt[cameraId] = new Date().toISOString();
   const targets = [`camera-${cameraId}`, 'all-cameras'];
@@ -60,16 +75,16 @@ io.on('connection', (socket) => {
 // Nếu cổng đang bận (zombie chưa nhả), thử lại thay vì crash âm thầm
 server.on('error', (err) => {
   if (err && err.code === 'EADDRINUSE') {
-    console.error('⚠️  [BRIDGE] Cổng 4001 đang bận — thử lại sau 1.5s...');
+    console.error(`⚠️  [BRIDGE] Cổng ${PORT} đang bận — thử lại sau 1.5s...`);
     setTimeout(() => {
       try { server.close(); } catch (e) {}
-      server.listen(4001);
+      server.listen(PORT);
     }, 1500);
   } else {
     throw err;
   }
 });
 
-server.listen(4001, () => {
-  console.log('✅ YOLO Bridge Server running on port 4001');
+server.listen(PORT, () => {
+  console.log(`✅ YOLO Bridge Server running on port ${PORT}`);
 });

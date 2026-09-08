@@ -79,15 +79,27 @@ Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engi
 
 | Target | Image | Cổng | Ghi chú |
 |---|---|---|---|
-| `dashboard` | `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | 3000 | Next.js standalone; SQLite tại volume `/app/data/dev.db`, lần đầu chạy tự chép DB đã seed |
+| `dashboard` | `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | 3000 | Next.js standalone; SQLite tại bind mount `./data` → `/app/data/dev.db`, lần đầu chạy tự chép DB đã seed |
 | `bridge` | `ghcr.io/nguyenbaquyen075/safesight-instructions/bridge` | 4001 | `ai-engine/yolo_bridge.js` + express + socket.io |
 
 ```bash
-cp .env.docker.example .env   # secret cho dashboard
+cp .env.docker.example .env   # secret cho dashboard + bridge
+mkdir -p data public/snapshots   # tạo trước để không bị Docker tạo bằng quyền root
 docker compose up -d          # hoặc: docker compose up -d --build
 ```
 
 AI engine và agent không đóng gói (cần model `.pt`, webcam/GPU, `ANTHROPIC_API_KEY`); chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent` và trỏ về địa chỉ máy Docker. `public/videos` được mount chỉ đọc để dashboard phát video mẫu.
+
+`./data` và `./public/snapshots` dùng **bind mount** (không phải named volume) vì AI engine/agent chạy
+trên host cần thấy ĐÚNG file mà dashboard container ghi: engine mở thẳng `dev.db` (readonly) để lấy danh
+sách camera, và ghi ảnh chụp vi phạm vào `public/snapshots` mà dashboard phục vụ qua API. Khi trỏ host
+engine/agent vào Docker, set `DATABASE_URL=file:./data/dev.db` (khớp thư mục bind mount) thay vì
+`file:./dev.db` như dev thường.
+
+Bridge giờ cũng đọc `AI_ENGINE_SECRET` (qua `env_file: .env`) và **bắt buộc** header
+`x-ai-engine-secret` khớp secret đó trên `POST /detections` — trước đây endpoint này không xác thực nên
+publish cổng 4001 ra ngoài là mở cửa cho ai cũng bơm detection giả. Nếu chưa cấu hình secret, bridge vẫn
+chạy (chỉ log cảnh báo) để dev cục bộ không bị chặn.
 
 ## Các lệnh npm
 

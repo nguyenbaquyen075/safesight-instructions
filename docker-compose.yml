@@ -1,5 +1,11 @@
 # Dashboard + YOLO Bridge từ image trên GHCR. AI engine (Python, model .pt) và agent chạy ngoài
 # container: xem README mục "Chạy từ mã nguồn". Biến môi trường: chép .env.docker.example thành .env.
+#
+# ./data và ./public/snapshots dùng bind mount (không phải named volume) vì AI engine/agent chạy
+# trên host cần đọc/ghi ĐÚNG file mà dashboard container thấy: engine mở thẳng dev.db (readonly) và
+# ghi ảnh chụp vi phạm vào public/snapshots, dashboard phục vụ ảnh đó qua API. Host-side engine/agent
+# phải chạy với DATABASE_URL=file:./data/dev.db (khớp bind mount ./data) và snapshot ghi vào cùng
+# thư mục public/snapshots ở repo root.
 services:
   dashboard:
     image: ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard:latest
@@ -14,7 +20,8 @@ services:
       NEXT_PUBLIC_YOLO_SERVER_URL: ${NEXT_PUBLIC_YOLO_SERVER_URL:-http://localhost:4001}
       YOLO_BRIDGE_URL: http://bridge:4001
     volumes:
-      - safesight-data:/app/data
+      - ./data:/app/data
+      - ./public/snapshots:/app/public/snapshots
       - ./public/videos:/app/public/videos:ro
     depends_on:
       - bridge
@@ -27,7 +34,5 @@ services:
       target: bridge
     ports:
       - "4001:4001"
+    env_file: .env
     restart: unless-stopped
-
-volumes:
-  safesight-data:

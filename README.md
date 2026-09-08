@@ -137,18 +137,21 @@ Hai image được CI build và đẩy lên GitHub Container Registry mỗi khi 
 
 | Image | Nội dung | Cổng |
 |---|---|---|
-| `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | Next.js dashboard + API, SQLite trong volume `/app/data` | 3000 |
+| `ghcr.io/nguyenbaquyen075/safesight-instructions/dashboard` | Next.js dashboard + API, SQLite tại bind mount `./data` | 3000 |
 | `ghcr.io/nguyenbaquyen075/safesight-instructions/bridge` | YOLO Bridge Socket.IO | 4001 |
 
 ```bash
 cp .env.docker.example .env      # điền NEXTAUTH_SECRET, AI_ENGINE_SECRET, TELEGRAM_ENCRYPT_KEY, AGENT_BRIDGE_SECRET
+mkdir -p data public/snapshots   # tạo trước để không bị Docker tạo bằng quyền root
 docker compose up -d             # kéo image từ GHCR; thêm --build để build tại chỗ
 ```
 
-Lần chạy đầu container tự tạo `dev.db` đã seed (Organization/Site/Camera mẫu). AI engine (Python, cần
-model `.pt`, webcam/GPU) và agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`,
-trỏ `NEXT_PUBLIC_YOLO_SERVER_URL` và API về địa chỉ máy chạy Docker. Tag image: `latest` (main),
-`0.6.0` / `0.6` (release), `main`, mã commit ngắn.
+Lần chạy đầu container tự tạo `dev.db` đã seed (Organization/Site/Camera mẫu) trong `./data` — thư mục
+này và `./public/snapshots` là bind mount dùng chung với AI engine/agent chạy trên host (cần
+`DATABASE_URL=file:./data/dev.db` khi trỏ vào Docker). AI engine (Python, cần model `.pt`, webcam/GPU) và
+agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`, trỏ `NEXT_PUBLIC_YOLO_SERVER_URL`
+và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` của bridge, không
+chỉ `POST /api/violations`. Tag image: `latest` (main), `0.6.0` / `0.6` (release), `main`, mã commit ngắn.
 
 ## 🤖 Agent giám sát tự động
 
