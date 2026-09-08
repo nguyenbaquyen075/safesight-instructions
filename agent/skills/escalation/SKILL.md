@@ -1,5 +1,6 @@
 ---
-description: Khi nào nhắc nhở, khi nào leo thang, và viết caption Telegram thế nào.
+name: escalation
+description: Dùng khi cân nhắc nhắc nhở hay leo thang một vi phạm, hoặc soạn caption Telegram.
 ---
 # Leo thang
 

@@ -176,15 +176,27 @@ Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_act
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
 `ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ.
 
-## Skill (`agent/skills/*.md`, nạp vào system prompt)
+## Skill (`agent/skills/<name>/SKILL.md`, nạp vào system prompt)
 
-- `evidence.md` — từng `ObservationKind`, khi nào dùng, vì sao không có confidence.
-- `ppe-review.md` — mũ chỉ tính khi ở vùng đầu; găng/giày là lớp yếu (oan 6–9%) nên cần
+Mỗi skill là một thư mục con của `agent/skills/` chứa duy nhất `SKILL.md`, mở đầu bằng
+frontmatter YAML `name: <name>` (chữ thường, gạch nối) và `description: Dùng khi …` (ngôi
+thứ ba, chỉ nêu điều kiện kích hoạt, ≤ 500 ký tự, tiếng Việt), theo sau là nội dung skill.
+`systemBlocks()` (`agent/lib/prompt.ts`) đọc mọi `agent/skills/*/SKILL.md` theo thứ tự tên
+thư mục, bỏ frontmatter khỏi nội dung ghép vào prompt, và dựng một bảng chỉ mục
+`| Skill | Dùng khi |` từ frontmatter đặt trước toàn bộ nội dung skill — `agent/instructions.md`
+chỉ tham chiếu bảng này, không lặp lại nội dung skill.
+
+Skill hiện có:
+- `evidence` — từng `ObservationKind`, khi nào dùng, vì sao không có confidence.
+- `ppe-review` — mũ chỉ tính khi ở vùng đầu; găng/giày là lớp yếu (oan 6–9%) nên cần
   bằng chứng primary mới kết luận; model không có lớp `no_vest`; người nền; ngược sáng.
-- `escalation.md` — lần 1 là nhắc nhở, từ lần 2 là vi phạm; không spam; caption ngắn có
+- `escalation` — lần 1 là nhắc nhở, từ lần 2 là vi phạm; không spam; caption ngắn có
   camera, món thiếu, lần thứ mấy.
-- `data-boundaries.md` — không suy đoán danh tính người, không mô tả đặc điểm cá nhân ngoài
+- `data-boundaries` — không suy đoán danh tính người, không mô tả đặc điểm cá nhân ngoài
   PPE, không gửi ảnh/đoạn văn ra ngoài ngoài Telegram đã cấu hình.
+
+Thêm skill mới: tạo thư mục `agent/skills/<name>/SKILL.md` với frontmatter `name`/
+`description` theo chuẩn trên rồi viết nội dung; loader tự nhặt, không cần sửa code.
 
 ## Panel
 

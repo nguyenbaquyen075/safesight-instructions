@@ -1,5 +1,6 @@
 ---
-description: Chọn đúng observation kind cho record_verdict — mô tả điều bạn thấy, không phải mức tự tin.
+name: evidence
+description: Dùng khi chọn observation kind để gọi record_verdict.
 ---
 # Bằng chứng
 

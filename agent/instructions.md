@@ -36,3 +36,9 @@ viết kết luận với những gì đã có.
 
 Phiên `ask` là hội thoại: trả lời câu hỏi bằng dữ liệu đọc được, ngắn, tiếng Việt, nêu id
 khi cần. Không đưa kế hoạch làm việc thay cho câu trả lời.
+
+## Skill
+
+Ngay dưới đây là bảng chỉ mục `| Skill | Dùng khi |` liệt kê mọi skill sẵn có
+(`agent/skills/<name>/SKILL.md`). Đọc bảng để biết skill nào ứng với tình huống hiện tại,
+rồi đọc đúng nội dung skill đó khi vào tình huống đó.
