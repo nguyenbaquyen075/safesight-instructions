@@ -4,6 +4,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-09-08
+
 ### Thêm
 - Clip bằng chứng ~8 giây cho mỗi vi phạm đã chốt: `ai-engine/clips.py` (`FrameRing` đệm 20 khung gần nhất mỗi luồng, `ClipWriter` bọc `cv2.VideoWriter` mp4v 4 fps, `PendingClip`/`start_clip`); engine ghi `public/snapshots/clip_<cameraId>_<timestamp>.mp4` gồm 20 khung TRƯỚC + 12 khung SAU (ghi dần ở các vòng lặp kế tiếp nên không chặn vòng lặp nhận diện) và gửi kèm `clipUrl` trong `POST /api/violations` (trường tuỳ chọn, lưu `Violation.clipUrl`). Modal chi tiết vi phạm phát clip với ảnh snapshot làm poster, không có clip thì hiện ảnh; `clear_snapshots()` và `snapshot.cleanup` của agent xử lý clip cùng luật với ảnh (chỉ xoá tệp của vi phạm đã đóng và cũ hơn 24h); `read_violation` trả `clipUrl` kèm nhắc "có clip 8s, xem trong modal".
 - Vùng nhận diện (Zone/ROI) theo camera: người có điểm chân ngoài mọi vùng `MONITORING` bị bỏ trước khi xét PPE (`ai-engine/zones.py` point-in-polygon thuần Python, `process_frame(frame, zones=...)`); engine đọc lại bảng `Zone` mỗi 60s và ghi ảnh xem trước `public/snapshots/preview_<cameraId>.jpg` mỗi 30s. API `GET/PUT /api/cameras/[id]/zones`, hook `useCameraZones`/`useSaveCameraZones`, trình vẽ đa giác trong dialog sửa camera (Cài đặt > Giám sát).
@@ -153,7 +155,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - Khởi tạo dự án: Next.js dashboard, Prisma, AI engine YOLOv8 và YOLO Bridge Socket.IO.
 
-[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.5.0...v0.6.0

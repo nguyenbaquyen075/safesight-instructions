@@ -22,7 +22,7 @@ Trang chủ tài liệu nội bộ của dự án `safesight-instructions`. Dùn
 
 ## ⚡ Tóm tắt nhanh
 
-- **Trạng thái:** 🟡 MVP đang phát triển (v0.8.0).
+- **Trạng thái:** 🟡 MVP đang phát triển (v0.9.0).
 - **Chạy:** `npm run dev` khởi động 4 tiến trình — Next.js (3000) + YOLO Bridge (4001) + AI engine Python + Agent (4002 nội bộ).
 - **Giao diện:** 11 trang trong dashboard, thiếu `/reports` và `/profile`.
 - **API:** 19 route, tất cả đã nối DB thật (Prisma + SQLite dev).
