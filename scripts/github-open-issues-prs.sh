@@ -45,8 +45,9 @@ for slug in "${slugs[@]}"; do
   fi
 done
 
+INTEGRATION_BRANCH="${INTEGRATION_BRANCH:-}"
 INTEGRATION_PR_BODY="${INTEGRATION_PR_BODY:-docs/github/prs/integration-${INTEGRATION_BRANCH##*/}.md}"
-if [ -n "${INTEGRATION_BRANCH:-}" ] && [ -f "$INTEGRATION_PR_BODY" ]; then
+if [ -n "$INTEGRATION_BRANCH" ] && [ -f "$INTEGRATION_PR_BODY" ]; then
   push "$INTEGRATION_BRANCH" && echo "đã push $INTEGRATION_BRANCH" || echo "push $INTEGRATION_BRANCH thất bại"
   exists=$(api GET "/pulls?state=open&head=${REPO%%/*}:$INTEGRATION_BRANCH" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['html_url'] if d else '')")
   if [ -n "$exists" ]; then echo "PR tổng đã có: $exists"; else
