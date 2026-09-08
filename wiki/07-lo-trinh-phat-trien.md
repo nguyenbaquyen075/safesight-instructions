@@ -25,13 +25,14 @@ Cập nhật 2026-09-07 theo hiện trạng code (thay cho bảng cũ trong `SPE
 5. KPI camera online và roster site đang lấy từ `src/data/mock-cameras.ts` → chuyển sang bảng `Camera` thật.
 6. Tỉ lệ tuân thủ đang suy từ số vi phạm (`rateFromCount`) → ghi thêm tổng lượt người quan sát mỗi ngày.
 7. Giao diện đọc `AuditLog`.
+8. `(dashboard)/cameras/page.tsx` vẫn ghi bản demo bản ghi vi phạm AI vào `localStorage['safesight_alerts']` (song song với ghi DB thật) — dọn nốt để chỉ còn một nguồn dữ liệu (DB), giống badge Sidebar và `/alerts` đã chuyển sang `useViolations()`.
 
 ## 🎯 Ưu tiên 3 — Vận hành
 
-8. Xác thực cho YOLO Bridge trước khi mở ra ngoài localhost.
-9. Production: PostgreSQL (`@prisma/adapter-pg` đã cài), khôi phục enum/array trong schema, build artifact thay vì `npm run dev`.
-10. Kênh cảnh báo khác (SMS/Email/Webhook) — enum đã có, chưa nối.
-11. Mở rộng lớp AI: kính (`goggles` đã có trong model, chưa bật), dây an toàn, té ngã, khói/lửa.
+9. Xác thực cho YOLO Bridge trước khi mở ra ngoài localhost.
+10. Production: PostgreSQL (`@prisma/adapter-pg` đã cài), khôi phục enum/array trong schema, build artifact thay vì `npm run dev`.
+11. Kênh cảnh báo khác (SMS/Email/Webhook) — enum đã có, chưa nối.
+12. Mở rộng lớp AI: kính (`goggles` đã có trong model, chưa bật), dây an toàn, té ngã, khói/lửa.
 
 ## ❓ Câu hỏi mở
 

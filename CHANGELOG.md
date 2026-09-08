@@ -47,6 +47,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
   detection giả. Không cấu hình secret thì vẫn chạy (chỉ cảnh báo) để dev cục bộ không bị chặn.
 - `docker-compose.yml`: dashboard dùng bind mount `./data` và `./public/snapshots` thay vì named volume,
   để AI engine/agent chạy trên host chia sẻ đúng `dev.db` và ảnh chụp vi phạm với container.
+- Badge số ở mục "Thông báo" trên Sidebar không còn cộng số ảo (`11 + localStorage`) mà đếm số vi phạm `status === 'open'` từ DB (`useViolations()`), cùng nguồn dữ liệu với trang `/violations`. Ẩn badge khi 0, hiển thị `99+` khi vượt 99.
+- Trang `/sites` không còn ghi bản ghi "công trường mới" vào `localStorage['safesight_alerts']` (đây không phải một vi phạm).
 
 ## [0.6.0] - 2026-09-07
 

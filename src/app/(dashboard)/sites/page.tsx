@@ -200,24 +200,6 @@ export default function SitesPage() {
     const updatedSites = [...customSites, newSite];
     setCustomSites(updatedSites);
     localStorage.setItem('safesight_custom_sites', JSON.stringify(updatedSites));
-
-    // Log to system alerts (simulated persistence)
-    const newAlert = {
-      id: Math.random(),
-      type: 'Thông báo Hệ thống',
-      severity: 'LOW',
-      siteName: data.name,
-      cameraName: 'N/A',
-      date: new Date().toLocaleDateString(),
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      description: `Một công trình mới đã được đăng ký bởi quản trị viên.`
-    };
-
-    const existingAlerts = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
-    localStorage.setItem('safesight_alerts', JSON.stringify([newAlert, ...existingAlerts]));
-
-    // Dispatch event to update sidebar badge
-    window.dispatchEvent(new Event('new-alert'));
   };
 
   // Chỉ site TỰ ĐĂNG KÝ (localStorage) mới xoá được — site gom từ roster camera thật gắn với

@@ -2,13 +2,14 @@
 // SPDX-License-Identifier: MIT
 
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useSession, signOut } from 'next-auth/react';
-import { UserRole } from '@/types/enums';
+import { UserRole, ViolationStatus } from '@/types/enums';
 import { canAccessPath } from '@/lib/auth/permissions';
+import { useViolations } from '@/hooks/use-violations';
 import {
   LayoutDashboard,
   Building2,
@@ -39,7 +40,7 @@ const navItems: NavItem[] = [
   { label: 'Công trường', href: '/sites', icon: Building2 },
   { label: 'Camera', href: '/cameras', icon: Camera },
   { label: 'Loa công trường', href: '/site-speaker', icon: Volume2 },
-  { label: 'Thông báo', href: '/alerts', icon: Bell, badge: 11 },
+  { label: 'Thông báo', href: '/alerts', icon: Bell },
   { label: 'Vi phạm', href: '/violations', icon: ShieldAlert },
   { label: 'Phân tích', href: '/analytics', icon: BarChart3 },
   { label: 'Agent', href: '/agent', icon: Bot },
@@ -50,28 +51,14 @@ const navItems: NavItem[] = [
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
-  const [alertCount, setAlertCount] = useState(11); // Initial mock count
   const pathname = usePathname();
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole;
+  const { data: violations = [] } = useViolations();
 
   const filteredNavItems = navItems.filter(item => canAccessPath(userRole, item.href));
 
-  useEffect(() => {
-    const updateCount = () => {
-      const customAlerts = JSON.parse(localStorage.getItem('safesight_alerts') || '[]');
-      setAlertCount(11 + customAlerts.length);
-    };
-
-    updateCount();
-    window.addEventListener('storage', updateCount);
-    window.addEventListener('new-alert', updateCount);
-    
-    return () => {
-      window.removeEventListener('storage', updateCount);
-      window.removeEventListener('new-alert', updateCount);
-    };
-  }, []);
+  const openAlertCount = violations.filter(v => v.status === ViolationStatus.OPEN).length;
 
   return (
     <aside
@@ -107,7 +94,8 @@ export function Sidebar() {
             pathname === item.href ||
             (item.href !== '/' && pathname.startsWith(item.href));
           const Icon = item.icon;
-          const currentBadge = item.label === 'Thông báo' ? alertCount : item.badge;
+          const currentBadge = item.label === 'Thông báo' ? openAlertCount : item.badge;
+          const badgeLabel = currentBadge && currentBadge > 99 ? '99+' : currentBadge;
 
           return (
             <Link
@@ -130,14 +118,14 @@ export function Sidebar() {
               {!collapsed && (
                 <>
                   <span className="flex-1">{item.label}</span>
-                  {currentBadge && (
+                  {!!currentBadge && (
                     <span className="flex-shrink-0 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--danger)] text-white">
-                      {currentBadge}
+                      {badgeLabel}
                     </span>
                   )}
                 </>
               )}
-              {collapsed && currentBadge && (
+              {collapsed && !!currentBadge && (
                 <span className="absolute left-12 top-0.5 w-2 h-2 rounded-full bg-[var(--danger)]" />
               )}
             </Link>

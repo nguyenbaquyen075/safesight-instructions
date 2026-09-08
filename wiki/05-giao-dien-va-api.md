@@ -10,6 +10,8 @@ Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng t�
 
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
+Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useViolations()` (đếm `status === 'open'`), cùng nguồn với `/violations` — không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
+
 | Route | File | Vai trò được xem | Nội dung |
 |---|---|---|---|
 | `/login` | `src/app/login/page.tsx` | — | NextAuth Credentials |
