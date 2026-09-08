@@ -36,7 +36,7 @@ CMD ["node", "server.js"]
 FROM node:24-alpine AS bridge
 WORKDIR /app
 COPY ai-engine/yolo_bridge.js ./
-RUN npm init -y >/dev/null && npm install --omit=dev express@5.2.1 socket.io@4.8.3 && npm cache clean --force
+RUN npm init -y >/dev/null && npm install --omit=dev express@5.2.1 socket.io@4.8.3 dotenv@17.4.2 && npm cache clean --force
 USER node
 EXPOSE 4001
 CMD ["node", "yolo_bridge.js"]

@@ -435,7 +435,7 @@ def run_inference():
                         # -> trình duyệt phát giây 0 còn AI phân tích giây 22, khung
                         # nhận diện thuộc về cảnh hoàn toàn khác.
                         "videoPos": vi_tri_video,
-                    }, timeout=0.1)
+                    }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=0.1)
                 except:
                     pass
 

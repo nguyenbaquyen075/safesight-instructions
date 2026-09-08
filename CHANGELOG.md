@@ -41,6 +41,11 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Vòng lặp agent thoát ngay khi nhận SIGTERM/SIGINT giữa lúc đang xử lý, không ngủ hết 20s rồi mới dừng.
 - `PATCH /api/cameras/[id]` chỉ đánh thức agent sau khi task `health.probe` đã ghi xong DB, không còn race trước khi task tồn tại.
 - Hỏi tiếp câu mới vào một task `ask` đã hết lượt thử không còn bị âm thầm bỏ qua: nối vào task cũ giờ reset `attempts` về 0.
+- `POST /detections` trên YOLO Bridge yêu cầu header `x-ai-engine-secret` khớp `AI_ENGINE_SECRET` (khi
+  đã cấu hình) — trước đây cổng 4001 publish ra ngoài mà endpoint này không xác thực, ai cũng bơm được
+  detection giả. Không cấu hình secret thì vẫn chạy (chỉ cảnh báo) để dev cục bộ không bị chặn.
+- `docker-compose.yml`: dashboard dùng bind mount `./data` và `./public/snapshots` thay vì named volume,
+  để AI engine/agent chạy trên host chia sẻ đúng `dev.db` và ảnh chụp vi phạm với container.
 
 ## [0.6.0] - 2026-09-07
 
