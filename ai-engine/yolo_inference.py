@@ -13,7 +13,7 @@ import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
 from clips import FrameRing, start_clip
-from zones import parse_polygon
+from zones import DangerZone, IntrusionTracker, intrusions, parse_polygon
 from env_local import load_dotenv_local
 
 load_dotenv_local()
@@ -128,6 +128,14 @@ def load_real_camera_overrides():
     return overrides
 
 # PPE thiếu -> (type, severity) khớp src/types/enums.ts (ViolationType/Severity)
+# Loại Zone nguy hiểm -> (ViolationType, Severity) khớp src/types/enums.ts.
+# WARNING là vùng "cảnh báo" (mép vùng cấm) nên nhẹ hơn một bậc.
+ZONE_VIOLATION_MAP = {
+    "RESTRICTED": ("zone_intrusion", "critical"),
+    "WARNING": ("zone_intrusion", "high"),
+    "SUSPENDED_LOAD": ("suspended_load", "critical"),
+}
+
 PPE_VIOLATION_MAP = {
     "helmet": ("hard_hat", "critical"),
     "vest": ("safety_vest", "high"),
@@ -153,17 +161,47 @@ def _draw_violation_box(frame, bbox_pct, label):
     return frame
 
 
+def _person_boxes(detections, frame):
+    """Khung NGƯỜI (pixel) dựng lại từ detections mà process_frame vừa trả về.
+
+    Lấy ở đây thay vì sửa ppe_tracker.py: chỉ cần toạ độ người, không cần đụng vào
+    400 dòng logic PPE. Đánh đổi: đây là người ĐÃ bị lọc theo vùng làm việc, nên
+    vùng cấm vẽ ngoài mọi vùng làm việc của camera sẽ không bắt được ai — camera
+    nào cần bắt xâm nhập thì đừng khai vùng làm việc, hoặc vẽ vùng làm việc phủ
+    luôn vùng cấm.
+    """
+    h, w = frame.shape[:2]
+    persons = []
+    for d in detections:
+        if d.get("type") != "person":
+            continue
+        bbox = d["bbox"]
+        x1 = _pct_to_ratio(bbox["left"]) * w
+        y1 = _pct_to_ratio(bbox["top"]) * h
+        persons.append({
+            "box": [x1, y1, x1 + _pct_to_ratio(bbox["width"]) * w,
+                    y1 + _pct_to_ratio(bbox["height"]) * h],
+            "detection": d,
+        })
+    return persons
+
+
 def report_violation(cam_id, detection):
     """Ghi 1 Violation vào DB qua API Next.js (POST /api/violations).
 
-    Chỉ gọi khi: có PPE bị thiếu khớp map, và đã có snapshot bằng chứng
+    Chỉ gọi khi: có PPE bị thiếu khớp map (hoặc detection đã tự khai
+    violationType — vi phạm xâm nhập vùng cấm), và đã có snapshot bằng chứng
     (snapshotUrl được yolo_inference.py gắn vào detection ở vòng lặp chính).
     """
-    vtype = severity = None
-    for ppe in ("helmet", "vest", "gloves", "boots"):  # ưu tiên theo mức nghiêm trọng
-        if ppe in detection.get("missingPpe", []):
-            vtype, severity = PPE_VIOLATION_MAP[ppe]
-            break
+    # Vi phạm xâm nhập tự khai type/severity (không dính gì tới PPE); PPE thì suy
+    # từ món còn thiếu như cũ.
+    vtype = detection.get("violationType")
+    severity = detection.get("severity")
+    if not vtype:
+        for ppe in ("helmet", "vest", "gloves", "boots"):  # ưu tiên theo mức nghiêm trọng
+            if ppe in detection.get("missingPpe", []):
+                vtype, severity = PPE_VIOLATION_MAP[ppe]
+                break
     snapshot_url = detection.get("snapshotUrl")
     if not vtype or not snapshot_url:
         return
@@ -185,6 +223,8 @@ def report_violation(cam_id, detection):
             }],
             "snapshotUrl": snapshot_url,
             "occurrenceCount": detection.get("occurrenceCount", 1),
+            # zoneId chỉ có ở vi phạm xâm nhập (API nhận zoneId tuỳ chọn, không nhận null).
+            **({"zoneId": detection["zoneId"]} if detection.get("zoneId") else {}),
             # Clip chỉ gửi khi ghi được (API nhận clipUrl tuỳ chọn, không nhận null).
             **({"clipUrl": detection["clipUrl"]} if detection.get("clipUrl") else {}),
         }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
@@ -252,19 +292,20 @@ ZONE_REFRESH_INTERVAL = 60
 
 
 def load_zones():
-    """Đọc VÙNG LÀM VIỆC của từng camera -> {cameraId: [[(x, y), ...], ...]}.
+    """Đọc MỌI vùng đang bật -> {cameraId: {'monitoring': [poly], 'danger': [DangerZone]}}.
 
-    Chỉ lấy Zone đang bật và type MONITORING (vùng "chỉ xét người trong vùng");
-    RESTRICTED/WARNING dành cho tính năng khác, chưa dùng ở đây. Toạ độ là tỉ lệ
-    0–1 theo khung hình (xem src/lib/zone-shape.ts, cùng quy ước với trình vẽ).
-    Camera không có vùng nào -> không có khoá trong dict -> xét cả khung.
+    Hai nhóm dùng vào hai việc khác hẳn nhau:
+      - MONITORING = vùng LÀM VIỆC, chỉ để LỌC người trước khi xét PPE;
+      - RESTRICTED/WARNING/SUSPENDED_LOAD = vùng NGUY HIỂM, bước chân vào là vi phạm.
+    Toạ độ là tỉ lệ 0–1 theo khung hình (xem src/lib/zone-shape.ts, cùng quy ước với
+    trình vẽ). Camera không có vùng nào -> không có khoá trong dict -> xét cả khung.
     """
     conn = _open_db_readonly()
     if conn is None:
         return {}
     try:
         rows = conn.execute(
-            "SELECT cameraId, polygonData FROM Zone WHERE isActive = 1 AND type = 'MONITORING'"
+            "SELECT id, cameraId, type, polygonData FROM Zone WHERE isActive = 1"
         ).fetchall()
     except sqlite3.Error as e:
         print(f"⚠️ Không đọc được vùng nhận diện từ DB: {e}")
@@ -273,25 +314,38 @@ def load_zones():
         conn.close()
 
     zones = {}
-    for cam_id, raw in rows:
+    for zone_id, cam_id, zone_type, raw in rows:
         polygon = parse_polygon(raw)
-        if polygon:
-            zones.setdefault(cam_id, []).append(polygon)
+        if not polygon:
+            continue
+        cam = zones.setdefault(cam_id, {'monitoring': [], 'danger': []})
+        if zone_type in ZONE_VIOLATION_MAP:
+            cam['danger'].append(DangerZone(zone_id, zone_type, polygon))
+        else:
+            # Loại lạ (sửa tay trong DB) coi như MONITORING, giống toZoneDTO bên web:
+            # thà lọc người thừa còn hơn tự dựng vùng cấm không ai khai.
+            cam['monitoring'].append(polygon)
     return zones
 
 
 def zones_for_stream(cam_ids, zones_by_camera):
-    """Vùng áp cho MỘT luồng video. Một luồng có thể phục vụ nhiều camera demo dùng
+    """Vùng LÀM VIỆC áp cho MỘT luồng video. Một luồng có thể phục vụ nhiều camera demo dùng
     chung file video: detections tính một lần rồi gửi cho tất cả, nên chỉ cần MỘT
     camera trong nhóm chưa khai vùng là phải xét cả khung (None), không thì camera
     đó mất người."""
     polygons = []
     for cam_id in cam_ids:
-        cam_zones = zones_by_camera.get(cam_id)
+        cam_zones = (zones_by_camera.get(cam_id) or {}).get('monitoring')
         if not cam_zones:
             return None
         polygons.extend(cam_zones)
     return polygons or None
+
+
+def danger_zones_for(cam_id, zones_by_camera):
+    """Vùng nguy hiểm của ĐÚNG một camera — không gộp theo luồng như vùng làm việc:
+    zoneId ghi vào Violation phải thuộc chính camera đang báo."""
+    return (zones_by_camera.get(cam_id) or {}).get('danger') or []
 
 class RTSPStream:
     """Đọc luồng RTSP (camera IP thật) trong 1 thread riêng, luôn giữ frame MỚI
@@ -526,10 +580,16 @@ def run_inference():
 
     zones_by_camera = load_zones()
     _zones_last = time.time()
+    # Xâm nhập vùng cấm: chốt sau 3s đứng liên tục trong vùng, báo lại mỗi 60s
+    # (cùng nhịp với REPORT_INTERVAL của vi phạm PPE). Khoá trạng thái đã gồm
+    # cameraId nên một bộ dùng chung cho mọi luồng.
+    intrusion_tracker = IntrusionTracker(repeat_seconds=REPORT_INTERVAL)
     # Phút đang gom số liệu quan sát; sang phút mới -> gửi hết mọi luồng rồi đếm lại.
     _obs_minute = minute_iso(time.time())
     if zones_by_camera:
-        print(f"🔷 Vùng làm việc: {', '.join(f'{c} ({len(z)} vùng)' for c, z in zones_by_camera.items())}")
+        print("🔷 Vùng: " + ', '.join(
+            f"{c} ({len(z['monitoring'])} làm việc, {len(z['danger'])} nguy hiểm)"
+            for c, z in zones_by_camera.items()))
 
     while True:
         # Vùng vừa vẽ trên web có hiệu lực sau tối đa 60s, không cần khởi động lại engine.
@@ -667,6 +727,40 @@ def run_inference():
                     d['occurrenceCount'] = violation_count[key]
                     report_violation(cam_id, d)
                     last_reported[key] = now
+
+                # XÂM NHẬP VÙNG CẤM: chỉ cần điểm CHÂN nằm trong vùng nguy hiểm của
+                # chính camera này (không liên quan PPE). Tracker lo phần "đứng đủ 3s"
+                # và "báo lại mỗi 60s", ở đây chỉ còn việc chụp ảnh + ghi DB.
+                danger = danger_zones_for(cam_id, zones_by_camera)
+                found = []
+                if danger:
+                    _h, _w = frame.shape[:2]
+                    found = intrusions(_person_boxes(detections, frame), danger, _w, _h)
+                # Gọi update kể cả khi không có ai/không còn vùng: đó cũng là lúc
+                # tracker xoá trạng thái của người đã rời vùng.
+                for person, zone_id, zone_type, count in intrusion_tracker.update(
+                        cam_id, found, lambda p: p["detection"].get("trackId")):
+                    vtype, severity = ZONE_VIOLATION_MAP[zone_type]
+                    label = "TẢI TREO" if vtype == "suspended_load" else "VÙNG CẤM"
+                    if not os.path.exists(SNAPSHOT_DIR):
+                        os.makedirs(SNAPSHOT_DIR)
+                    person_det = person["detection"]
+                    timestamp = time.strftime("%Y%m%d-%H%M%S")
+                    # Hậu tố "-zone": cùng người/cùng giây có thể vừa thiếu PPE vừa
+                    # đứng trong vùng cấm -> hai ảnh khác nhau, không đè lên nhau.
+                    filename = f"violation_{cam_id}_{timestamp}_{person_det.get('trackId')}-zone.jpg"
+                    cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}",
+                                _draw_violation_box(frame.copy(), person_det["bbox"], label))
+                    report_violation(cam_id, {
+                        "bbox": person_det["bbox"],
+                        "label": label,
+                        "confidence": person_det["confidence"],
+                        "violationType": vtype,
+                        "severity": severity,
+                        "zoneId": zone_id,
+                        "occurrenceCount": count,
+                        "snapshotUrl": f"/snapshots/{filename}",
+                    })
 
             # Phần đuôi của các clip đang mở: mỗi vòng thêm 1 khung, đủ 12 khung thì tự đóng.
             if st.get("pending_clips"):

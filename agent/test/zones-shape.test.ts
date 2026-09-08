@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { defaultZoneName, parseZonePolygon, serializeZonePolygon, toZoneDTO, zonesPayloadSchema } from '@/lib/zone-shape';
+import { MONITORING_ZONE_TYPE, defaultZoneName, parseZonePolygon, serializeZonePolygon, toZoneDTO, zonesPayloadSchema } from '@/lib/zone-shape';
 
 // Phần thuần của GET/PUT /api/cameras/[id]/zones (route handler cần ngữ cảnh Next
 // request + auth() nên không test trực tiếp được, giống camera-agent-shape.test.ts).
@@ -31,10 +31,29 @@ test('a coordinate outside 0-1 is rejected', () => {
 });
 
 test('a zone row with a broken polygon has no DTO', () => {
-  assert.equal(toZoneDTO({ id: 'z1', name: 'Vùng 1', polygonData: '[]' }), null);
-  assert.deepEqual(toZoneDTO({ id: 'z1', name: 'Vùng 1', polygonData: serializeZonePolygon(TRIANGLE) }), {
-    id: 'z1', name: 'Vùng 1', points: TRIANGLE,
+  assert.equal(toZoneDTO({ id: 'z1', name: 'Vùng 1', type: MONITORING_ZONE_TYPE, polygonData: '[]' }), null);
+  assert.deepEqual(toZoneDTO({ id: 'z1', name: 'Vùng 1', type: 'RESTRICTED', polygonData: serializeZonePolygon(TRIANGLE) }), {
+    id: 'z1', name: 'Vùng 1', type: 'RESTRICTED', points: TRIANGLE,
   });
+});
+
+test('a zone row with an unknown type falls back to MONITORING', () => {
+  const dto = toZoneDTO({ id: 'z1', name: 'Vùng 1', type: 'nonsense', polygonData: serializeZonePolygon(TRIANGLE) });
+  assert.equal(dto?.type, MONITORING_ZONE_TYPE);
+});
+
+test('the PUT payload defaults a zone without a type to MONITORING', () => {
+  const parsed = zonesPayloadSchema.safeParse({ zones: [{ points: TRIANGLE }] });
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.data?.zones[0].type, MONITORING_ZONE_TYPE);
+});
+
+test('the PUT payload accepts every zone type and rejects an unknown one', () => {
+  for (const type of ['MONITORING', 'RESTRICTED', 'WARNING', 'SUSPENDED_LOAD']) {
+    assert.equal(zonesPayloadSchema.safeParse({ zones: [{ points: TRIANGLE, type }] }).success, true, type);
+  }
+  assert.equal(zonesPayloadSchema.safeParse({ zones: [{ points: TRIANGLE, type: 'monitoring' }] }).success, false);
+  assert.equal(zonesPayloadSchema.safeParse({ zones: [{ points: TRIANGLE, type: 'DANGER' }] }).success, false);
 });
 
 test('the PUT payload accepts an empty list (clearing every zone)', () => {

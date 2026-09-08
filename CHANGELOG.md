@@ -4,6 +4,10 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- **Cảnh báo xâm nhập vùng cấm**: vùng `RESTRICTED` / `WARNING` / `SUSPENDED_LOAD` của bảng `Zone` giờ được AI engine dùng thật — người có điểm chân nằm trong vùng liên tục ≥ 3 giây sinh vi phạm `zone_intrusion` (mức `critical` / `high`) hoặc `suspended_load` (`critical`), kèm `zoneId`, ảnh khoanh đỏ nhãn "VÙNG CẤM" / "TẢI TREO", và báo lại mỗi 60 giây với `occurrenceCount` tăng dần nếu người đó vẫn đứng trong vùng (`intrusions` / `IntrusionTracker` trong `ai-engine/zones.py`, thuần Python nên test không cần torch).
+- Trình vẽ vùng (Cài đặt > Giám sát > sửa camera) thêm ô chọn **loại vùng** cho từng vùng và chú giải màu (vùng làm việc xanh, cảnh báo vàng, vùng cấm / dưới tải treo đỏ); `GET/PUT /api/cameras/[id]/zones` đọc và ghi mọi loại vùng (`type` mặc định `MONITORING`, PUT vẫn thay toàn bộ danh sách của camera).
+
 ## [0.10.0] - 2026-09-08
 
 ### Thêm

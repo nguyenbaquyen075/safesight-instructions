@@ -26,7 +26,7 @@ CameraAgent (1 dòng/camera: subagent riêng của camera)
 | `Organization` | Tổ chức/doanh nghiệp (đa tenant) | có `plan`, `logoUrl` |
 | `Site` | Công trường | toạ độ `lat`/`lng`, các số đếm camera/tuân thủ/cảnh báo |
 | `Camera` | Camera giám sát | `rtspUrl` lưu nguồn theo quy ước `webcam:0` / `rtsp://...` / `video:ten.mp4`; `status` khác `ONLINE` thì AI bỏ qua |
-| `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string (điểm tỉ lệ 0–1, `ZoneDTO` trong `src/lib/zone-shape.ts`); AI engine đọc lại mỗi 60s (`ai-engine/zones.py`) và bỏ người có điểm chân ngoài mọi vùng `MONITORING` trước khi xét PPE |
+| `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string (điểm tỉ lệ 0–1, `ZoneDTO` trong `src/lib/zone-shape.ts`); `type` quyết định vùng dùng để LỌC hay để BẮT xâm nhập (bảng dưới); AI engine đọc lại mọi vùng đang bật mỗi 60s (`ai-engine/zones.py`) |
 | `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `clipUrl` (clip bằng chứng ~8s do engine ghi, NULL khi không ghi được), `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung; GET `/api/violations` và `/api/violations/[id]` trả về trường này), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
 | `ObservationStat` | Số người AI quan sát được mỗi phút của một camera | `minute` (mốc phút), `persons` (đông nhất trong phút), `personSeconds` ("người × giây"), `@@unique([cameraId, minute])`; AI engine ghi qua `POST /api/observations`, là MẪU SỐ của tỉ lệ tuân thủ thật (`GET /api/stats/compliance`). Cố ý không khai quan hệ Prisma tới Camera/Site — chỉ đọc theo `siteId` + `minute` |
 | `Alert` | Cảnh báo sinh từ vi phạm | `channel`, `recipient`, `errorMessage` (null = gửi thành công, dùng tính cooldown) |
@@ -54,6 +54,17 @@ SQLite không có enum nên DB lưu **String**; giá trị hợp lệ định ng
 - **`SiteStatus`**: `active` / `inactive` / `setup`
 - **`ZoneType`**: `restricted` / `warning` / `monitoring` / `suspended_load`
 
+### Các loại `Zone.type` (DB lưu chữ HOA)
+
+| `type` | Ý nghĩa | Engine làm gì |
+|---|---|---|
+| `MONITORING` | Vùng LÀM VIỆC — phạm vi AI được phép soi PPE | Người có điểm chân ngoài **mọi** vùng MONITORING bị loại trước khi xét PPE |
+| `RESTRICTED` | Vùng CẤM vào | Người đứng trong vùng ≥ 3 giây → Violation `zone_intrusion` mức `critical` |
+| `WARNING` | Vùng cảnh báo (mép vùng cấm) | Như trên nhưng mức `high` |
+| `SUSPENDED_LOAD` | Vùng dưới tải treo/cẩu | Người đứng trong vùng ≥ 3 giây → Violation `suspended_load` mức `critical` |
+
+Vùng nguy hiểm ghi kèm `Violation.zoneId`; xoá vùng thì `zoneId` của vi phạm cũ về `null` (`onDelete: SetNull`), không mất hồ sơ. Giá trị `type` lạ (sửa tay trong DB) được quy về `MONITORING` ở cả hai phía (`toZoneDTO`, `load_zones`).
+
 > Lưu ý chữ hoa/thường: schema Prisma đặt default chữ HOA (`"ONLINE"`, `"OPEN"`), API chuyển về chữ thường khi trả DTO (xem `toCameraDTO()` trong `src/lib/camera-shape.ts` và route violations).
 
 ## Liên hệ với AI
@@ -67,7 +78,17 @@ SQLite không có enum nên DB lưu **String**; giá trị hợp lệ định ng
 | `gloves` | `safety_gloves` | `medium` |
 | `boots` | `safety_footwear` | `medium` |
 
-Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghiêm trọng nhất (thứ tự trên). Các `ViolationType` còn lại (té ngã, khói/lửa, xâm nhập vùng…) đã có trong enum nhưng **chưa có model AI**.
+Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghiêm trọng nhất (thứ tự trên).
+
+`ZONE_VIOLATION_MAP` ánh xạ vùng nguy hiểm → `(type, severity)`:
+
+| `Zone.type` | `ViolationType` | `Severity` |
+|---|---|---|
+| `RESTRICTED` | `zone_intrusion` | `critical` |
+| `WARNING` | `zone_intrusion` | `high` |
+| `SUSPENDED_LOAD` | `suspended_load` | `critical` |
+
+Các `ViolationType` còn lại (té ngã, khói/lửa…) đã có trong enum nhưng **chưa có model AI**.
 
 ## Seed dữ liệu
 

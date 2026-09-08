@@ -21,7 +21,7 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 |---|---|
 | `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB, gửi số người quan sát được mỗi phút |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
-| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
+| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân, `intrusions`/`IntrusionTracker` cho vùng cấm) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
 | `clips.py` | Clip bằng chứng: `FrameRing` (đệm 20 khung gần nhất), `ClipWriter` (bọc `cv2.VideoWriter`), `PendingClip`/`start_clip` — chỉ `ClipWriter` cần cv2 nên test được bằng `python3 -m unittest ai-engine/test_clips.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
 | `src/hooks/useYolo.ts` | Hook WebSocket phía frontend |
@@ -42,13 +42,21 @@ dưới khung người) nằm ngoài **mọi** vùng thì bị loại TRƯỚC k
 vi phạm và không tính là người quan sát. Camera không khai vùng nào = xét cả khung.
 
 ```
-Zone (isActive, type=MONITORING, polygonData = [{x,y}] tỉ lệ 0–1)
-   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s
-   ▼
-ppe_tracker.process_frame(frame, zones=[...])
-   │  zones.filter_persons_in_zones() — ray casting, bỏ người ngoài vùng
-   ▼
-phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
+Zone (isActive, polygonData = [{x,y}] tỉ lệ 0–1)
+   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s,
+   │  tách {cameraId: {'monitoring': [...], 'danger': [DangerZone(id, type, poly)]}}
+   ├─ monitoring ─────────────────────────────────────────────┐
+   ▼                                                          │
+ppe_tracker.process_frame(frame, zones=[...])                 │
+   │  zones.filter_persons_in_zones() — ray casting           │
+   ▼                                                          │
+PPE, vi phạm, snapshot (giữ nguyên)                           │
+   │                                                          │
+   └─ persons của khung ──► zones.intrusions() ◄─ danger ─────┘
+                                │  IntrusionTracker: đủ 3s liên tục mới chốt,
+                                │  còn đứng thì báo lại mỗi 60s (occurrenceCount++)
+                                ▼
+                     snapshot "VÙNG CẤM"/"TẢI TREO" + POST /api/violations (kèm zoneId)
 ```
 
 - Vẽ vùng ở **Cài đặt > Giám sát > sửa camera > "Vùng nhận diện"** (`ZoneEditor.tsx`),
@@ -60,7 +68,16 @@ phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
   vẽ hiện trạng thái rỗng.
 - Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
   vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
-- `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
+- Vùng **nguy hiểm** (`RESTRICTED`/`WARNING`/`SUSPENDED_LOAD`) không lọc ai cả: chỉ cần
+  điểm chân nằm trong vùng **liên tục 3 giây** là ghi vi phạm (`zone_intrusion` /
+  `suspended_load`, xem bảng `ZONE_VIOLATION_MAP` ở wiki/04), kèm `zoneId` và ảnh
+  khoanh đỏ `violation_<cam>_<giờ>_<track>-zone.jpg`. Còn đứng trong vùng thì báo lại
+  mỗi 60 giây với `occurrenceCount` tăng dần; rời vùng thì đếm lại từ đầu.
+- Vùng nguy hiểm xét theo **từng camera** (không gộp theo luồng như vùng làm việc) vì
+  `zoneId` ghi vào vi phạm phải thuộc đúng camera đó.
+- Giới hạn hiện tại: người được lấy từ kết quả `process_frame`, tức là **đã bị lọc theo
+  vùng làm việc**. Camera vừa khai vùng làm việc vừa khai vùng cấm thì vùng cấm phải nằm
+  TRONG vùng làm việc, không thì không ai bị bắt.
 
 ## Clip bằng chứng cho mỗi vi phạm
 

@@ -5,13 +5,26 @@ import { useRef, useState } from 'react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useCameraZones, useSaveCameraZones } from '@/hooks/use-cameras';
-import type { ZonePoint } from '@/lib/zone-shape';
+import { MONITORING_ZONE_TYPE, ZONE_TYPES, type ZoneKind, type ZonePoint } from '@/lib/zone-shape';
 
 const MAX_ZONES = 10;      // khớp zonesPayloadSchema
 const MAX_POINTS = 20;     // khớp zonePolygonSchema
 
-// Mỗi vùng một màu để phân biệt khi chồng nhau; quay vòng khi quá 4 vùng.
-const ZONE_COLORS = ['var(--primary)', 'var(--success)', 'var(--warning)', 'var(--danger)'];
+// Màu theo LOẠI vùng (không theo thứ tự vẽ): nhìn ảnh là biết vùng nào chỉ lọc
+// người, vùng nào bước chân vào là vi phạm. Khớp DESIGN.md.
+const ZONE_TYPE_COLOR: Record<ZoneKind, string> = {
+  MONITORING: 'var(--primary)',
+  WARNING: 'var(--warning)',
+  RESTRICTED: 'var(--danger)',
+  SUSPENDED_LOAD: 'var(--danger)',
+};
+
+const ZONE_TYPE_LABEL: Record<ZoneKind, string> = {
+  MONITORING: 'Vùng làm việc',
+  WARNING: 'Vùng cảnh báo',
+  RESTRICTED: 'Vùng cấm',
+  SUSPENDED_LOAD: 'Dưới tải treo',
+};
 
 /** Trình vẽ VÙNG LÀM VIỆC trên ảnh xem trước của camera.
  *
@@ -38,11 +51,14 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
   // Tên vùng song song với draft theo chỉ số; undefined = vùng mới chưa đặt tên,
   // server tự sinh "Vùng N" khi lưu (defaultZoneName).
   const [names, setNames] = useState<(string | undefined)[]>([]);
+  // Loại vùng song song với draft theo chỉ số (mặc định MONITORING như schema).
+  const [types, setTypes] = useState<ZoneKind[]>([]);
   const [loadedFrom, setLoadedFrom] = useState<typeof zones>(undefined);
   if (zones && zones !== loadedFrom) {
     setLoadedFrom(zones);
     setDraft(zones.map((z) => z.points));
     setNames(zones.map((z) => z.name));
+    setTypes(zones.map((z) => z.type));
     setActive(0);
   }
 
@@ -89,7 +105,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
     // Vùng dưới 3 điểm chưa thành đa giác -> bỏ, đỡ để API trả 400 vì một vùng đang vẽ dở.
     // Giữ tên vùng theo đúng chỉ số gốc (draft/names song song) khi lọc.
     const ready = draft
-      .map((points, i) => ({ points, name: names[i] }))
+      .map((points, i) => ({ points, name: names[i], type: types[i] ?? MONITORING_ZONE_TYPE }))
       .filter((zone) => zone.points.length >= 3);
     if (ready.length !== draft.length) {
       toast('Vùng chưa đủ 3 điểm sẽ không được lưu', 'error');
@@ -147,7 +163,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                 onPointerLeave={() => setDragging(null)}
               >
                 {draft.map((points, zi) => {
-                  const color = ZONE_COLORS[zi % ZONE_COLORS.length];
+                  const color = ZONE_TYPE_COLOR[types[zi] ?? MONITORING_ZONE_TYPE];
                   return (
                     <g key={zi} opacity={zi === active ? 1 : 0.55}>
                       <polygon
@@ -197,12 +213,27 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                 >
                   Vùng {zi + 1} ({points.length} điểm)
                 </button>
+                <select
+                  aria-label={`Loại của vùng ${zi + 1}`}
+                  value={types[zi] ?? MONITORING_ZONE_TYPE}
+                  onChange={(e) => {
+                    const next = e.target.value as ZoneKind;
+                    setActive(zi);
+                    setTypes((prev) => prev.map((t, i) => (i === zi ? next : t)));
+                  }}
+                  className="rounded border border-[var(--border)] bg-[var(--background)] px-1 py-0.5 text-[11px] text-[var(--text-secondary)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                >
+                  {ZONE_TYPES.map((t) => (
+                    <option key={t} value={t}>{ZONE_TYPE_LABEL[t]}</option>
+                  ))}
+                </select>
                 <button
                   type="button"
                   aria-label={`Xoá vùng ${zi + 1}`}
                   onClick={() => {
                     setDraft((prev) => prev.filter((_, i) => i !== zi));
                     setNames((prev) => prev.filter((_, i) => i !== zi));
+                    setTypes((prev) => prev.filter((_, i) => i !== zi));
                     setActive(0);
                   }}
                   className="text-[var(--text-muted)] hover:text-[var(--danger)] focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded"
@@ -217,6 +248,7 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
                 if (draft.length >= MAX_ZONES) { toast(`Tối đa ${MAX_ZONES} vùng`, 'error'); return; }
                 setDraft((prev) => [...prev, []]);
                 setNames((prev) => [...prev, undefined]);
+                setTypes((prev) => [...prev, MONITORING_ZONE_TYPE]);
                 setActive(draft.length);
               }}
               className="rounded-lg border border-dashed border-[var(--primary)] px-2 py-1 text-[11px] text-[var(--primary-light)] hover:bg-[var(--primary-muted)] focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
@@ -233,9 +265,24 @@ export function ZoneEditor({ cameraId }: { cameraId: string }) {
             </button>
           </div>
 
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[10px] text-[var(--text-muted)]">
+            {ZONE_TYPES.map((t) => (
+              <span key={t} className="flex items-center gap-1">
+                <span
+                  aria-hidden
+                  className="inline-block h-2 w-2 rounded-full"
+                  style={{ backgroundColor: ZONE_TYPE_COLOR[t] }}
+                />
+                {ZONE_TYPE_LABEL[t]}
+              </span>
+            ))}
+          </div>
+
           <p className="text-[10px] text-[var(--text-muted)]">
             Bấm vào ảnh để thêm điểm, kéo điểm để chỉnh, bấm chuột phải lên điểm để xoá.
-            Người có CHÂN ngoài mọi vùng sẽ không bị xét PPE. Không vẽ vùng nào = xét cả khung hình.
+            Người có CHÂN ngoài mọi VÙNG LÀM VIỆC sẽ không bị xét PPE; không vẽ vùng làm việc
+            nào = xét cả khung hình. Vùng cấm / cảnh báo / dưới tải treo thì chỉ cần người
+            đứng trong đó 3 giây là ghi vi phạm xâm nhập.
           </p>
         </>
       )}
