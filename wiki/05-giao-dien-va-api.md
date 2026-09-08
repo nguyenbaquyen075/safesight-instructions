@@ -10,7 +10,7 @@ Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng t�
 
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
-Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useViolations()` (đếm `status === 'open'`), cùng nguồn với `/violations` — không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
+Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViolationCount()` (`GET /api/violations/count` trả `{ open }`, đếm bằng SQL theo phạm vi site) — không tải cả danh sách vi phạm, không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
 
 | Route | File | Vai trò được xem | Nội dung |
 |---|---|---|---|
@@ -30,18 +30,19 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useViolation
 
 ## Danh mục API route (`src/app/api/`)
 
-Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route theo site kiểm quyền bằng `assertSiteAccess()` (`src/lib/auth/site-access.ts`).
+Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middleware (`src/proxy.ts`) **không** chạy trên `/api`, nên mỗi handler tự kiểm quyền bằng `src/lib/auth/site-access.ts`: `requireSession()` (401 khi chưa đăng nhập), `allowedSiteIds()` (null = vai trò toàn tổ chức SUPER_ADMIN/ORG_ADMIN, ngược lại là `assignedSites`), `assertSiteAccess()` (403 khi đụng site ngoài phạm vi). Danh sách vi phạm/camera/công trường lọc sẵn theo `allowedSiteIds()`; xin `?siteId=` ngoài phạm vi trả 403.
 
 | Route | Method | Ghi chú |
 |---|---|---|
 | `/api/auth/[...nextauth]` | * | NextAuth handler |
-| `/api/violations` | GET, POST | POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret`; sau khi ghi gọi `notifyViolation()` (Telegram) |
-| `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá |
-| `/api/cameras` | GET, POST | Danh sách + thêm camera thật |
-| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá |
+| `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session) rồi gọi `notifyViolation()` (Telegram) |
+| `/api/violations/count` | GET | Cần session; `{ open: N }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
+| `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
+| `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
+| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
-| `/api/sites`, `/api/sites/[id]` | GET | Công trường |
-| `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng |
+| `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
+| `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`) |
 | `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site |
 | `/api/alert-rules/[id]` | PATCH, DELETE | |
 | `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt |
@@ -56,7 +57,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Route th
 
 | Hook | File | Nguồn |
 |---|---|---|
-| `useViolations` | `use-violations.ts` | `/api/violations` |
+| `useViolations`, `useOpenViolationCount` | `use-violations.ts` | `/api/violations`, `/api/violations/count` |
 | `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera` | `use-cameras.ts` | `/api/cameras` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
 | `useUsers` | `use-users.ts` | `/api/users` |

@@ -51,4 +51,4 @@
 - `O***` Agent: chỉ tự chuyển sang `false_positive` khi band VERIFIED báo oan; các band khác chỉ ghi phán quyết.
 - `O****` Gửi Telegram: hệ thống gửi theo quy tắc khi API nhận vi phạm; agent leo thang khi VERIFIED thật và hết cooldown.
 
-**Điểm cần lưu ý cho giai đoạn sau:** hiện tại API vi phạm và cảnh báo chỉ yêu cầu đăng nhập, không phân biệt vai trò; nếu nghiệp vụ cần hạn chế "Xoá vi phạm" cho quản trị, đưa vào sprint sau (xem [15-implementation-rules.md](15-implementation-rules.md)).
+**Điểm cần lưu ý cho giai đoạn sau:** API vi phạm/camera/công trường đã yêu cầu đăng nhập và lọc theo `assignedSites`, nhưng chưa phân biệt vai trò trong cùng phạm vi site; nếu nghiệp vụ cần hạn chế "Xoá vi phạm" cho quản trị, đưa vào sprint sau (xem [15-implementation-rules.md](15-implementation-rules.md)).

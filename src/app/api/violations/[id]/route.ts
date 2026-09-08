@@ -3,22 +3,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
-import { assertSiteAccess } from '@/lib/auth/site-access';
+import { assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 import { toViolationDTO } from '@/lib/violation-shape';
 
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
+  // Chặn từ vòng ngoài trước khi đọc DB: khách vãng lai không được biết id nào có thật.
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+
   const { id } = await params;
   const violation = await prisma.violation.findUnique({
     where: { id },
-    include: { camera: true, site: true },
+    include: { camera: { select: { name: true } }, site: { select: { name: true } } },
   });
 
   if (!violation) {
     return NextResponse.json({ error: 'Violation not found' }, { status: 404 });
   }
+
+  const authError = await assertSiteAccess(violation.siteId);
+  if (authError) return authError;
 
   return NextResponse.json(toViolationDTO(violation));
 }
