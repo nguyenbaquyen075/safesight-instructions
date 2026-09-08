@@ -25,6 +25,7 @@ const OPENING: Record<string, string> = {
   'violation.review': 'Đây là một lượt review tự động có ngân sách: nhìn ảnh, đọc lịch sử nếu cần, record_verdict, leo thang nếu đủ điều kiện, rồi kết luận ngắn.',
   'camera.digest': 'Đây là lượt tổng hợp camera: đọc lịch sử 24h/7 ngày, nhận xét xu hướng (write_note), hẹn xem lại nếu cần. Không record_verdict.',
   'shift.report': 'Viết báo cáo ca cho nhóm quản lý: vi phạm thật / báo oan theo camera, sự cố vận hành đã tự xử lý, việc cần người làm. Gửi bằng escalate (không violationId) rồi trả lời lại nội dung báo cáo.',
+  'weekly.report': 'Viết báo cáo TUẦN (7 ngày gần nhất) cho ban chỉ huy: theo công trường và camera — vi phạm thật, báo oan, camera báo oan nhiều nhất, việc còn mở, sự cố vận hành đáng chú ý. Dùng search_violations và read_agent_activity để lấy số liệu, gửi bằng escalate (không violationId), rồi trả lời lại bằng bản báo cáo markdown ngắn gọn.',
   'ops.escalate': 'Sự cố vận hành mà trực tự động không xử được. Đọc read_system_health, viết một thông báo dễ hiểu cho admin và gửi bằng escalate (không violationId).',
   'followup': 'Lượt xem lại theo lịch đã hẹn. Lý do hẹn ở dưới. Làm đúng việc đã hẹn rồi kết luận.',
   'ask': 'Đây là HỘI THOẠI với người dùng đang mở dashboard. Trả lời câu hỏi, ngắn, có id khi cần. Không đưa kế hoạch làm việc.',

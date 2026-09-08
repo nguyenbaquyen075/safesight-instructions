@@ -242,6 +242,7 @@ model AgentSettings {
   reviewEffort  String   @default("medium")
   dailyTokenCap Int      @default(2000000)
   shiftReportAt String   @default("17:30")
+  weeklyReportAt String  @default("MON 08:00") // thứ viết tắt tiếng Anh + giờ 24h, giờ địa phương
   updatedAt     DateTime @updatedAt
 }
 

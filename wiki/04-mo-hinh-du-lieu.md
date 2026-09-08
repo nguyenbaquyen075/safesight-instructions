@@ -35,7 +35,7 @@ CameraAgent (1 dòng/camera: subagent riêng của camera)
 | `ZaloSettings` | Cấu hình Zalo OA dùng chung | `accessTokenEncrypted` (AES-256-GCM, cùng khoá `TELEGRAM_ENCRYPT_KEY`), `isEnabled` |
 | `AgentTask` | Hàng đợi việc của agent | `kind`, lane suy từ kind, `priority`, `budget` (số tool call tối đa/phiên), `attempts`, `dueAt`/`leasedUntil` (lease), `sessionId`, `outcome`; xem [Agent giám sát tự động](09-agent.md) |
 | `AgentEvent` | Audit + lịch sử hội thoại agent | `sessionId`, `taskId?`, `subjectType?/subjectId?`, `type` (`tool.call`/`tool.result`/`verdict`/`action`/`message.user`/`message.assistant`/`health`/`error`/`report`/`session.ended`), `data` (JSON string) |
-| `AgentSettings` | Cấu hình agent (1 dòng) | `isEnabled` (kill switch), `model`, `reviewEffort`, `dailyTokenCap`, `shiftReportAt` |
+| `AgentSettings` | Cấu hình agent (1 dòng) | `isEnabled` (kill switch), `model`, `reviewEffort`, `dailyTokenCap`, `shiftReportAt`, `weeklyReportAt` (`"MON 08:00"`) |
 | `CameraAgent` | Subagent của một camera (1 dòng/camera, `id` = `Camera.id`, tạo lười khi camera có task đầu tiên) | `isEnabled` (bật/tắt riêng camera), `memory` (JSON `[{ at, text, sessionId }]`, tối đa 20 ghi chú, mỗi ghi chú ≤ 300 ký tự — trí nhớ bền về camera: góc máy, giờ ngược sáng, khu vực hay báo oan), `digestEveryMin` (nhịp tổng hợp), `dailyTokenCap`/`tokensUsedToday`/`usageDay` (trần token riêng theo ngày địa phương), `lastDigestAt`; không có quan hệ Prisma — `DELETE /api/cameras/[id]` xoá dòng này tường minh |
 
 ## Bộ giá trị (enum nghiệp vụ)

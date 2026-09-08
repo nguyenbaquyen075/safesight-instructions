@@ -13,6 +13,8 @@ import { cn } from '@/lib/utils';
 const FILTERS = [['', 'Tất cả'], ['verdict', 'Phán quyết'], ['action', 'Hành động'], ['health', 'Sức khoẻ'], ['error', 'Lỗi']] as const;
 // Gợi ý sẵn; admin vẫn gõ được tên model bất kỳ (proxy tương thích OpenAI dùng tên riêng).
 const MODELS = ['claude-opus-5', 'claude-sonnet-5'];
+// Mã thứ khớp nextWeekly trong agent/lib/recurring.ts; nhãn tiếng Việt cho người dùng.
+const WEEKDAY_OPTIONS = [['MON', 'Thứ 2'], ['TUE', 'Thứ 3'], ['WED', 'Thứ 4'], ['THU', 'Thứ 5'], ['FRI', 'Thứ 6'], ['SAT', 'Thứ 7'], ['SUN', 'Chủ nhật']] as const;
 
 export default function AgentPage() {
   const [type, setType] = useState<string>('');
@@ -69,6 +71,15 @@ export default function AgentPage() {
                 {/* key theo giá trị server để input tự remount sau refetch, tránh lưu lại giá trị cũ trong DOM */}
                 <InputGroup label="Trần token / ngày"><input key={`cap-${settings.dailyTokenCap}`} type="number" defaultValue={settings.dailyTokenCap} onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== settings.dailyTokenCap) update({ dailyTokenCap: v }); }} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" /></InputGroup>
                 <InputGroup label="Giờ báo cáo ca"><input key={`shift-${settings.shiftReportAt}`} type="time" defaultValue={settings.shiftReportAt} onBlur={e => { if (e.target.value !== settings.shiftReportAt) update({ shiftReportAt: e.target.value }); }} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" /></InputGroup>
+                {/* Báo cáo tuần lưu dạng "MON 08:00": chọn thứ + giờ nên không nhập sai được. */}
+                <InputGroup label="Giờ báo cáo tuần" description="Agent gửi báo cáo 7 ngày cho ban chỉ huy và hiện ở trang Báo cáo.">
+                  <div className="flex gap-2">
+                    <select value={settings.weeklyReportAt.split(' ')[0]} onChange={e => update({ weeklyReportAt: `${e.target.value} ${settings.weeklyReportAt.split(' ')[1]}` })} className="flex-1 min-w-0 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm">
+                      {WEEKDAY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                    <input key={`weekly-${settings.weeklyReportAt}`} type="time" aria-label="Giờ gửi báo cáo tuần" defaultValue={settings.weeklyReportAt.split(' ')[1]} onBlur={e => { const next = `${settings.weeklyReportAt.split(' ')[0]} ${e.target.value}`; if (e.target.value && next !== settings.weeklyReportAt) update({ weeklyReportAt: next }); }} className="flex-1 min-w-0 rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" />
+                  </div>
+                </InputGroup>
               </div>
             )}
           </SettingCard>

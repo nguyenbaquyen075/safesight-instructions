@@ -27,6 +27,7 @@ function toolsForKind(kind: string, ctx: ToolContext) {
     case 'followup': return [...reads, makeRecordVerdict(ctx), makeEscalate(ctx), makeScheduleFollowup(ctx), makeWriteNote(ctx)];
     case 'camera.digest': return [...reads, makeScheduleFollowup(ctx), makeWriteNote(ctx), makeEscalate(ctx)];
     case 'shift.report': return [...reads, makeReadAgentActivity(ctx), makeWriteNote(ctx), makeEscalate(ctx)];
+    case 'weekly.report': return [...reads, makeReadAgentActivity(ctx), makeWriteNote(ctx), makeEscalate(ctx)];
     case 'ops.escalate': return [...reads, makeReadAgentActivity(ctx), makeEscalate(ctx), makeWriteNote(ctx)];
     case 'ask': return [...reads, makeReadAgentActivity(ctx), makeRecordVerdict(ctx), makeEscalate(ctx), makeScheduleFollowup(ctx), makeWriteNote(ctx)];
     default: return reads;

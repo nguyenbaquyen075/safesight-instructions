@@ -12,6 +12,7 @@ const ALL_ROLES = Object.values(UserRole);
 export const PAGE_ROLES: Record<string, UserRole[]> = {
   '/sites': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN, UserRole.SITE_MANAGER],
   '/analytics': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN, UserRole.SITE_MANAGER, UserRole.SAFETY_OFFICER],
+  '/reports': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN, UserRole.SITE_MANAGER],
   // Mỗi lần chạy tốn 1 credit Roboflow -> chỉ admin, không mở cho toàn bộ nhân sự.
   '/roboflow': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN],
   '/users': [UserRole.SUPER_ADMIN, UserRole.ORG_ADMIN],

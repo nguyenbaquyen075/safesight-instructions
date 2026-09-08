@@ -40,6 +40,7 @@ thử với outcome nêu rõ.
 | `violation.review` | nghiên cứu | 300 | `POST /api/violations` | mỗi vi phạm chốt |
 | `ops.escalate` | nghiên cứu | 250 | `health.sweep` khi không tự xử được | theo nhu cầu |
 | `shift.report` | nghiên cứu | 200 | agent tự gieo theo `shiftReportAt` | 1 lần/ngày |
+| `weekly.report` | nghiên cứu | 150 | `ensureRecurring()` theo `AgentSettings.weeklyReportAt` (`"MON 08:00"`, giờ địa phương) | 1 lần/tuần |
 | `camera.digest` | nghiên cứu | 50 | `ensureRecurring()` cho mỗi camera ONLINE có subagent bật; agent cũng tự hẹn qua `schedule_followup` | `lastDigestAt + digestEveryMin` (mặc định 30 phút; lần đầu `now + digestEveryMin`) |
 | `followup` | nghiên cứu | 0 | tool `schedule_followup` | theo lý do agent nêu |
 
@@ -209,7 +210,7 @@ cùng hàng đợi.
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
-`camera.digest`/`shift.report`/`ops.escalate` = đọc + `write_note` + `escalate`
+`camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
 `ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ; phiên thuộc một camera
 được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
@@ -267,7 +268,11 @@ UI:
   chờ, sức khoẻ.
 - Trang `/agent` (menu "Agent", quyền SUPER_ADMIN/ORG_ADMIN/SITE_MANAGER trong
   `PAGE_ROLES`): dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt
-  (bật/tắt, model, trần token, giờ báo cáo), ô hỏi toàn hệ thống, capabilities.
+  (bật/tắt, model, trần token, giờ báo cáo ca, giờ báo cáo tuần), ô hỏi toàn hệ thống, capabilities.
+- Trang `/reports` đọc `GET /api/agent/events?type=report&limit=1` để hiện bản báo cáo tuần mới
+  nhất: cuối phiên `weekly.report`, `runSession` phát thêm `AgentEvent report { text }` bên cạnh
+  `session.ended` (agent vẫn gửi Telegram bằng `escalate` không `violationId` như `shift.report`).
+  `weekly.report` cũng chạy với `effort: 'high'` giống `shift.report`.
 - Hook React Query `src/hooks/use-agent.ts`: `useAgentTasks`, `useAgentEvents` (poll khi
   thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent`.
 

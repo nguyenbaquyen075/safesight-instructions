@@ -28,7 +28,9 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo, tab "Nhật ký" (`AuditLogCard`, đọc `GET /api/audit-log`) |
 | `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), ô hỏi toàn hệ thống, capabilities |
 | `/profile` | `(dashboard)/profile/page.tsx` | tất cả (không có trong `PAGE_ROLES` → mở cho mọi vai trò) | Xem tên/email/vai trò (chỉ đọc) + form đổi mật khẩu (`PATCH /api/users/me/password`); vào từ menu avatar ở Header |
-| `/reports` | — | — | ❌ Chưa có |
+| `/reports` | `(dashboard)/reports/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Lọc công trường/camera/khoảng ngày (mặc định 7 ngày), 4 ô số tổng, bảng tổng hợp theo camera, bảng chi tiết (200 dòng mới nhất), "Xuất CSV" (Blob UTF-8 có BOM, đủ số dòng API trả), "In / PDF" (`window.print()`), báo cáo tuần mới nhất của agent |
+
+Bản in của `/reports` dùng khối `@media print` ở cuối `src/app/globals.css`: đổi token màu sang nền sáng (giao diện nền tối in ra giấy sẽ mất chữ), ẩn `aside`/`header`/`.no-print`, bỏ `margin-left` của khung nội dung (`print:ml-0` trong `(dashboard)/layout.tsx`).
 
 Quên mật khẩu (đặt lại khi không nhớ mật khẩu cũ) chưa làm — cần gửi email, để lại backlog.
 
@@ -61,6 +63,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt |
 | `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
+| `/api/reports/violations` | GET | Cần session; `?siteId&cameraId&from&to` (mặc định 7 ngày, `siteId` ngoài phạm vi → 403) → `{ range, byCamera, rows }`, `rows` tối đa 2.000 dòng mới nhất. Gộp theo camera bằng `buildReportSummary` trong `src/lib/report-shape.ts` |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
 | `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN; PATCH ghi `AuditLog` |
@@ -76,6 +79,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useViolations`, `useOpenViolationCount` | `use-violations.ts` | `/api/violations`, `/api/violations/count` |
 | `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
+| `useViolationReport` | `use-reports.ts` | `/api/reports/violations` |
 | `useUsers`, `useUser`, `useCreateUser`, `useUpdateUser`, `useDeleteUser`, `useChangePassword` | `use-users.ts` | `/api/users`, `/api/users/me/password` |
 | `useAuditLog` | `use-audit-log.ts` | `/api/audit-log` |
 | `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |

@@ -36,6 +36,7 @@ export default function DashboardLayout({
     if (pathname.startsWith('/alerts')) return { title: 'Trung tâm Thông báo', subtitle: 'Xem và xác nhận thông báo' };
     if (pathname.startsWith('/violations')) return { title: 'Nhật ký Vi phạm', subtitle: 'Kiểm tra và giải quyết vi phạm an toàn' };
     if (pathname.startsWith('/analytics')) return { title: 'Phân tích An toàn', subtitle: 'Xu hướng tuân thủ và báo cáo' };
+    if (pathname.startsWith('/reports')) return { title: 'Báo cáo Vi phạm', subtitle: 'Tổng hợp theo camera, xuất CSV/PDF và báo cáo tuần của agent' };
     if (pathname.startsWith('/agent')) return { title: 'Agent giám sát', subtitle: 'Trực vận hành và cán bộ an toàn tự động' };
     if (pathname.startsWith('/users')) return { title: 'Quản lý Người dùng', subtitle: 'Phân quyền và kiểm soát truy cập' };
     if (pathname.startsWith('/settings')) return { title: 'Cài đặt', subtitle: 'Cấu hình cá nhân và hệ thống' };
@@ -48,7 +49,7 @@ export default function DashboardLayout({
   return (
     <div className="flex min-h-screen bg-[var(--background)]">
       <Sidebar />
-      <div className="flex-1 ml-[260px] flex flex-col transition-all duration-300">
+      <div className="flex-1 ml-[260px] print:ml-0 flex flex-col transition-all duration-300">
         <Header title={title} subtitle={subtitle} />
         <main className="flex-1 p-6 overflow-y-auto">
           {allowed ? children : (

@@ -11,7 +11,7 @@ import type { AgentSettingsView } from '@/types/agent';
 async function getOrCreate() {
   return prisma.agentSettings.upsert({ where: { id: 'agent-settings' }, update: {}, create: { id: 'agent-settings' } });
 }
-const toView = (s: Awaited<ReturnType<typeof getOrCreate>>): AgentSettingsView => ({ isEnabled: s.isEnabled, model: s.model, reviewEffort: s.reviewEffort, dailyTokenCap: s.dailyTokenCap, shiftReportAt: s.shiftReportAt });
+const toView = (s: Awaited<ReturnType<typeof getOrCreate>>): AgentSettingsView => ({ isEnabled: s.isEnabled, model: s.model, reviewEffort: s.reviewEffort, dailyTokenCap: s.dailyTokenCap, shiftReportAt: s.shiftReportAt, weeklyReportAt: s.weeklyReportAt });
 
 export async function GET() {
   const session = await auth();
@@ -26,6 +26,8 @@ const updateSchema = z.object({
   reviewEffort: z.enum(['low', 'medium', 'high']).optional(),
   dailyTokenCap: z.number().int().min(100_000).max(50_000_000).optional(),
   shiftReportAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),
+  // "MON 08:00": thứ viết tắt tiếng Anh (giống agent/lib/recurring.ts nextWeekly) + giờ 24h.
+  weeklyReportAt: z.string().regex(/^(SUN|MON|TUE|WED|THU|FRI|SAT) ([01]\d|2[0-3]):[0-5]\d$/).optional(),
 });
 
 export async function PATCH(request: NextRequest) {
