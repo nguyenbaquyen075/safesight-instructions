@@ -14,6 +14,7 @@ Cập nhật 2026-09-08 theo hiện trạng code (thay cho bảng cũ trong `SPE
 - Agent giám sát tự động (`agent/`, tiến trình thứ 4): trực vận hành (sweep 5 phát hiện + tự khắc phục) + cán bộ an toàn (review vi phạm bằng bằng chứng/band, leo thang Telegram, digest, báo cáo ca) + trợ lý hỏi đáp (trang `/agent`, tab Agent trong modal vi phạm/camera/site). Xem [Agent giám sát tự động](09-agent.md).
 - Subagent theo camera (v0.8.0): `CameraAgent` bật/tắt, trí nhớ, trần token riêng, digest định kỳ; lane nghiên cứu song song; skill chuẩn `SKILL.md`.
 - Lộ trình v0.9.0 (9 tính năng, PR #4–#21): vùng nhận diện Zone/ROI theo camera; kênh cảnh báo Zalo OA và Webhook; tạo người dùng, đổi mật khẩu, nhật ký thao tác; giao diện di động + PWA; trang `/reports` (CSV/in) và báo cáo tuần của agent; tỉ lệ tuân thủ từ số người quan sát được; clip bằng chứng 8s; bản đồ nhiệt vi phạm; chạy trên PostgreSQL và nhiều worker agent.
+- v0.10.0: widget Trợ lý SafeSight nổi (chat bong bóng), agent trưởng điều phối subagent camera (`list_camera_agents`, `dispatch_to_camera`, `camera.instruction`), Code of Conduct, đợt review health/change trước release.
 - Đợt review và fix v0.7.0: lane nghiên cứu tương thích OpenAI, SQLite WAL, API đọc có đăng nhập và scope site, Docker bind mount, bridge secret, kiểm danh tính pid, badge Sidebar từ DB, dependency vá.
 
 ## 🎯 Ưu tiên 1 — Chất lượng nhận diện

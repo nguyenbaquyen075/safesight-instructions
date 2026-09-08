@@ -4,6 +4,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-09-08
+
 ### Thêm
 - Widget **Trợ lý SafeSight** nổi góc phải dưới trên mọi trang dashboard (trừ `/agent`): nút tròn mở panel chat với agent (header gradient, bong bóng chào, câu hỏi bên phải / trả lời bên trái, ô nhập Enter để gửi, Esc để đóng, nút mở trang `/agent`). Phiên hỏi đáp giữ nguyên khi đổi trang vì widget nằm ở layout.
 
@@ -168,7 +170,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - Khởi tạo dự án: Next.js dashboard, Prisma, AI engine YOLOv8 và YOLO Bridge Socket.IO.
 
-[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.6.0...v0.7.0
