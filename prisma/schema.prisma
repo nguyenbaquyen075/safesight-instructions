@@ -236,3 +236,18 @@ model AgentSettings {
   shiftReportAt String   @default("17:30")
   updatedAt     DateTime @updatedAt
 }
+
+// Subagent riêng của một camera: bật/tắt, trí nhớ, trần token và nhịp tổng hợp riêng.
+// id = Camera.id, tạo lười khi camera đó có task đầu tiên. Không khai báo quan hệ Prisma
+// để giữ SQLite đơn giản — DELETE /api/cameras/[id] xoá dòng này tường minh.
+model CameraAgent {
+  id              String    @id // = Camera.id
+  isEnabled       Boolean   @default(true)
+  memory          String    @default("[]") // JSON: [{ at, text, sessionId }], tối đa 20 ghi chú, mỗi ghi chú ≤ 300 ký tự
+  digestEveryMin  Int       @default(30)
+  dailyTokenCap   Int       @default(300000)
+  tokensUsedToday Int       @default(0)
+  usageDay        String    @default("") // "YYYY-MM-DD" giờ địa phương; khác ngày thì reset tokensUsedToday
+  lastDigestAt    DateTime?
+  updatedAt       DateTime  @updatedAt
+}
