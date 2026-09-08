@@ -66,6 +66,29 @@ Mỗi use case gồm Summary và Business information. Mã use case theo [09-use
 - BR-03-3: Xoá vi phạm cần xác nhận và không hoàn tác.
 - BR-03-4: Phán quyết của agent chỉ là tham khảo; người dùng luôn được ghi đè.
 
+## UC-29 Giao và theo dõi khắc phục
+
+| Trường | Nội dung |
+|---|---|
+| Use case name | Giao và theo dõi khắc phục |
+| Use case ID | UC-29 |
+| Description | Người dùng giao việc khắc phục cho một người sau khi xem bằng chứng vi phạm, đặt hạn xử lý, rồi theo dõi tới lúc việc được xác nhận đã khắc phục; việc quá hạn được agent leo thang cho trực vận hành |
+| Actor | Cán bộ an toàn, Quản lý công trường (agent leo thang việc quá hạn) |
+| Priority | Cao |
+| Trigger | Người dùng bấm "Giao xử lý" trong modal chi tiết vi phạm |
+| Pre-condition | Đã đăng nhập; vi phạm thuộc công trường người dùng được xem (`assertSiteAccess`) |
+| Post-condition | Bản ghi `CorrectiveAction` trạng thái `OPEN` kèm người xử lý, mô tả và hạn; vi phạm đang `OPEN` chuyển `UNDER_REVIEW`; `AuditLog` ghi `violation.action.create` |
+
+**Business rule**
+- BR-29-1: Bắt buộc tên người xử lý (2–80 ký tự) và mô tả việc (5–500 ký tự); `assigneeId` chỉ điền khi người đó có tài khoản, tổ đội / thầu phụ vẫn giao được bằng tên.
+- BR-29-2: Hạn xử lý phải ở tương lai; không chọn thì mặc định 24 giờ kể từ lúc giao.
+- BR-29-3: Bấm "Đã khắc phục" đặt trạng thái `DONE`, ghi `completedAt` và ghi chú bằng chứng (không bắt buộc).
+- BR-29-4: Khi vi phạm không còn việc `OPEN` nào và đã có ít nhất một việc `DONE` thì vi phạm tự chuyển `RESOLVED`.
+- BR-29-5: Việc `OPEN` quá hạn được agent gộp thành một phát hiện `capa.overdue`, xếp một task `ops.escalate` (nêu tên tối đa 5 việc) rồi đánh dấu `escalatedAt` — mỗi việc chỉ leo thang một lần, vòng quét sau không báo lại.
+- BR-29-6: Danh sách việc còn mở ở `/reports` chỉ hiện công trường người dùng được xem.
+
+**Non-functional requirement:** việc quá hạn phải được leo thang trong vòng một chu kỳ quét sức khoẻ (60 giây) kể từ khi qua hạn.
+
 ## UC-04 Nhắc nhở qua loa công trường
 
 | Trường | Nội dung |

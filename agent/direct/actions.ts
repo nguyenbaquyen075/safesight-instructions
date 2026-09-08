@@ -9,6 +9,8 @@ import type { Finding } from './health';
 export interface ActionContext { sessionId: string; taskId: string; repeats: Map<string, number>; paused: boolean }
 
 const OPS_ALERT_AFTER = 3;
+/** Số việc khắc phục quá hạn được nêu tên trong lý do leo thang (phần còn lại chỉ đếm). */
+const NAMED_OVERDUE_ACTIONS = 5;
 
 async function setCameraStatus(cameraId: string, status: 'ONLINE' | 'DEGRADED' | 'OFFLINE'): Promise<boolean> {
   // Đọc trước: camera đã đúng trạng thái thì không phải hành động, và không được tiêu suất rate-limit —
@@ -57,11 +59,32 @@ export async function applyFindings(findings: Finding[], ctx: ActionContext): Pr
         done.push('xếp lịch dọn ảnh'); mine.push('xếp lịch dọn ảnh');
         break;
       }
+      case 'capa.overdue': {
+        const ids = (f.detail.ids ?? []) as string[];
+        if (ids.length === 0) break;
+        // Tên người xử lý đọc lại từ DB thay vì mang theo trong finding: detail được ghi
+        // nguyên vào AgentEvent nên chỉ giữ số đếm và id.
+        const named = (await prisma.correctiveAction.findMany({
+          where: { id: { in: ids } }, orderBy: { dueAt: 'asc' }, take: NAMED_OVERDUE_ACTIONS,
+          select: { assigneeName: true, violationId: true },
+        })).map(a => `${a.assigneeName} (vi phạm ${a.violationId})`).join('; ');
+        await scheduleTask({ kind: 'ops.escalate', subjectType: 'system', reason: `${ids.length} việc khắc phục quá hạn chưa xong: ${named}`, dueAt: new Date(), priority: PRIORITY['ops.escalate'] });
+        // Đánh dấu NGAY để vòng quét sau (60s) không báo lại đúng những việc này; `escalatedAt:
+        // null` trong where làm bước này idempotent (chạy lại cùng finding không dời mốc cũ).
+        // Đánh dấu cả việc không được nêu tên: lý do đã ghi đủ số lượng, người xử lý mở trang
+        // báo cáo là thấy hết.
+        await prisma.correctiveAction.updateMany({ where: { id: { in: ids }, escalatedAt: null }, data: { escalatedAt: new Date() } });
+        done.push(`leo thang ${ids.length} việc khắc phục quá hạn`); mine.push(`leo thang ${ids.length} việc khắc phục quá hạn`);
+        break;
+      }
       case 'bridge.down':
       case 'model.missing': break; // chỉ leo thang khi lặp (bên dưới)
     }
 
-    if (repeats === OPS_ALERT_AFTER || (f.code === 'model.missing' && repeats === 1)) {
+    // capa.overdue đã tự leo thang ngay ở trên và tự dập bằng escalatedAt: cho nó rơi vào khối
+    // đếm-lần-lặp nữa thì vòng thứ ba sẽ tạo THÊM một ops.escalate và bắn JSON.stringify(detail)
+    // (tới 50 id) qua mọi kênh cảnh báo.
+    if (f.code !== 'capa.overdue' && (repeats === OPS_ALERT_AFTER || (f.code === 'model.missing' && repeats === 1))) {
       const text = `🛠 SafeSight agent: ${f.code}${f.subjectId ? ` (${f.subjectId})` : ''} lặp ${repeats} lần. ${JSON.stringify(f.detail)}`;
       const r = await sendOpsAlert(text);
       await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: f.subjectType, subjectId: f.subjectId, type: 'action', data: { action: 'ops.alert', sent: r.sent, reason: r.reason } });

@@ -22,9 +22,11 @@ export interface HealthSignals {
   snapshotBytes: number;
   modelFiles: { required: boolean; present: boolean; file?: string }[];
   cameras: { id: string; status: string; rtspUrl: string }[];
+  /** Id các việc khắc phục quá hạn chưa từng leo thang; tên người lấy sau, lúc dựng lý do. */
+  overdueActionIds: string[];
 }
 
-export type FindingCode = 'camera.stalled' | 'camera.recovered' | 'engine.stalled' | 'bridge.down' | 'disk.pressure' | 'model.missing';
+export type FindingCode = 'camera.stalled' | 'camera.recovered' | 'engine.stalled' | 'bridge.down' | 'disk.pressure' | 'model.missing' | 'capa.overdue';
 export interface Finding { code: FindingCode; subjectType: 'camera' | 'system'; subjectId: string | null; detail: Record<string, unknown> }
 
 function processAlive(pid: number): boolean {
@@ -60,6 +62,25 @@ async function exists(file: string): Promise<boolean> {
   try { await stat(path.resolve(process.cwd(), file)); return true; } catch { return false; }
 }
 
+// Chỉ lấy việc CHƯA từng leo thang: escalatedAt là dấu "đã báo người rồi", nếu không mỗi
+// vòng quét 60s lại báo lại đúng những việc đó. Trần 50 việc để một tồn đọng lớn không
+// kéo cả lượt quét. Chỉ trả id: detail của finding đi thẳng vào AgentEvent nên phải gọn,
+// tên người xử lý được đọc lại lúc dựng lý do leo thang (agent/direct/actions.ts).
+export async function findOverdueActionIds(now = new Date()): Promise<string[]> {
+  try {
+    const rows = await prisma.correctiveAction.findMany({
+      where: { status: 'OPEN', escalatedAt: null, dueAt: { lt: now } },
+      orderBy: { dueAt: 'asc' },
+      take: 50,
+      select: { id: true },
+    });
+    return rows.map(r => r.id);
+  } catch (error) {
+    console.warn('[health] không đọc được bảng CorrectiveAction', error instanceof Error ? error.message : String(error));
+    return [];
+  }
+}
+
 export async function collectSignals(): Promise<HealthSignals> {
   let bridge: HealthSignals['bridge'] = null;
   try {
@@ -81,6 +102,7 @@ export async function collectSignals(): Promise<HealthSignals> {
     snapshotBytes: await dirBytes(env.snapshotDir),
     modelFiles: await Promise.all(MODEL_FILES.map(async m => ({ file: m.file, required: m.required, present: await exists(m.file) }))),
     cameras,
+    overdueActionIds: await findOverdueActionIds(),
   };
 }
 
@@ -120,6 +142,11 @@ export function decide(s: HealthSignals, opts: { snapshotMaxMb: number; bridgeFa
   }
   for (const m of s.modelFiles) {
     if (m.required && !m.present) out.push({ code: 'model.missing', subjectType: 'system', subjectId: null, detail: { file: m.file ?? 'ppe_multiclass.pt' } });
+  }
+  // Việc khắc phục quá hạn là chuyện của NGƯỜI, agent không tự làm được -> gộp thành một
+  // phát hiện toàn hệ thống rồi leo thang một lần, thay vì mỗi việc một finding.
+  if (s.overdueActionIds.length > 0) {
+    out.push({ code: 'capa.overdue', subjectType: 'system', subjectId: null, detail: { count: s.overdueActionIds.length, ids: s.overdueActionIds } });
   }
   return out;
 }

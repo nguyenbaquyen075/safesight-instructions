@@ -12,7 +12,8 @@ Organization (tổ chức / tenant)
         └── Camera (camera giám sát)
               └── Zone (vùng nhận diện)
                     └── Violation (vi phạm)
-                          └── Alert (cảnh báo đã gửi)
+                          ├── Alert (cảnh báo đã gửi)
+                          └── CorrectiveAction (việc khắc phục giao cho người)
 AuditLog (nhật ký thao tác)   ·   TelegramSettings (1 dòng: bot token đã mã hoá)
 ObservationStat (số người quan sát được mỗi phút của từng camera)
 AgentTask (hàng đợi)   ·   AgentEvent (audit + chat)   ·   AgentSettings (1 dòng: kill switch, model, trần token)
@@ -28,6 +29,7 @@ CameraAgent (1 dòng/camera: subagent riêng của camera)
 | `Camera` | Camera giám sát | `rtspUrl` lưu nguồn theo quy ước `webcam:0` / `rtsp://...` / `video:ten.mp4`; `status` khác `ONLINE` thì AI bỏ qua |
 | `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string (điểm tỉ lệ 0–1, `ZoneDTO` trong `src/lib/zone-shape.ts`); `type` quyết định vùng dùng để LỌC hay để BẮT xâm nhập (bảng dưới); AI engine đọc lại mọi vùng đang bật mỗi 60s (`ai-engine/zones.py`) |
 | `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `clipUrl` (clip bằng chứng ~8s do engine ghi, NULL khi không ghi được), `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung; GET `/api/violations` và `/api/violations/[id]` trả về trường này), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
+| `CorrectiveAction` | Việc khắc phục (CAPA) giao cho người sau một vi phạm | `assigneeId?` (null khi người xử lý không có tài khoản) + `assigneeName`, `description`, `dueAt`, `status` `OPEN`/`DONE`/`CANCELLED` (chữ HOA cả trong DB lẫn API — xem `src/lib/corrective-action-shape.ts`), `evidenceNote?`, `completedAt?`, `escalatedAt?` (dấu "đã leo thang", agent chỉ leo thang mỗi việc MỘT lần), `createdById`; `onDelete: Cascade` theo `Violation`, index `[violationId]` và `[siteId, status, dueAt]` |
 | `ObservationStat` | Số người AI quan sát được mỗi phút của một camera | `minute` (mốc phút), `persons` (đông nhất trong phút), `personSeconds` ("người × giây"), `@@unique([cameraId, minute])`; AI engine ghi qua `POST /api/observations`, là MẪU SỐ của tỉ lệ tuân thủ thật (`GET /api/stats/compliance`). Cố ý không khai quan hệ Prisma tới Camera/Site — chỉ đọc theo `siteId` + `minute` |
 | `Alert` | Cảnh báo sinh từ vi phạm | `channel`, `recipient`, `errorMessage` (null = gửi thành công, dùng tính cooldown) |
 | `AlertRule` | Quy tắc cảnh báo | `violationTypes`/`channels`/`recipients` JSON array, `threshold`, `cooldownSec` |

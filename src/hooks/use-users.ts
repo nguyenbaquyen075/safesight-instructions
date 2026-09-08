@@ -4,9 +4,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { User } from '@/types/models';
 import type { CreateUserInput } from '@/lib/user-shape';
 
-export function useUsers(filters?: { role?: string }) {
+// opts.enabled: `GET /api/users` chỉ mở cho SUPER_ADMIN/ORG_ADMIN, nơi gọi biết trước vai trò
+// thì tắt hẳn để vai trò công trường không bắn request chắc chắn 403.
+export function useUsers(filters?: { role?: string }, opts?: { enabled?: boolean }) {
   return useQuery<User[]>({
     queryKey: ['users', filters],
+    enabled: opts?.enabled ?? true,
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters?.role) params.append('role', filters.role);

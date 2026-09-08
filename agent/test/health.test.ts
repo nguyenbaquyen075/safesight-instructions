@@ -15,6 +15,7 @@ function base(over: Partial<HealthSignals> = {}): HealthSignals {
     snapshotBytes: 10 * 1024 * 1024,
     modelFiles: [{ required: true, present: true }],
     cameras: [{ id: 'cam-001', status: 'ONLINE', rtspUrl: 'video:samples1.mp4' }],
+    overdueActionIds: [],
     ...over,
   };
 }

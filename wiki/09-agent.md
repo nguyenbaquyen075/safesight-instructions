@@ -103,6 +103,27 @@ kèm `snapshotUrl` và truyền cờ `closed` cho từng file. Không còn luậ
 engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0 file
 và `disk.pressure` lặp lại mỗi sweep dù đĩa đang đầy thật.
 
+### Việc khắc phục quá hạn (`capa.overdue`)
+
+`collectSignals()` đọc thêm `overdueActionIds` (`findOverdueActionIds`): id của các
+`CorrectiveAction` còn `OPEN`, đã qua `dueAt` và **chưa từng leo thang** (`escalatedAt = null`),
+tối đa 50. Có ít nhất một id thì `decide()` sinh **một** finding `capa.overdue`
+(`subjectType: 'system'`, `detail = { count, ids }`) — gộp chung chứ không phải mỗi việc một
+finding, vì đây là một việc leo thang duy nhất cho trực vận hành.
+
+`detail` cố ý chỉ mang số đếm và id: nó được ghi nguyên vào `AgentEvent`, nên tên người xử lý
+được `applyFindings()` đọc lại từ DB đúng lúc dựng lý do. Hàm này xếp một
+`AgentTask kind=ops.escalate` với lý do nêu tên **tối đa 5** việc quá hạn lâu nhất (phần còn lại
+chỉ đếm), rồi `updateMany({ id: { in: ids }, escalatedAt: null })` đặt `escalatedAt` cho **toàn
+bộ** việc trong finding — điều kiện `escalatedAt: null` làm bước này idempotent khi cùng một
+finding chạy lại. Đó là dấu "đã báo người rồi": vòng quét sau (60s) không còn thấy chúng nữa,
+nên mỗi việc chỉ leo thang một lần thay vì báo lại mỗi phút.
+
+`capa.overdue` **không** đi qua khối leo thang theo số lần lặp (`repeats === 3`) như các phát
+hiện khác: nó đã tự leo thang ngay ở lần đầu và tự dập bằng `escalatedAt`, cho nó lặp tiếp sẽ
+tạo thêm một `ops.escalate` thứ hai và bắn `JSON.stringify(detail)` (tới 50 id) qua mọi kênh
+cảnh báo. Agent **không** tự đóng hay tự làm việc khắc phục — đó là việc của người; nó chỉ nhắc.
+
 ## Bằng chứng và band
 
 `ObservationKind` là danh sách đóng, mỗi kind có `weight`, `primary`, `label`:
@@ -205,11 +226,11 @@ cùng hàng đợi.
 
 | Tool | Loại | Input | Trả về |
 |---|---|---|---|
-| `read_violation` | đọc | `violationId` | ảnh snapshot, bbox, type, severity, confidence, occurrenceCount, status, `agentReview` cũ, **cameraId, siteId** |
+| `read_violation` | đọc | `violationId` | ảnh snapshot, bbox, type, severity, confidence, occurrenceCount, status, `agentReview` cũ, **cameraId, siteId**, `actions[]` (`assigneeName`, `dueAt`, `status`, `overdue`) — việc khắc phục đã giao cho người |
 | `read_camera_history` | đọc | `cameraId, hours (24/168)` | vi phạm (id, type, status, detectedAt), tỉ lệ `false_positive`, giờ cao điểm, sức khoẻ gần nhất, **siteId** |
 | `read_site_context` | đọc | `siteId` | site, camera (id, name, status), AlertRule bật, số người nhận Telegram |
 | `search_violations` | đọc | `cameraId?/siteId?/type?/status?/from?/to?/limit` | danh sách id + tóm tắt; không fuzzy |
-| `read_agent_activity` | đọc | `hours` | task đã xong/đang chờ, phán quyết gần đây, sweep gần nhất |
+| `read_agent_activity` | đọc | `hours` | task đã xong/đang chờ, phán quyết gần đây, sweep gần nhất, `openActions`/`overdueActions` (số việc khắc phục còn mở / quá hạn) |
 | `read_system_health` | đọc | — | kết quả `health.sweep` gần nhất, capabilities |
 | `record_verdict` | ghi | `violationId, observations: ObservationKind[], note` | `{ band, applied: bool, statusNow }` |
 | `escalate` | ghi | `violationId, caption` | `{ sent, blockedReason? }` |
@@ -234,7 +255,8 @@ nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`act
 `announce` nằm ở **cuối** bộ tool của `violation.review`, `followup`, `camera.instruction` và `ask`
 (thứ tự các tool trước đó không đổi để cache prompt còn dùng lại được). OPENING của
 `violation.review` trong `agent/lib/preamble.ts` nhắc: "Vi phạm VERIFIED thật và camera có loa →
-announce một câu ngắn".
+announce một câu ngắn". OPENING của `shift.report` và `weekly.report` nhắc thêm phần "việc khắc
+phục còn mở / quá hạn" và chỉ tới `read_agent_activity` (`openActions`, `overdueActions`).
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
