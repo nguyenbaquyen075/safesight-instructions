@@ -45,11 +45,12 @@ for slug in "${slugs[@]}"; do
   fi
 done
 
-if [ -n "${INTEGRATION_BRANCH:-}" ] && [ -f docs/github/prs/integration-v0.9.md ]; then
+INTEGRATION_PR_BODY="${INTEGRATION_PR_BODY:-docs/github/prs/integration-${INTEGRATION_BRANCH##*/}.md}"
+if [ -n "${INTEGRATION_BRANCH:-}" ] && [ -f "$INTEGRATION_PR_BODY" ]; then
   push "$INTEGRATION_BRANCH" && echo "đã push $INTEGRATION_BRANCH" || echo "push $INTEGRATION_BRANCH thất bại"
   exists=$(api GET "/pulls?state=open&head=${REPO%%/*}:$INTEGRATION_BRANCH" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d[0]['html_url'] if d else '')")
   if [ -n "$exists" ]; then echo "PR tổng đã có: $exists"; else
-    url=$(api POST "/pulls" -d "$(python3 -c 'import json,sys; print(json.dumps({"title": sys.argv[1], "head": sys.argv[2], "base": sys.argv[3], "body": open(sys.argv[4]).read()}))' "v0.9 integration: nine roadmap features and the review fix wave" "$INTEGRATION_BRANCH" "$BASE" docs/github/prs/integration-v0.9.md)" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('html_url') or d)")
+    url=$(api POST "/pulls" -d "$(python3 -c 'import json,sys; print(json.dumps({"title": sys.argv[1], "head": sys.argv[2], "base": sys.argv[3], "body": open(sys.argv[4]).read()}))' "${INTEGRATION_PR_TITLE:-${INTEGRATION_BRANCH##*/} integration}" "$INTEGRATION_BRANCH" "$BASE" "$INTEGRATION_PR_BODY")" | python3 -c "import json,sys; d=json.load(sys.stdin); print(d.get('html_url') or d)")
     echo "PR tổng: $url"
   fi
 fi
