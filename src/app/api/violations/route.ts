@@ -6,30 +6,14 @@ import { prisma } from '@/lib/prisma';
 import { notifyViolation } from '@/lib/alert-notifier';
 import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
 import type { Violation } from '@/types/models';
+import { toViolationDTO } from '@/lib/violation-shape';
 
 async function getRealViolations(): Promise<Violation[]> {
   const rows = await prisma.violation.findMany({
     include: { camera: true, site: true },
     orderBy: { detectedAt: 'desc' },
   });
-  return rows.map((v) => ({
-    id: v.id,
-    cameraId: v.cameraId,
-    cameraName: v.camera.name,
-    siteId: v.siteId,
-    siteName: v.site.name,
-    zoneId: v.zoneId ?? undefined,
-    type: v.type as Violation['type'],
-    severity: v.severity as Violation['severity'],
-    confidence: v.confidence,
-    bboxData: JSON.parse(v.bboxData),
-    snapshotUrl: v.snapshotUrl,
-    clipUrl: v.clipUrl ?? undefined,
-    status: v.status.toLowerCase() as Violation['status'],
-    agentReview: v.agentReview ? JSON.parse(v.agentReview) : null,
-    detectedAt: v.detectedAt.toISOString(),
-    createdAt: v.createdAt.toISOString(),
-  }));
+  return rows.map(toViolationDTO);
 }
 
 export async function GET(request: NextRequest) {
@@ -53,8 +37,6 @@ export async function GET(request: NextRequest) {
   if (status) {
     violations = violations.filter(v => v.status === status);
   }
-  
-  await new Promise((resolve) => setTimeout(resolve, 800));
   return NextResponse.json(violations);
 }
 

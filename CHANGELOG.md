@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Sửa
+- API vi phạm trả thêm `occurrenceCount`; JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách; bỏ độ trễ giả 800ms ở `GET /api/violations`; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
+
 ### Thêm
 - README mới theo chuẩn dự án mã nguồn mở: logo, badge, mục tính năng, tài liệu, đóng góp.
 - `Dockerfile` hai target (`dashboard`, `bridge`), `docker-compose.yml`, `.env.docker.example`; workflow Docker build và đẩy image lên GHCR.
