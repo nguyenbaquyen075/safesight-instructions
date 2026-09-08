@@ -108,7 +108,7 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
   const effort = task.kind === 'shift.report' || task.kind === 'weekly.report' ? 'high' : settings.reviewEffort;
   const client = opts.client ?? (env.llmProvider === 'openai' ? openAiClient() : anthropicClient());
   const messages = [{ role: 'user', content: await preambleFor(task, { userMessage: opts.userMessage, sessionId, cameraId, memory }) }];
-  await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget, cameraId } });
+  await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget, cameraId, workerId: env.workerId } });
 
   const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0 };
   let finalText = ''; let stop: string | null = null;

@@ -12,11 +12,21 @@ COPY package.json package-lock.json ./
 RUN npm ci
 
 FROM deps AS build
-ENV NEXT_TELEMETRY_DISABLED=1 DATABASE_URL=file:./data/dev.db
+# Mặc định dựng bản SQLite. Bản PostgreSQL:
+#   --build-arg PRISMA_SCHEMA=prisma/postgres/schema.prisma
+#   --build-arg BUILD_DATABASE_URL=postgresql://build/build
+# (docker-compose.yml đọc hai giá trị này từ .env). Prisma 7 nhúng query compiler theo provider
+# của schema lúc generate, nên MỘT client chỉ nói được một loại DB — phải chọn ngay ở bước build.
+# BUILD_DATABASE_URL chỉ để src/lib/prisma.ts chọn đúng adapter lúc `next build` nạp module; không
+# có kết nối DB nào ở bước này (next build chạy TRƯỚC db push, tức lúc chưa có file dev.db nào).
+ARG PRISMA_SCHEMA=prisma/schema.prisma
+ARG BUILD_DATABASE_URL=file:./data/dev.db
+ENV NEXT_TELEMETRY_DISABLED=1 DATABASE_URL=${BUILD_DATABASE_URL}
 COPY . .
-RUN npx prisma generate \
+RUN npx prisma generate --schema "$PRISMA_SCHEMA" \
  && npm run build \
- && mkdir -p data && npx prisma db push && npm run db:seed
+ && mkdir -p data \
+ && if [ "$PRISMA_SCHEMA" = "prisma/schema.prisma" ]; then npx prisma db push && npm run db:seed; else touch data/dev.db; fi
 
 FROM node:24-alpine AS dashboard
 WORKDIR /app

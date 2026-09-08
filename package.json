@@ -10,6 +10,9 @@
     "dev:agent": "tsx agent/main.ts",
     "test:agent": "DATABASE_URL=file:./agent-test.db prisma db push --accept-data-loss && DATABASE_URL=file:./agent-test.db node --import tsx --test --test-concurrency=1 agent/test/*.test.ts",
     "db:seed": "node prisma/seed.mjs",
+    "db:pg:generate": "prisma generate --schema prisma/postgres/schema.prisma",
+    "db:pg:push": "prisma db push --schema prisma/postgres/schema.prisma",
+    "db:pg:migrate-data": "node scripts/sqlite-to-postgres.mjs",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"

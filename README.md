@@ -178,6 +178,14 @@ agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:age
 và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` của bridge, không
 chỉ `POST /api/violations`. Tag image: `latest` (main), `0.6.0` / `0.6` (release), `main`, mã commit ngắn.
 
+**PostgreSQL (tuỳ chọn).** Ngăn xếp mặc định chạy SQLite. Cần nhiều worker agent hoặc nhiều bản dashboard
+thì bật profile `pg`: `docker compose --profile pg up -d` khởi thêm service `postgres:16-alpine` (volume
+`pgdata`, chỉ mở `127.0.0.1:5432`). Vì Prisma 7 nhúng query compiler theo provider ngay lúc `prisma generate`,
+image dashboard phải được **dựng lại** với `PRISMA_SCHEMA=prisma/postgres/schema.prisma`. Toàn bộ các bước
+(tạo bảng → chép dữ liệu bằng `npm run db:pg:migrate-data` → đổi client) nằm ở
+[wiki/03 — Chuyển sang PostgreSQL](wiki/03-cai-dat-va-van-hanh.md#chuyển-sang-postgresql). Phần này chưa
+được nghiệm thu trên PostgreSQL thật.
+
 Nâng cấp từ bản dùng named volume `safesight-data` (trước khi đổi sang bind mount): chép dữ liệu cũ
 sang `./data` rồi mới chạy lại — `docker run --rm -v <project>_safesight-data:/from -v "$PWD/data":/to alpine cp -a /from/. /to/`
 (`docker volume ls` để tìm đúng tên volume). Chi tiết uid/gid: [wiki/03](wiki/03-cai-dat-va-van-hanh.md).

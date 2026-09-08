@@ -53,11 +53,32 @@ export function pushMemory(notes: CameraMemoryNote[], note: CameraMemoryNote, re
   return [...notes, trimmed].slice(-MEMORY_MAX);
 }
 
+/** Ghi trí nhớ là "đọc JSON -> thêm ghi chú -> ghi lại cả chuỗi". Chạy nhiều worker
+ * (mỗi worker một tiến trình `agent/main.ts`) thì hai phiên của cùng một camera có thể
+ * đọc cùng một bản `memory` rồi ghi đè nhau -> mất ghi chú, không báo lỗi.
+ *
+ * Cách sửa: cập nhật có điều kiện (optimistic) — `updateMany` chỉ ghi khi `memory` trong
+ * DB vẫn đúng bản vừa đọc; `count === 0` nghĩa là worker khác chen vào, đọc lại rồi thử
+ * lần hai trên bản mới nên ghi chú của cả hai đều còn.
+ *
+ * Cố ý so theo `memory` chứ không theo `updatedAt`: `updatedAt` của SQLite chỉ tới
+ * mili-giây (hai lượt ghi trong cùng 1ms sẽ không phát hiện được xung đột) và bị
+ * `addCameraTokens` đụng vào liên tục (báo xung đột giả). So thẳng giá trị đang sửa là
+ * đúng nghĩa compare-and-swap.
+ *
+ * ponytail: thử lại 1 lần là đủ cho nhịp thực tế (≤ 3 lần ghi/phiên, phiên thưa); nếu về
+ * sau có nhiều worker ghi dày hơn thì đổi thành vòng lặp có backoff. */
 export async function rememberCamera(cameraId: string, text: string, sessionId: string, replaceIndex?: number): Promise<CameraMemoryNote[]> {
-  const agent = await getCameraAgent(cameraId);
-  const notes = pushMemory(parseMemory(agent.memory), { at: new Date().toISOString(), text, sessionId }, replaceIndex);
-  await prisma.cameraAgent.update({ where: { id: cameraId }, data: { memory: JSON.stringify(notes) } });
-  return notes;
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const agent = await getCameraAgent(cameraId);
+    const notes = pushMemory(parseMemory(agent.memory), { at: new Date().toISOString(), text, sessionId }, replaceIndex);
+    const { count } = await prisma.cameraAgent.updateMany({
+      where: { id: cameraId, memory: agent.memory },
+      data: { memory: JSON.stringify(notes) },
+    });
+    if (count > 0) return notes;
+  }
+  throw new Error(`rememberCamera: xung đột ghi trí nhớ camera ${cameraId} sau 2 lần thử`);
 }
 
 export async function addCameraTokens(cameraId: string, tokens: number, now = new Date()): Promise<void> {
