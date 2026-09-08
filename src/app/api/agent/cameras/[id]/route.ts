@@ -27,6 +27,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = updateSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
+  // PATCH rỗng không tạo dòng, không ghi audit.
+  if (Object.keys(parsed.data).length === 0) return NextResponse.json({ error: 'Không có trường nào để cập nhật' }, { status: 400 });
   const { clearMemory, ...fields } = parsed.data;
   const data = { ...fields, ...(clearMemory ? { memory: '[]' } : {}) };
   const row = await prisma.cameraAgent.upsert({ where: { id }, create: { id, ...data }, update: data });
