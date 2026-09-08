@@ -218,6 +218,17 @@ cùng hàng đợi.
 | `list_camera_agents` | đọc | — | `{ cameras: [{ cameraId, name, status, siteId, isEnabled, tokensUsedToday, dailyTokenCap, lastDigestAt, notes (3 ghi chú mới nhất), openViolations }] }` — chỉ trong phiên toàn hệ thống |
 | `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryWritten, memoryTotal }` (task đã xếp thì ghi trí nhớ lỗi cũng không đổi thành lỗi) hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
 
+`escalate` không có `violationId` (leo thang vận hành, kind `ops.escalate`) đi qua
+`sendOpsAlert` (`agent/lib/notify.ts`), không phải chỉ Telegram: `opsTargets(rules)` (thuần,
+có test riêng) chọn rule `AlertRule` đang bật có `violationTypes` rỗng (không có thì rule bật
+đầu tiên), rồi trải ra **mọi kênh** của rule đó đã có sender nối thật (`senderFor`, cùng
+`src/lib/alert-channels/*` mà `notifyViolation` dùng cho vi phạm) — Telegram/Zalo/Webhook,
+mỗi kênh mỗi người nhận. `sent = true` nếu ít nhất một kênh gửi được, kèm `perChannel` (kênh,
+người nhận, ok/error) để agent ghi vào `AgentEvent`. Cảnh báo vận hành **không** ghi bảng
+`Alert` (khác với `notifyViolation`) vì `Alert.violationId` bắt buộc và ở đây không có vi phạm
+nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`action: 'escalate.ops'` /
+`'ops.alert'`), không ở trang `/alerts`.
+
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
@@ -282,7 +293,8 @@ UI:
   (bật/tắt, model, trần token, giờ báo cáo ca, giờ báo cáo tuần), ô hỏi toàn hệ thống, capabilities.
 - Trang `/reports` đọc `GET /api/agent/events?type=report&limit=1` để hiện bản báo cáo tuần mới
   nhất: cuối phiên `weekly.report`, `runSession` phát thêm `AgentEvent report { text }` bên cạnh
-  `session.ended` (agent vẫn gửi Telegram bằng `escalate` không `violationId` như `shift.report`).
+  `session.ended` (agent vẫn leo thang bằng `escalate` không `violationId` như `shift.report`,
+  qua `sendOpsAlert` — mọi kênh AlertRule đã cấu hình, không chỉ Telegram).
   `weekly.report` cũng chạy với `effort: 'high'` giống `shift.report`.
 - Hook React Query `src/hooks/use-agent.ts`: `useAgentTasks`, `useAgentEvents` (poll khi
   thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent`.
@@ -364,6 +376,10 @@ Kiểm thử (`agent/test/*.test.ts`), file mới thêm để lấp khoảng tr�
 - `escalate.test.ts` — `makeEscalate()` (`agent/tools/escalate.ts`): chặn khi chưa VERIFIED,
   chưa đủ nghiêm trọng, hết lượt leo thang trong phiên, agent tạm dừng; và đường vận hành
   (không có `violationId`) gọi `sendOpsAlert` + tăng `ctx.spent.escalations`.
+- `ops-alert.test.ts` — `opsTargets()` (thuần) chọn đúng rule và trải ra mọi kênh/người nhận
+  có prefix `zalo:`/`webhook:`, bỏ kênh chưa nối sender; `sendOpsAlert()` với sender giả tiêm
+  qua tham số `senders` (không đụng mạng): gửi qua nhiều kênh, coi là `sent` khi ít nhất một
+  kênh ok, và báo lý do khi không có rule/kênh nào bật.
 - `agent-bridge.test.ts` — `enqueueAgentTask()` (`src/lib/agent-bridge.ts`): gộp task trùng
   đang chờ, không gộp vào task đang lease hoặc đã xong.
 - `violation-status.test.ts` — bất biến status viết HOA (route `PATCH

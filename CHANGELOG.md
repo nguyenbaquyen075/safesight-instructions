@@ -7,6 +7,14 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - `ai-engine/requirements.txt` ghim phiên bản các gói Python engine dùng trực tiếp (`torch`, `torchvision`, `ultralytics`, `opencv-python`, `numpy`, `requests`) theo `.venv` của operator; README chuyển sang cài bằng `pip install -r ai-engine/requirements.txt`; wiki/03 ghi chú cách chạy `pip-audit` thủ công cho các gói này.
 
+### Sửa
+- Leo thang vận hành của agent (`escalate` không `violationId`, kind `ops.escalate`) giờ gửi
+  qua **mọi kênh** đã cấu hình trong `AlertRule` — Zalo và Webhook, chứ không chỉ Telegram
+  như trước. `sendOpsAlert` (`agent/lib/notify.ts`) dùng lại `senderFor`/`recipientsForChannel`
+  của `src/lib/alert-channels/*` thay vì tự dựng `TelegramClient`; hàm thuần mới `opsTargets`
+  chọn rule và trải ra từng kênh/người nhận. Cảnh báo vận hành không ghi bảng `Alert` (không
+  có `violationId` để gắn) nên không xuất hiện ở trang `/alerts`, chỉ ở nhật ký `AgentEvent`.
+
 ## [0.10.0] - 2026-09-08
 
 ### Thêm

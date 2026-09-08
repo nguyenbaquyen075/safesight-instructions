@@ -64,7 +64,7 @@ export async function applyFindings(findings: Finding[], ctx: ActionContext): Pr
     if (repeats === OPS_ALERT_AFTER || (f.code === 'model.missing' && repeats === 1)) {
       const text = `🛠 SafeSight agent: ${f.code}${f.subjectId ? ` (${f.subjectId})` : ''} lặp ${repeats} lần. ${JSON.stringify(f.detail)}`;
       const r = await sendOpsAlert(text);
-      await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: f.subjectType, subjectId: f.subjectId, type: 'action', data: { action: 'ops.telegram', sent: r.sent, reason: r.reason } });
+      await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: f.subjectType, subjectId: f.subjectId, type: 'action', data: { action: 'ops.alert', sent: r.sent, reason: r.reason } });
       await scheduleTask({ kind: 'ops.escalate', subjectType: f.subjectType, subjectId: f.subjectId, reason: `${f.code} lặp ${repeats} lần, không tự xử được`, dueAt: new Date(), priority: PRIORITY['ops.escalate'] });
       done.push(`leo thang ${f.code}`); mine.push(`leo thang ${f.code}`);
     }

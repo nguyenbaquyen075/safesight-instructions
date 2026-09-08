@@ -13,7 +13,10 @@ export const telegramSender: AlertSender = {
     const client = new TelegramClient(decrypt(settings.botTokenEncrypted));
     let result: TelegramResult;
     try {
-      result = await client.sendPhoto(recipient, violation.snapshotUrl, caption);
+      // Cảnh báo vận hành (sendOpsAlert) không gắn Violation nên không có ảnh để gửi kèm.
+      result = violation
+        ? await client.sendPhoto(recipient, violation.snapshotUrl, caption)
+        : await client.sendMessage(recipient, caption);
     } catch (err) {
       result = { ok: false, description: err instanceof Error ? err.message : String(err) };
     }
