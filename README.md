@@ -182,6 +182,7 @@ Tiến trình thứ 4 (`agent/`, port 4002 nội bộ), khởi động cùng `np
 
 - **Bật/tắt:** kill switch trên trang `/agent` (`AgentSettings.isEnabled`), hoặc để trống `ANTHROPIC_API_KEY` để chỉ giữ lane trực vận hành.
 - **Chạy riêng:** `npm run dev:agent`; kiểm tra sức khoẻ: `curl 127.0.0.1:4002/health`.
+- **Subagent theo camera:** mỗi camera có một subagent riêng (`CameraAgent`): bật/tắt riêng, trí nhớ riêng (tối đa 20 ghi chú bền về góc máy, giờ ngược sáng, vùng ngoài hàng rào…), trần token riêng (mặc định 300k/ngày), tổng hợp định kỳ (mặc định 30 phút, bỏ qua nếu camera không có hoạt động mới). Review vi phạm và hỏi đáp về camera chạy dưới subagent của camera đó; tối đa 3 phiên song song, mỗi camera một phiên. Quản lý trên trang `/agent` (thẻ từng camera) hoặc tab Agent trong modal camera.
 
 Chi tiết đầy đủ (hàng đợi, bằng chứng/band, tool, rào chắn, panel): [`wiki/09-agent.md`](wiki/09-agent.md).
 

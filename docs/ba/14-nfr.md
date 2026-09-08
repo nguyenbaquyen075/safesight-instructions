@@ -12,7 +12,7 @@ Trạng thái: ✅ đã đáp ứng ở v0.6.0 · 🟡 một phần · 🔲 chư
 | NFR-04 | Bí mật (bot token Telegram) mã hoá AES-256-GCM khi lưu, không trả lại client | ✅ | Khoá `TELEGRAM_ENCRYPT_KEY` |
 | NFR-05 | Khoá API bên thứ ba (Roboflow, Anthropic) chỉ ở server, không lộ ra trình duyệt | ✅ | |
 | NFR-06 | Video camera xử lý tại chỗ, không đưa luồng video lên cloud; Roboflow chỉ cho ảnh tĩnh do người dùng chọn | ✅ | Quy tắc dự án |
-| NFR-07 | Agent bị kill switch, giới hạn tần suất hành động, trần token / ngày; mọi hành động ghi audit `AgentEvent` | ✅ | |
+| NFR-07 | Agent bị kill switch, giới hạn tần suất hành động, trần token / ngày toàn cục và trần riêng từng camera (`CameraAgent.dailyTokenCap`, mặc định 300k); `remember_camera` ≤ 3 lần/phiên; mọi hành động ghi audit `AgentEvent` | ✅ | |
 | NFR-08 | YOLO Bridge có xác thực trước khi mở ra ngoài localhost | 🔲 | Lộ trình P3 |
 | NFR-09 | Tải video mẫu: ≤ 200MB, chặn đường dẫn `../`, chỉ quản trị | ✅ | |
 | NFR-10 | Nội dung động trong tin Telegram (HTML) được escape | 🟡 | Caption mặc định chưa escape (tồn đọng) |

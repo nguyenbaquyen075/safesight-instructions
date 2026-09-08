@@ -36,3 +36,5 @@ Ba quy trình nghiệp vụ chính. Lane đặt theo nhóm tham gia; hệ thốn
 <sub>Sơ đồ vẽ bằng Excalidraw.</sub>
 
 Phát hiện hiện có: `camera.stalled`, `camera.recovered`, `engine.stalled`, `bridge.down`, `disk.pressure`, `model.missing`.
+
+Song song với lane trực tiếp, mỗi camera ONLINE có một **subagent** (lane nghiên cứu) tự tổng hợp định kỳ (`camera.digest`, mặc định 30 phút, chỉ khi có hoạt động mới) và review vi phạm của camera đó với trí nhớ riêng; xem UC-28 và `wiki/09-agent.md`.
