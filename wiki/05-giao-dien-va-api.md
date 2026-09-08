@@ -10,8 +10,7 @@ Thiết kế industrial editorial: hero hai cột ảnh/chữ, preview riêng t�
 
 Nhóm layout `(dashboard)` dùng chung Sidebar + Header (`src/components/layout/`). Quyền xem trang theo vai trò khai báo một chỗ ở `src/lib/auth/permissions.ts` (`PAGE_ROLES`), Sidebar ẩn menu và `DashboardLayout` chặn truy cập thẳng bằng URL.
 
-Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViolationCount()` (`GET /api/violations/count` trả `{ open }`, đếm bằng SQL theo phạm vi site) — không tải cả danh sách vi phạm, không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
-Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useViolations()` (đếm `status === 'open'`), cùng nguồn với `/violations` — không còn đọc `localStorage['safesight_alerts']`. Badge ẩn khi 0, hiển thị `99+` khi vượt 99. Số đếm hiển thị = số vi phạm `open` trừ đi các id đã đánh dấu "đã đọc" ở `/alerts` (`useReadAlertIds()` trong `src/hooks/use-read-alerts.ts`, nguồn `localStorage['safesight_read_alerts']`), để "Đánh dấu tất cả đã đọc" trên `/alerts` phản ánh đúng lên badge.
+Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViolationCount()` (`GET /api/violations/count` trả `{ open, openIds }` theo phạm vi site, chỉ id, không join) — không tải cả danh sách vi phạm, không còn đọc `localStorage['safesight_alerts']`. Số hiển thị = vi phạm `open` trừ các id đã đánh dấu "đã đọc" ở `/alerts` (`useReadAlertIds()` trong `src/hooks/use-read-alerts.ts`, nguồn `localStorage['safesight_read_alerts']`), nên "Đánh dấu tất cả đã đọc" phản ánh đúng lên badge. Badge ẩn khi 0, hiển thị `99+` khi vượt 99.
 
 | Route | File | Vai trò được xem | Nội dung |
 |---|---|---|---|
@@ -37,7 +36,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 |---|---|---|
 | `/api/auth/[...nextauth]` | * | NextAuth handler |
 | `/api/violations` | GET, POST | GET cần session, lọc `siteId/type/severity/status` bằng SQL và theo phạm vi site; POST chỉ cho AI engine, bắt buộc header `X-AI-Engine-Secret` (không có session) rồi gọi `notifyViolation()` (Telegram) |
-| `/api/violations/count` | GET | Cần session; `{ open: N }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
+| `/api/violations/count` | GET | Cần session; `{ open, openIds }` theo phạm vi site — badge Sidebar dùng thay vì tải cả danh sách |
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess` |

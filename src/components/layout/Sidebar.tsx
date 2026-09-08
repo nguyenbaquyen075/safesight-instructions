@@ -10,6 +10,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { UserRole } from '@/types/enums';
 import { canAccessPath } from '@/lib/auth/permissions';
 import { useOpenViolationCount } from '@/hooks/use-violations';
+import { useReadAlertIds } from '@/hooks/use-read-alerts';
 import {
   LayoutDashboard,
   Building2,
@@ -32,7 +33,6 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
-  badge?: number;
 }
 
 const navItems: NavItem[] = [
@@ -55,10 +55,12 @@ export function Sidebar() {
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole;
   const { data: openViolations } = useOpenViolationCount();
+  const readIds = useReadAlertIds();
 
   const filteredNavItems = navItems.filter(item => canAccessPath(userRole, item.href));
 
-  const openAlertCount = openViolations?.open ?? 0;
+  // Badge = vi phạm đang mở trừ những id đã "đánh dấu đã đọc" ở trang /alerts (cùng nguồn READ_ALERTS_KEY).
+  const openAlertCount = (openViolations?.openIds ?? []).filter(id => !readIds.has(id)).length;
 
   return (
     <aside
@@ -94,7 +96,7 @@ export function Sidebar() {
             pathname === item.href ||
             (item.href !== '/' && pathname.startsWith(item.href));
           const Icon = item.icon;
-          const currentBadge = item.label === 'Thông báo' ? openAlertCount : item.badge;
+          const currentBadge = item.href === '/alerts' ? openAlertCount : 0;
           const badgeLabel = currentBadge && currentBadge > 99 ? '99+' : currentBadge;
 
           return (

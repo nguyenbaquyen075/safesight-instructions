@@ -30,7 +30,7 @@ export function useViolations(filters?: { siteId?: string; status?: string; type
 // Sidebar chỉ cần số vi phạm đang mở -> gọi endpoint COUNT thay vì tải cả danh sách.
 // Key nằm dưới tiền tố ['violations'] nên các invalidateQueries sẵn có cũng làm mới nó.
 export function useOpenViolationCount() {
-  return useQuery<{ open: number }>({
+  return useQuery<{ open: number; openIds: string[] }>({
     queryKey: ['violations', 'open-count'],
     queryFn: async () => {
       const res = await fetch('/api/violations/count');
