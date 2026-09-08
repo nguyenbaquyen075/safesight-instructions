@@ -150,7 +150,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
 
   return (
     <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 sm:p-8 bg-black/95 backdrop-blur-xl animate-in fade-in zoom-in-95 duration-500">
-      <div className="relative w-full max-w-5xl bg-[var(--surface)] rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl flex flex-col lg:flex-row">
+      <div className="relative w-full max-w-5xl max-h-[90vh] bg-[var(--surface)] rounded-[3rem] overflow-hidden border border-white/10 shadow-2xl flex flex-col lg:flex-row">
         {/* Video Side */}
         <div className="flex-1 bg-black relative aspect-video lg:aspect-auto">
           {/* Có clip 8s (20 khung trước + 12 khung sau lúc chốt) thì phát clip, dùng ảnh chốt làm
@@ -191,8 +191,9 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
           )}
         </div>
 
-        {/* Content Side */}
-        <div className="w-full lg:w-96 p-10 flex flex-col justify-between border-l border-white/5">
+        {/* Content Side — cột này cuộn riêng: màn hình thấp thì các nút ở đáy vẫn bấm được
+            (min-h-0 để flex item chịu co lại, nếu không overflow-y-auto không có tác dụng). */}
+        <div className="w-full lg:w-96 min-h-0 overflow-y-auto p-10 flex flex-col justify-between border-l border-white/5">
            <div className="space-y-8">
               <div className="flex justify-between items-start">
                  <div>

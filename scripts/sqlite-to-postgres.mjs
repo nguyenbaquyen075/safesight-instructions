@@ -25,6 +25,7 @@ const TABLES = [
   ['Camera', 'camera'],
   ['Zone', 'zone'],
   ['Violation', 'violation'],
+  ['CorrectiveAction', 'correctiveAction'], // sau Violation (violationId)
   ['ObservationStat', 'observationStat'],
   ['User', 'user'],
   ['AlertRule', 'alertRule'],
