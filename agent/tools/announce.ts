@@ -17,8 +17,10 @@ const REVIEW_KINDS = new Set(['violation.review', 'followup']);
 
 function isRealViolation(agentReview: string | null): boolean {
   if (!agentReview) return false;
-  const review = JSON.parse(agentReview);
-  return review?.band === 'VERIFIED' && review?.verdict === 'violation';
+  try {
+    const review = JSON.parse(agentReview);
+    return review?.band === 'VERIFIED' && review?.verdict === 'violation';
+  } catch { return false; } // JSON hỏng = chưa có phán quyết, không phải lỗi tool
 }
 
 // Loa chỉ được phát khi đã có phán quyết VERIFIED "vi phạm thật" cho camera đó: trong phiên
@@ -56,7 +58,8 @@ export const makeAnnounce = (ctx: ToolContext) => betaZodTool({
       return JSON.stringify({ ok: false, blockedReason: 'camera này vừa phát loa, chờ đủ 60 giây' });
     }
     const result = await announce(cameraId, text);
-    ctx.spent.announces++;
+    // Bridge không phát được (down/401) thì không trừ hạn mức phiên: lần thử sau vẫn còn slot.
+    if (result.ok) ctx.spent.announces++;
     await emit({ sessionId: ctx.sessionId, taskId: ctx.taskId, subjectType: 'camera', subjectId: cameraId, type: 'action', data: { action: 'announce', cameraId, text, listeners: result.listeners } });
     return JSON.stringify({ ok: result.ok, listeners: result.listeners, blockedReason: result.error });
   }),

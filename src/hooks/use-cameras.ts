@@ -111,7 +111,7 @@ export function useAnnounceCamera() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text, violationId }),
       });
-      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to announce');
+      if (!res.ok) { const err = (await res.json().catch(() => ({}))).error; throw new Error(typeof err === 'string' ? err : 'Không phát được loa'); }
       return res.json() as Promise<{ ok: boolean; listeners?: number; error?: string; text: string }>;
     },
   });

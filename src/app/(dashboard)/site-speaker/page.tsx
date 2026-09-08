@@ -27,6 +27,8 @@ function speak(text: string) {
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = 'vi-VN';
   utterance.rate = 0.95;
+  // Huỷ câu đang đọc dở: một loạt cảnh báo dồn dập không được xếp hàng rồi đọc lại nội dung cũ vài phút sau.
+  window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 }
 

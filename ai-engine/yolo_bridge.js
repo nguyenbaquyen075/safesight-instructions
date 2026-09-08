@@ -13,7 +13,7 @@ const { Server } = require('socket.io');
 const PORT = 4001;
 const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
 if (!AI_ENGINE_SECRET) {
-  console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections KHÔNG xác thực (chỉ dùng cho dev).');
+  console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections và POST /announce KHÔNG xác thực (chỉ dùng cho dev).');
 }
 
 const app = express();
@@ -54,8 +54,9 @@ app.post('/announce', (req, res) => {
     return res.sendStatus(401);
   }
   const { cameraId, text } = req.body || {};
-  if (!cameraId || !text) {
-    return res.status(400).json({ ok: false, error: 'cameraId và text là bắt buộc' });
+  // Bridge là ranh giới tin cậy cuối trước loa: kiểm kiểu và độ dài ở đây, không tin route/tool phía trên.
+  if (typeof cameraId !== 'string' || !cameraId.trim() || typeof text !== 'string' || !text.trim() || text.length > 200) {
+    return res.status(400).json({ ok: false, error: 'cameraId và text (1–200 ký tự) là bắt buộc' });
   }
   const room = `camera-${cameraId}`;
   io.to(room).emit('voice-announce', { cameraId, text, at: new Date().toISOString() });
