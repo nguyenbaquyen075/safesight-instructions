@@ -79,3 +79,6 @@ agent-test.db*
 
 # Sơ đồ BA: chỉ commit PNG
 /docs/ba/diagrams/*.excalidraw
+
+# Python virtualenv của AI engine (tạo cục bộ)
+.venv/
