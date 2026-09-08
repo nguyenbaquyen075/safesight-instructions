@@ -150,7 +150,8 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
   chỉ ghi event và `snapshot.cleanup` không xoá file nào. `write_note` **vẫn chạy**: nó chỉ
   ghi nhận vào nhật ký agent, không đụng tới dữ liệu vận hành.
 - **Tần suất:** `escalate` theo AlertRule cooldown; `record_verdict` 1 lần/vi phạm/phiên;
-  `schedule_followup` tối đa 3/phiên; `remember_camera` tối đa 3/phiên; sweep: đổi trạng thái camera 1/5 phút/camera,
+  `schedule_followup` tối đa 3/phiên; `remember_camera` tối đa 3/phiên; `announce` tối đa 2/phiên
+  (`LIMITS.announcePerSession`) và 60 giây/camera; sweep: đổi trạng thái camera 1/5 phút/camera,
   SIGTERM engine 3/giờ.
 - **Không bao giờ:** không có tool xoá bản ghi, sửa User/role/AlertRule/TelegramSettings,
   đổi `rtspUrl`, sửa ngưỡng nhận diện, đọc/ghi file ngoài `public/snapshots`, gọi mạng ngoài
@@ -215,6 +216,7 @@ cùng hàng đợi.
 | `schedule_followup` | ghi | `kind ("followup"\|"camera.digest"), subjectType, subjectId, minutes (5..1440), reason (≥10 ký tự)` | `{ dueAt }` |
 | `write_note` | ghi | `subjectType, subjectId, note` | `{ ok }` |
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
+| `announce` | ghi | `cameraId, text (10..200)` | `{ ok, listeners? }` hoặc `blockedReason` — phát câu nhắc qua loa công trường của camera (`announce()` trong `src/lib/announce.ts` → `POST /announce` của bridge). Chỉ có trong kind `violation.review`, `followup`, `camera.instruction`, `ask`. Điều kiện: phiên review/followup phải đã `record_verdict` **VERIFIED + vi phạm thật** cho vi phạm của chính camera đó (`ctx.spent.verdicts`); các kind khác cần một phán quyết VERIFIED thật của camera đó trong 10 phút gần nhất. Tối đa 2 lần/phiên (`LIMITS.announcePerSession`), mỗi camera cách nhau 60 giây (`rateLimit('announce:<cameraId>', 1, 60_000)`), kill switch chặn |
 | `list_camera_agents` | đọc | — | `{ cameras: [{ cameraId, name, status, siteId, isEnabled, tokensUsedToday, dailyTokenCap, lastDigestAt, notes (3 ghi chú mới nhất), openViolations }] }` — chỉ trong phiên toàn hệ thống |
 | `dispatch_to_camera` | ghi | `cameraId, instruction (10..300), minutes? (0..1440)` | `{ dispatched, dueAt, replacedPending, memoryWritten, memoryTotal }` (task đã xếp thì ghi trí nhớ lỗi cũng không đổi thành lỗi) hoặc `blockedReason` (subagent tắt, camera không tồn tại, kill switch, hết hạn mức) — tạo task `camera.instruction` và ghi "Chỉ dẫn từ agent trưởng: …" vào trí nhớ camera; đếm chung `LIMITS.followupPerSession` với `schedule_followup` |
 
@@ -228,6 +230,11 @@ người nhận, ok/error) để agent ghi vào `AgentEvent`. Cảnh báo vận 
 `Alert` (khác với `notifyViolation`) vì `Alert.violationId` bắt buộc và ở đây không có vi phạm
 nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`action: 'escalate.ops'` /
 `'ops.alert'`), không ở trang `/alerts`.
+
+`announce` nằm ở **cuối** bộ tool của `violation.review`, `followup`, `camera.instruction` và `ask`
+(thứ tự các tool trước đó không đổi để cache prompt còn dùng lại được). OPENING của
+`violation.review` trong `agent/lib/preamble.ts` nhắc: "Vi phạm VERIFIED thật và camera có loa →
+announce một câu ngắn".
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`

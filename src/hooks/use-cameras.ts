@@ -102,6 +102,21 @@ export function useSaveCameraZones(id: string | undefined) {
   });
 }
 
+/** Phát một câu qua loa của camera (không text thì server dựng câu từ vi phạm). */
+export function useAnnounceCamera() {
+  return useMutation({
+    mutationFn: async ({ cameraId, text, violationId }: { cameraId: string; text?: string; violationId?: string }) => {
+      const res = await fetch(`/api/cameras/${cameraId}/announce`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, violationId }),
+      });
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).error ?? 'Failed to announce');
+      return res.json() as Promise<{ ok: boolean; listeners?: number; error?: string; text: string }>;
+    },
+  });
+}
+
 export function useDeleteCamera() {
   const queryClient = useQueryClient();
   return useMutation({

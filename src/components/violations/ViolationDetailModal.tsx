@@ -8,6 +8,7 @@ import {
   Calendar,
   MapPin,
   Search,
+  Volume2,
   X,
 } from 'lucide-react';
 import { cn, getViolationTypeLabel } from '@/lib/utils';
@@ -15,6 +16,7 @@ import { toast } from '@/lib/toast';
 import { Severity, ViolationStatus } from '@/types/enums';
 import { MicButton } from '@/components/cameras/MicButton';
 import { useUpdateViolationStatus } from '@/hooks/use-violations';
+import { useAnnounceCamera } from '@/hooks/use-cameras';
 import { AgentReviewCard } from '@/components/agent/AgentReviewCard';
 import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 import type { Violation } from '@/types/models';
@@ -32,6 +34,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
   const [empDept, setEmpDept] = useState('');
   const [penalty, setPenalty] = useState('200.000đ');
   const updateStatus = useUpdateViolationStatus();
+  const announceCamera = useAnnounceCamera();
 
   if (!violation) return null;
 
@@ -45,6 +48,22 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
       {
         onSuccess: () => toast('Đã ghi nhận xem xét tuân thủ cho vi phạm này', 'success'),
         onError: () => toast('Cập nhật thất bại, thử lại sau', 'error'),
+      }
+    );
+  };
+
+  // Phát loa: server dựng câu nhắc từ loại vi phạm rồi đẩy qua bridge tới thiết bị loa.
+  const playAnnouncement = () => {
+    if (!violation.cameraId) return;
+    announceCamera.mutate(
+      { cameraId: violation.cameraId, violationId: violation.id },
+      {
+        onSuccess: (res) => {
+          if (!res.ok) { toast(`Không phát được loa: ${res.error ?? 'bridge không phản hồi'}`, 'error'); return; }
+          if (!res.listeners) { toast('Đã gửi nhưng không có loa nào đang nghe camera này', 'info'); return; }
+          toast(`Đã phát loa tới ${res.listeners} thiết bị: "${res.text}"`, 'success');
+        },
+        onError: (err: Error) => toast(err.message || 'Không phát được loa, thử lại sau', 'error'),
       }
     );
   };
@@ -174,6 +193,14 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
               >
                  <ShieldAlert className="w-4 h-4" />
                  Lập phiếu phạt
+              </button>
+              <button
+                 onClick={playAnnouncement}
+                 disabled={!violation.cameraId || announceCamera.isPending}
+                 className="w-full py-4 rounded-2xl bg-[var(--primary-muted)] text-[var(--primary-light)] border border-[var(--primary)]/30 font-black text-sm uppercase tracking-widest hover:bg-[var(--primary)]/20 transition-all flex items-center justify-center gap-2 disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+              >
+                 <Volume2 className="w-4 h-4" />
+                 {announceCamera.isPending ? 'Đang phát loa...' : 'Phát loa'}
               </button>
               <button
                  onClick={markUnderReview}

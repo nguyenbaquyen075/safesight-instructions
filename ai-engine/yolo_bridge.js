@@ -47,6 +47,21 @@ app.post('/detections', (req, res) => {
   res.sendStatus(200);
 });
 
+// Loa công trường: dashboard/agent đẩy một câu, bridge phát cho thiết bị đang mở
+// /site-speaker của camera đó. Trả về số thiết bị đang nghe để người gọi biết có ai nghe không.
+app.post('/announce', (req, res) => {
+  if (AI_ENGINE_SECRET && req.headers['x-ai-engine-secret'] !== AI_ENGINE_SECRET) {
+    return res.sendStatus(401);
+  }
+  const { cameraId, text } = req.body || {};
+  if (!cameraId || !text) {
+    return res.status(400).json({ ok: false, error: 'cameraId và text là bắt buộc' });
+  }
+  const room = `camera-${cameraId}`;
+  io.to(room).emit('voice-announce', { cameraId, text, at: new Date().toISOString() });
+  res.json({ ok: true, listeners: io.sockets.adapter.rooms.get(room)?.size ?? 0 });
+});
+
 // Sức khoẻ cho agent/direct/health.ts: camera nào còn gửi detection, bao nhiêu client đang xem
 app.get('/health', (_req, res) => {
   res.json({ ok: true, lastDetectionAt, clients: io.engine.clientsCount, uptimeSec: Math.round((Date.now() - startedAt) / 1000) });

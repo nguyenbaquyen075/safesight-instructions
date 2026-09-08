@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Thêm
+- **Loa công trường tự động**: bridge có `POST /announce` (`{ cameraId, text }`, cùng header
+  `X-AI-Engine-Secret` như `/detections`) phát sự kiện `voice-announce` vào room `camera-<id>`
+  và trả `{ ok, listeners }`. Trang `/site-speaker` đọc câu nhận được bằng `speechSynthesis`
+  (`vi-VN`, rate 0.95), có nút "Thử loa", danh sách 10 thông báo gần nhất và cảnh báo khi
+  trình duyệt không hỗ trợ Web Speech API. Modal vi phạm thêm nút **"Phát loa"** gọi
+  `POST /api/cameras/[id]/announce` (session + `assertSiteAccess`, ghi `AuditLog`
+  `camera.announce`); không truyền `text` thì câu được dựng từ loại vi phạm bằng hàm thuần
+  `announcementFor()` (`src/lib/announce-shape.ts`, tối đa 200 ký tự). Agent có tool mới
+  `announce` cho kind `violation.review`/`followup`/`camera.instruction`/`ask`, chỉ chạy khi
+  đã có phán quyết VERIFIED "vi phạm thật" cho camera đó, tối đa 2 lần/phiên và 60 giây/camera.
+  Biến mới `YOLO_BRIDGE_URL` (tuỳ chọn) cho địa chỉ bridge phía máy chủ.
 - `ai-engine/requirements.txt` ghim phiên bản các gói Python engine dùng trực tiếp (`torch`, `torchvision`, `ultralytics`, `opencv-python`, `numpy`, `requests`) theo `.venv` của operator; README chuyển sang cài bằng `pip install -r ai-engine/requirements.txt`; wiki/03 ghi chú cách chạy `pip-audit` thủ công cho các gói này.
 
 ### Sửa

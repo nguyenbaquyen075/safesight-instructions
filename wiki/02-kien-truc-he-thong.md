@@ -35,6 +35,7 @@ Cả 4 tiến trình khởi động bằng **một lệnh** `npm run dev` (`dev-
 - Server Express + Socket.IO (port **4001**).
 - Nhận detection từ Python, phát vào room `camera-<id>` và room `all-cameras` (client chỉ xem 1 camera không phải nhận dữ liệu mọi camera).
 - Relay sự kiện `voice-broadcast` (mic trên trang `/cameras` → trang `/site-speaker`).
+- `POST /announce` (`{ cameraId, text }`, header `X-AI-Engine-Secret` như `/detections`) → phát `voice-announce` vào room `camera-<id>`, trả `{ ok, listeners }` (số thiết bị loa đang nghe). Dashboard và agent dùng để cho loa đọc câu nhắc.
 
 ### 3. Next.js Dashboard — `src/`
 - Next.js 16 App Router (port **3000**), NextAuth v5 (Credentials), Prisma 7.

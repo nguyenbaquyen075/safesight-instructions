@@ -12,7 +12,7 @@ const SESSION = 's-remember';
 
 const ctx = (cameraId: string | null = CAM): ToolContext => ({
   sessionId: SESSION, taskId: null, taskKind: 'camera.digest', budget: 6, cameraId,
-  spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() },
+  spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set() },
 });
 
 const run = async (input: { text: string; replaceIndex?: number }, c: ToolContext) =>
