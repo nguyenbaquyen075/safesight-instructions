@@ -98,13 +98,15 @@ export function useViolationActions(violationId: string) {
   });
 }
 
-export function useOpenCorrectiveActions(filters?: { siteId?: string; status?: 'open' | 'overdue' }) {
+export function useOpenCorrectiveActions(filters?: { siteId?: string; status?: 'open' | 'overdue'; limit?: number }) {
   return useQuery<CorrectiveActionDTO[]>({
     queryKey: ['actions', 'list', filters],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filters?.siteId) params.append('siteId', filters.siteId);
       if (filters?.status) params.append('status', filters.status);
+      // Không truyền limit thì route trả mặc định 100 việc — trang báo cáo cần trần rõ ràng.
+      if (filters?.limit) params.append('limit', String(filters.limit));
       const res = await fetch(`/api/actions?${params.toString()}`);
       if (!res.ok) throw new Error('Không tải được việc khắc phục');
       return (await res.json()).actions;

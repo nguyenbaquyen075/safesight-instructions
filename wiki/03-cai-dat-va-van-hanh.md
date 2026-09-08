@@ -148,7 +148,7 @@ SQLITE_URL=file:./data/dev.db POSTGRES_URL="$POSTGRES_URL" npm run db:pg:migrate
 npm run db:pg:generate
 ```
 
-`scripts/sqlite-to-postgres.mjs` chép **16 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
+`scripts/sqlite-to-postgres.mjs` chép **17 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `CorrectiveAction` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
 
 Với Docker, `.env` cần thêm (xem `.env.docker.example`):
 

@@ -58,6 +58,11 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
 
+  // Xoá-rồi-tạo-lại: mỗi lần lưu vùng sinh một bộ Zone.id MỚI. Violation.zoneId khai
+  // `onDelete: SetNull` nên vi phạm zone_intrusion cũ mất liên kết vùng (về null) — thống kê
+  // theo vùng chỉ đúng cho vi phạm sinh sau lần lưu gần nhất. Chấp nhận: hình vùng đã đổi thì
+  // vi phạm cũ cũng không còn thuộc vùng đó nữa. Muốn giữ lịch sử thì phải cập nhật theo id
+  // thay vì thay cả danh sách (đổi hợp đồng của PUT).
   await prisma.$transaction([
     prisma.zone.deleteMany({ where: { cameraId: id } }),
     ...parsed.data.zones.map((zone, i) => prisma.zone.create({

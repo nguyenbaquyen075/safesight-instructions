@@ -24,6 +24,16 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Trình vẽ vùng (Cài đặt > Giám sát > sửa camera) thêm ô chọn **loại vùng** cho từng vùng và chú giải màu (vùng làm việc xanh, cảnh báo vàng, vùng cấm / dưới tải treo đỏ); `GET/PUT /api/cameras/[id]/zones` đọc và ghi mọi loại vùng (`type` mặc định `MONITORING`, PUT vẫn thay toàn bộ danh sách của camera).
 
 ### Sửa
+- Vòng sửa sau review v0.11: leo thang việc khắc phục quá hạn dùng khoá gộp riêng
+  (`subjectType: 'capa', subjectId: 'overdue'`) nên không còn bị leo thang vận hành
+  (`bridge.down`/`engine.stalled`/`model.missing`, khoá `system`) ghi đè mất lý do; tên người
+  xử lý trong lý do được cắt còn 40 ký tự, bỏ xuống dòng và ghi rõ "(tên do người dùng nhập)".
+  `scripts/sqlite-to-postgres.mjs` chép thêm bảng `CorrectiveAction` (trước đây bị bỏ sót nên
+  toàn bộ việc khắc phục biến mất khi chuyển sang PostgreSQL). Modal chi tiết vi phạm giới hạn
+  `max-h-[90vh]` và cột nội dung tự cuộn nên màn hình thấp vẫn bấm được các nút ở đáy; thẻ đánh
+  giá phán quyết agent dựng lại theo `violationId` nên không còn hiện phản hồi của vi phạm trước.
+  Trang `/reports` xin `limit=200` cho mục "Việc khắc phục" (nêu "(tối đa 200)" khi chạm trần)
+  và xếp hai nút xuất mỗi nút một dòng dưới `sm` để không bị cắt ở 390 px.
 - Leo thang vận hành của agent (`escalate` không `violationId`, kind `ops.escalate`) giờ gửi
   qua **mọi kênh** đã cấu hình trong `AlertRule` — Zalo và Webhook, chứ không chỉ Telegram
   như trước. `sendOpsAlert` (`agent/lib/notify.ts`) dùng lại `senderFor`/`recipientsForChannel`

@@ -11,6 +11,13 @@ export interface ActionContext { sessionId: string; taskId: string; repeats: Map
 const OPS_ALERT_AFTER = 3;
 /** Số việc khắc phục quá hạn được nêu tên trong lý do leo thang (phần còn lại chỉ đếm). */
 const NAMED_OVERDUE_ACTIONS = 5;
+/** Trần độ dài một tên người xử lý trong lý do leo thang. */
+const NAME_MAX = 40;
+
+// Tên người xử lý là chữ NGƯỜI DÙNG TỰ NHẬP và lý do leo thang đi thẳng vào prompt của phiên
+// nghiên cứu: gộp mọi khoảng trắng (bỏ xuống dòng) và cắt ngắn để không nhét được cả một
+// đoạn "chỉ dẫn" vào prompt; lý do cũng nói rõ phần này là dữ liệu người dùng nhập.
+const cleanName = (name: string) => name.replace(/\s+/g, ' ').trim().slice(0, NAME_MAX);
 
 async function setCameraStatus(cameraId: string, status: 'ONLINE' | 'DEGRADED' | 'OFFLINE'): Promise<boolean> {
   // Đọc trước: camera đã đúng trạng thái thì không phải hành động, và không được tiêu suất rate-limit —
@@ -67,8 +74,11 @@ export async function applyFindings(findings: Finding[], ctx: ActionContext): Pr
         const named = (await prisma.correctiveAction.findMany({
           where: { id: { in: ids } }, orderBy: { dueAt: 'asc' }, take: NAMED_OVERDUE_ACTIONS,
           select: { assigneeName: true, violationId: true },
-        })).map(a => `${a.assigneeName} (vi phạm ${a.violationId})`).join('; ');
-        await scheduleTask({ kind: 'ops.escalate', subjectType: 'system', reason: `${ids.length} việc khắc phục quá hạn chưa xong: ${named}`, dueAt: new Date(), priority: PRIORITY['ops.escalate'] });
+        })).map(a => `${cleanName(a.assigneeName)} (vi phạm ${a.violationId})`).join('; ');
+        // Khoá gộp riêng (capa/overdue): dùng chung `subjectType: 'system'` với bridge.down /
+        // engine.stalled / model.missing thì scheduleTask coi là một task và ghi đè lý do —
+        // lý do CAPA mất, mà escalatedAt đã đặt nên không bao giờ được dựng lại.
+        await scheduleTask({ kind: 'ops.escalate', subjectType: 'capa', subjectId: 'overdue', reason: `${ids.length} việc khắc phục quá hạn chưa xong (tên do người dùng nhập): ${named}`, dueAt: new Date(), priority: PRIORITY['ops.escalate'] });
         // Đánh dấu NGAY để vòng quét sau (60s) không báo lại đúng những việc này; `escalatedAt:
         // null` trong where làm bước này idempotent (chạy lại cùng finding không dời mốc cũ).
         // Đánh dấu cả việc không được nêu tên: lý do đã ghi đủ số lượng, người xử lý mở trang

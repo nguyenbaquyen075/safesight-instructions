@@ -29,6 +29,10 @@ const MAX_TABLE_ROWS = 200;
 // Danh sách việc quá hạn chỉ liệt kê 20 dòng đầu (đã sắp theo hạn cũ nhất); phần còn lại chỉ đếm.
 const MAX_OVERDUE_ROWS = 20;
 
+// Trần của GET /api/actions (MAX_LIMIT = 200). Không truyền thì route trả 100 việc và số
+// liệu "đang mở / quá hạn" theo công trường bị hụt mà không báo gì.
+const ACTIONS_LIMIT = 200;
+
 // Ngày theo giờ máy người dùng (toISOString sẽ lệch một ngày ở múi giờ +07).
 function toDateInput(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -74,7 +78,7 @@ export default function ReportsPage() {
   const { data: cameras = [] } = useCameras(siteId ? { siteId } : undefined);
   const { data: report, isLoading, isError } = useViolationReport({ siteId, cameraId, from, to });
   const { data: reportEvents = [] } = useAgentEvents({ type: 'report', limit: 1 });
-  const { data: openActions = [], isLoading: actionsLoading, isError: actionsError } = useOpenCorrectiveActions(siteId ? { siteId } : undefined);
+  const { data: openActions = [], isLoading: actionsLoading, isError: actionsError } = useOpenCorrectiveActions({ ...(siteId ? { siteId } : {}), limit: ACTIONS_LIMIT });
 
   const rows = report?.rows ?? [];
   const byCamera = report?.byCamera ?? [];
@@ -131,19 +135,20 @@ export default function ReportsPage() {
           <InputGroup label="Đến ngày">
             <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" />
           </InputGroup>
+          {/* Dưới sm mỗi nút chiếm trọn một dòng: hai nút cạnh nhau ở 390px làm nút thứ hai bị cắt. */}
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => exportCsv(rows, from, to)}
               disabled={rows.length === 0}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
+              className="basis-full grow sm:basis-0 inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--primary)] px-3 py-2 text-sm font-bold text-white transition-colors hover:bg-[var(--primary-hover)] disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Download className="w-4 h-4" /> Xuất CSV
             </button>
             <button
               type="button"
               onClick={() => window.print()}
-              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
+              className="basis-full grow sm:basis-0 inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)]"
             >
               <Printer className="w-4 h-4" /> In / PDF
             </button>
@@ -252,7 +257,7 @@ export default function ReportsPage() {
       <SettingCard>
         <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
           <h3 className="font-black flex items-center gap-2"><ClipboardCheck className="w-4 h-4" /> Việc khắc phục</h3>
-          <p className="text-xs text-[var(--text-muted)]">Việc còn mở theo công trường{siteId ? '' : ' (mọi công trường bạn được xem)'}</p>
+          <p className="text-xs text-[var(--text-muted)]">Việc còn mở theo công trường{siteId ? '' : ' (mọi công trường bạn được xem)'}{openActions.length >= ACTIONS_LIMIT ? ` (tối đa ${ACTIONS_LIMIT})` : ''}</p>
         </div>
         {actionsError ? (
           <p className="text-sm text-[var(--danger)]">Không tải được việc khắc phục. Thử lại sau.</p>

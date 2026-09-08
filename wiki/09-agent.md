@@ -113,8 +113,12 @@ finding, vì đây là một việc leo thang duy nhất cho trực vận hành.
 
 `detail` cố ý chỉ mang số đếm và id: nó được ghi nguyên vào `AgentEvent`, nên tên người xử lý
 được `applyFindings()` đọc lại từ DB đúng lúc dựng lý do. Hàm này xếp một
-`AgentTask kind=ops.escalate` với lý do nêu tên **tối đa 5** việc quá hạn lâu nhất (phần còn lại
-chỉ đếm), rồi `updateMany({ id: { in: ids }, escalatedAt: null })` đặt `escalatedAt` cho **toàn
+`AgentTask kind=ops.escalate` **với khoá gộp riêng `subjectType: 'capa', subjectId: 'overdue'`** —
+leo thang vận hành (`bridge.down`/`engine.stalled`/`model.missing`) dùng `subjectType: 'system'`,
+dùng chung khoá thì `scheduleTask` coi là một task và ghi đè lý do của nhau. Lý do nêu tên
+**tối đa 5** việc quá hạn lâu nhất (phần còn lại chỉ đếm); tên người xử lý là chữ người dùng
+tự nhập nên được gộp khoảng trắng và cắt còn **40 ký tự**, và lý do ghi rõ "(tên do người dùng
+nhập)" trước danh sách để phiên nghiên cứu không đọc nhầm phần đó là chỉ dẫn. Sau đó `updateMany({ id: { in: ids }, escalatedAt: null })` đặt `escalatedAt` cho **toàn
 bộ** việc trong finding — điều kiện `escalatedAt: null` làm bước này idempotent khi cùng một
 finding chạy lại. Đó là dấu "đã báo người rồi": vòng quét sau (60s) không còn thấy chúng nữa,
 nên mỗi việc chỉ leo thang một lần thay vì báo lại mỗi phút.

@@ -83,7 +83,8 @@ export function AgentReviewCard({ review, violationId, feedback }: { review: Age
         {(review.observations ?? []).map(o => <span key={o} className="px-2 py-0.5 rounded-md border border-[var(--border)] text-[10px] text-[var(--text-secondary)]">{OBSERVATION_LABELS[o] ?? o}</span>)}
       </div>
       <p className="text-sm text-[var(--text-primary)] break-words">{review.note}</p>
-      <ReviewFeedbackRow violationId={violationId} feedback={feedback} />
+      {/* key: state "đã gửi" khởi tạo từ prop, đổi sang vi phạm khác phải dựng lại hàng này. */}
+      <ReviewFeedbackRow key={violationId} violationId={violationId} feedback={feedback} />
     </div>
   );
 }
