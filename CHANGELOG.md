@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- `ai-engine/requirements.txt` ghim phiên bản các gói Python engine dùng trực tiếp (`torch`, `torchvision`, `ultralytics`, `opencv-python`, `numpy`, `requests`) theo `.venv` của operator; README chuyển sang cài bằng `pip install -r ai-engine/requirements.txt`; wiki/03 ghi chú cách chạy `pip-audit` thủ công cho các gói này.
+
 ## [0.10.0] - 2026-09-08
 
 ### Thêm

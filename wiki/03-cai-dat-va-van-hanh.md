@@ -7,7 +7,8 @@
 
 **Python** (chỉ cần khi chạy AI)
 - Python >= 3.9 (venv của dự án đang là 3.14)
-- Thư viện: `ultralytics`, `opencv-python`, `requests` (torch được ultralytics kéo theo)
+- Thư viện: `ultralytics`, `opencv-python`, `requests` (torch được ultralytics kéo theo); phiên bản ghim trong `ai-engine/requirements.txt`
+- `pip-audit` chưa được cài trong `.venv`; kiểm tra lỗ hổng cho các gói ghim thì chạy tay: `.venv/bin/pip install pip-audit && .venv/bin/pip-audit -r ai-engine/requirements.txt`
 
 ## Cài đặt
 
