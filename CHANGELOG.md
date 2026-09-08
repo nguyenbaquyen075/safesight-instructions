@@ -15,6 +15,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Test agent 45 → 66: hạn mức token ngày (`usage`), tool `escalate`, gộp task `enqueueAgentTask`, trạng thái vi phạm chữ hoa, PRAGMA SQLite, client OpenAI, kiểm danh tính pid, probe/sweep, cleanup.
 
 ### Thay đổi
+- Dependency: `next` 16.3.4, `next-auth` 5.0.0-beta.32, `@auth/prisma-adapter` 2.11.3 (vá `@auth/core` homoglyph/fail-open), `sharp` 0.35.4, `prisma`/`@prisma/client` 7.10.0, `npm audit fix` cho engine.io/hono/js-yaml/brace-expansion/browserslist: 27 advisory → 4 (chỉ còn chuỗi `@prisma/config`/`mysql2`/`deepmerge-ts` đòi hạ Prisma về 6.x, bỏ qua).
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
 - API vi phạm trả thêm `occurrenceCount`; mapping DTO gom về `src/lib/violation-shape.ts`; bỏ độ trễ giả 800ms ở `GET /api/violations`.
 - Badge "Thông báo" ở Sidebar đếm vi phạm `open` từ DB thay vì `localStorage` + hằng 11; trang Công trường không ghi thông báo vào `safesight_alerts` nữa.

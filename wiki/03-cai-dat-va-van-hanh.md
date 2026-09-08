@@ -103,6 +103,10 @@ Bridge giờ cũng đọc `AI_ENGINE_SECRET` (qua `env_file: .env`) và **bắt 
 publish cổng 4001 ra ngoài là mở cửa cho ai cũng bơm detection giả. Nếu chưa cấu hình secret, bridge vẫn
 chạy (chỉ log cảnh báo) để dev cục bộ không bị chặn.
 
+## Lưu ý Prisma 7.10 với trợ lý AI
+
+Từ Prisma CLI 7.10, `prisma db push --accept-data-loss` (nằm trong `npm run test:agent`, chạy trên file tạm `agent-test.db`) từ chối chạy khi phát hiện được gọi bởi Claude Code và yêu cầu người vận hành đồng ý rõ ràng; phiên AI phải đặt biến `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` đúng nội dung câu đồng ý. Chạy tay trong terminal hoặc trên CI không bị ảnh hưởng.
+
 ## Các lệnh npm
 
 | Lệnh | Tác dụng |
