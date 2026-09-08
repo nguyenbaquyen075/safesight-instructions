@@ -13,7 +13,8 @@ import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
 from clips import FrameRing, start_clip
-from zones import DangerZone, IntrusionTracker, intrusions, parse_polygon
+from zones import (DangerZone, IntrusionTracker, danger_zones_for, intrusions,
+                   parse_polygon, zones_for_stream)
 from env_local import load_dotenv_local
 
 load_dotenv_local()
@@ -327,25 +328,6 @@ def load_zones():
             cam['monitoring'].append(polygon)
     return zones
 
-
-def zones_for_stream(cam_ids, zones_by_camera):
-    """Vùng LÀM VIỆC áp cho MỘT luồng video. Một luồng có thể phục vụ nhiều camera demo dùng
-    chung file video: detections tính một lần rồi gửi cho tất cả, nên chỉ cần MỘT
-    camera trong nhóm chưa khai vùng là phải xét cả khung (None), không thì camera
-    đó mất người."""
-    polygons = []
-    for cam_id in cam_ids:
-        cam_zones = (zones_by_camera.get(cam_id) or {}).get('monitoring')
-        if not cam_zones:
-            return None
-        polygons.extend(cam_zones)
-    return polygons or None
-
-
-def danger_zones_for(cam_id, zones_by_camera):
-    """Vùng nguy hiểm của ĐÚNG một camera — không gộp theo luồng như vùng làm việc:
-    zoneId ghi vào Violation phải thuộc chính camera đang báo."""
-    return (zones_by_camera.get(cam_id) or {}).get('danger') or []
 
 class RTSPStream:
     """Đọc luồng RTSP (camera IP thật) trong 1 thread riêng, luôn giữ frame MỚI
@@ -741,7 +723,11 @@ def run_inference():
                 for person, zone_id, zone_type, count in intrusion_tracker.update(
                         cam_id, found, lambda p: p["detection"].get("trackId")):
                     vtype, severity = ZONE_VIOLATION_MAP[zone_type]
+                    # Nhãn VẼ LÊN ẢNH phải không dấu: cv2.putText chỉ có font Hershey
+                    # (ASCII), chữ tiếng Việt ra ký tự rác. Nhãn tiếng Việt vẫn được
+                    # gửi trong bboxData[].label để dashboard hiện đúng.
                     label = "TẢI TREO" if vtype == "suspended_load" else "VÙNG CẤM"
+                    label_ascii = "TAI TREO" if vtype == "suspended_load" else "VUNG CAM"
                     if not os.path.exists(SNAPSHOT_DIR):
                         os.makedirs(SNAPSHOT_DIR)
                     person_det = person["detection"]
@@ -750,7 +736,7 @@ def run_inference():
                     # đứng trong vùng cấm -> hai ảnh khác nhau, không đè lên nhau.
                     filename = f"violation_{cam_id}_{timestamp}_{person_det.get('trackId')}-zone.jpg"
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}",
-                                _draw_violation_box(frame.copy(), person_det["bbox"], label))
+                                _draw_violation_box(frame.copy(), person_det["bbox"], label_ascii))
                     report_violation(cam_id, {
                         "bbox": person_det["bbox"],
                         "label": label,

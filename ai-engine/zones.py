@@ -80,6 +80,34 @@ def filter_persons_in_zones(persons, zones, width, height):
 DangerZone = namedtuple('DangerZone', 'zone_id type polygon')
 
 
+def zones_for_stream(cam_ids, zones_by_camera):
+    """Vùng GIỮ người cho MỘT luồng video -> [đa giác] hoặc None (= xét cả khung).
+
+    Một luồng có thể phục vụ nhiều camera demo dùng chung file video: detections
+    tính một lần rồi gửi cho tất cả, nên chỉ cần MỘT camera trong nhóm chưa khai
+    vùng làm việc là phải xét cả khung, không thì camera đó mất người.
+
+    Vùng NGUY HIỂM cũng nằm trong tập giữ: người đứng trong vùng cấm mà bị lọc mất
+    ở process_frame thì intrusions() không bao giờ nhìn thấy họ. Hệ quả: người chỉ
+    đứng trong vùng cấm cũng bị xét PPE và được tính vào ObservationStat.
+    """
+    polygons = []
+    for cam_id in cam_ids:
+        cam = zones_by_camera.get(cam_id) or {}
+        monitoring = cam.get('monitoring')
+        if not monitoring:
+            return None
+        polygons.extend(monitoring)
+        polygons.extend(z[2] for z in cam.get('danger') or [])
+    return polygons or None
+
+
+def danger_zones_for(cam_id, zones_by_camera):
+    """Vùng nguy hiểm của ĐÚNG một camera — không gộp theo luồng như vùng giữ người:
+    zoneId ghi vào Violation phải thuộc chính camera đang báo."""
+    return (zones_by_camera.get(cam_id) or {}).get('danger') or []
+
+
 def intrusions(persons, danger_zones, width, height):
     """Người đang đứng trong vùng nguy hiểm -> [(person, zone_id, type)].
 
@@ -105,6 +133,13 @@ class IntrusionTracker:
     trong vùng liên tục >= confirm_seconds mới chốt, giống CONFIRM_DELAY của PPE.
     Còn đứng đó thì cứ repeat_seconds báo lại một lần với occurrenceCount tăng dần
     (khớp cách REPORT_INTERVAL của yolo_inference.py báo lại vi phạm PPE).
+
+    "Liên tục" có ÂN HẠN bằng đúng confirm_seconds: engine chỉ chạy ~4 fps và model
+    trượt người vài khung là chuyện thường — xoá trạng thái ngay khi vắng một khung
+    thì đồng hồ 3 giây không bao giờ đếm xong.
+
+    Giới hạn đã biết: BoT-SORT cấp lại một trackId cũ cho người khác trong cùng vùng
+    thì người mới thừa hưởng mốc `since` của người cũ và có thể bị chốt sớm.
     """
 
     def __init__(self, confirm_seconds=3.0, repeat_seconds=60.0, now=time.time):
@@ -126,8 +161,9 @@ class IntrusionTracker:
             seen.add(key)
             state = self._state.get(key)
             if state is None:
-                self._state[key] = {'since': now, 'last': 0.0, 'count': 0}
+                self._state[key] = {'since': now, 'seen_at': now, 'last': 0.0, 'count': 0}
                 continue
+            state['seen_at'] = now
             if now - state['since'] < self.confirm_seconds:
                 continue
             if state['count'] and now - state['last'] < self.repeat_seconds:
@@ -135,8 +171,11 @@ class IntrusionTracker:
             state['count'] += 1
             state['last'] = now
             confirmed.append((person, zone_id, zone_type, state['count']))
-        # Rời vùng (hoặc rời khung hình) -> quên luôn, lần sau bước vào phải đủ 3s lại từ đầu.
-        # Chỉ đụng trạng thái CỦA camera này: các camera khác cập nhật ở lượt riêng.
-        for key in [k for k in self._state if k[0] == cam_id and k not in seen]:
+        # Vắng mặt lâu hơn ân hạn = đã rời vùng -> quên luôn, lần sau bước vào phải
+        # đủ confirm_seconds lại từ đầu. Chỉ đụng trạng thái CỦA camera này: các
+        # camera khác cập nhật ở lượt riêng.
+        for key in [k for k, st in self._state.items()
+                    if k[0] == cam_id and k not in seen
+                    and now - st['seen_at'] > self.confirm_seconds]:
             del self._state[key]
         return confirmed

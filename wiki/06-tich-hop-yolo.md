@@ -67,7 +67,12 @@ PPE, vi phạm, snapshot (giữ nguyên)                           │
   thread phụ nên không làm chậm vòng lặp). Chưa chạy engine thì chưa có ảnh và trình
   vẽ hiện trạng thái rỗng.
 - Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
-  vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
+  vùng làm việc là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
+- Tập GIỮ người của một luồng = vùng làm việc **hợp** vùng nguy hiểm của các camera đó
+  (`zones_for_stream` trong `zones.py`, có test riêng). Nếu không hợp vào thì người đứng
+  trong vùng cấm bị lọc mất ngay ở `process_frame` và `intrusions()` không bao giờ thấy họ.
+  Hệ quả (cố ý): người **chỉ** đứng trong vùng nguy hiểm cũng bị xét PPE và được tính vào
+  `ObservationStat` — họ đang ở trong phạm vi công trường nên đây là điều mong muốn.
 - Vùng **nguy hiểm** (`RESTRICTED`/`WARNING`/`SUSPENDED_LOAD`) không lọc ai cả: chỉ cần
   điểm chân nằm trong vùng **liên tục 3 giây** là ghi vi phạm (`zone_intrusion` /
   `suspended_load`, xem bảng `ZONE_VIOLATION_MAP` ở wiki/04), kèm `zoneId` và ảnh
@@ -75,9 +80,14 @@ PPE, vi phạm, snapshot (giữ nguyên)                           │
   mỗi 60 giây với `occurrenceCount` tăng dần; rời vùng thì đếm lại từ đầu.
 - Vùng nguy hiểm xét theo **từng camera** (không gộp theo luồng như vùng làm việc) vì
   `zoneId` ghi vào vi phạm phải thuộc đúng camera đó.
-- Giới hạn hiện tại: người được lấy từ kết quả `process_frame`, tức là **đã bị lọc theo
-  vùng làm việc**. Camera vừa khai vùng làm việc vừa khai vùng cấm thì vùng cấm phải nằm
-  TRONG vùng làm việc, không thì không ai bị bắt.
+- Người được lấy từ kết quả `process_frame` (không sửa `ppe_tracker.py`). Vùng cấm nằm
+  ngoài vùng làm việc vẫn bắt được nhờ phép hợp ở trên.
+- "Liên tục 3 giây" có **ân hạn 3 giây**: model trượt người vài khung (engine chỉ ~4 fps)
+  không làm đồng hồ đếm lại từ đầu; vắng mặt lâu hơn ân hạn mới coi là đã rời vùng.
+- Giới hạn đã biết: nếu BoT-SORT cấp lại một `trackId` cũ cho người khác trong cùng vùng,
+  người mới thừa hưởng mốc thời gian của người cũ và có thể bị chốt sớm.
+- Nhãn vẽ lên ảnh bằng chứng là ASCII (`VUNG CAM` / `TAI TREO`) vì `cv2.putText` chỉ có
+  font Hershey không dấu; nhãn tiếng Việt có dấu nằm trong `bboxData[].label` của vi phạm.
 
 ## Clip bằng chứng cho mỗi vi phạm
 
