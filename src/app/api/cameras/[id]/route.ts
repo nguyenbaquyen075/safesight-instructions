@@ -103,5 +103,8 @@ export async function DELETE(
   // schema Prisma) và AI engine sẽ bỏ qua video này ở lần khởi động lại tiếp theo
   // (xem yolo_inference.py: load_video_camera_map lọc theo camera còn tồn tại trong DB).
   await prisma.camera.delete({ where: { id } });
+  // CameraAgent.id = Camera.id nhưng cố tình KHÔNG khai quan hệ Prisma (spec §2, giữ
+  // SQLite đơn giản) nên phải tự xoá, không thì subagent cũ sống lại khi id được dùng lại.
+  await prisma.cameraAgent.deleteMany({ where: { id } });
   return NextResponse.json({ success: true });
 }

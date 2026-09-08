@@ -29,3 +29,19 @@ export const OBSERVATION_LABELS: Record<string, string> = {
   'snapshot.person-outside-work-zone': 'người ngoài khu làm việc',
   'contradiction': 'bằng chứng mâu thuẫn',
 };
+
+// Một ghi chú trí nhớ camera (khớp CameraMemoryNote trong agent/lib/camera-agent.ts).
+export interface CameraMemoryNote { at: string; text: string; sessionId: string }
+
+// Một subagent camera cho UI: cài đặt + mức dùng + vài số liệu 24h của camera đó.
+export interface CameraAgentView {
+  cameraId: string; name: string; siteId: string; siteName: string; cameraStatus: string;
+  exists: boolean; // false = chưa có dòng CameraAgent, đang hiển thị giá trị mặc định
+  isEnabled: boolean; digestEveryMin: number; dailyTokenCap: number; tokensUsedToday: number;
+  lastDigestAt: string | null; memory: CameraMemoryNote[];
+  openViolations: number; reviewed24h: number; falsePositiveRate24h: number;
+}
+
+export interface CameraAgentUpdate {
+  isEnabled?: boolean; digestEveryMin?: number; dailyTokenCap?: number; clearMemory?: true;
+}

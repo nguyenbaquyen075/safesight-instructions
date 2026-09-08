@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import type { AgentEventView, AgentSettingsView, AgentTaskView } from '@/types/agent';
+import type { AgentEventView, AgentSettingsView, AgentTaskView, CameraAgentUpdate, CameraAgentView } from '@/types/agent';
 
 const qs = (o: Record<string, string | number | undefined>) => new URLSearchParams(Object.entries(o).filter(([, v]) => v !== undefined && v !== '').map(([k, v]) => [k, String(v)])).toString();
 
@@ -38,5 +38,39 @@ export function useAskAgent() {
   return useMutation({
     mutationFn: async (data: { message: string; subjectType?: string; subjectId?: string; sessionId?: string }) => { const r = await fetch('/api/agent/ask', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) }); if (!r.ok) throw new Error('Gửi câu hỏi thất bại'); return r.json() as Promise<{ sessionId: string; taskId: string }>; },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['agent-events'] }); qc.invalidateQueries({ queryKey: ['agent-tasks'] }); },
+  });
+}
+
+// Subagent theo camera: danh sách đủ cho cả lưới thẻ ở /agent và panel trong modal camera
+// (lọc theo cameraId ở phía component thay vì thêm một route chi tiết).
+export function useCameraAgents() {
+  return useQuery<CameraAgentView[]>({
+    queryKey: ['camera-agents'],
+    queryFn: async () => { const r = await fetch('/api/agent/cameras'); if (!r.ok) throw new Error('Không tải được subagent camera'); return r.json(); },
+    refetchInterval: 15_000,
+  });
+}
+
+export function useSaveCameraAgent() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ cameraId, ...data }: CameraAgentUpdate & { cameraId: string }) => {
+      const r = await fetch(`/api/agent/cameras/${cameraId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
+      if (!r.ok) throw new Error('Lưu subagent camera thất bại');
+      return r.json() as Promise<Pick<CameraAgentView, 'isEnabled' | 'digestEveryMin' | 'dailyTokenCap' | 'memory'>>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['camera-agents'] }),
+  });
+}
+
+export function useDigestCamera() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (cameraId: string) => {
+      const r = await fetch(`/api/agent/cameras/${cameraId}/digest`, { method: 'POST' });
+      if (!r.ok) throw new Error('Không xếp được lượt tổng hợp');
+      return r.json() as Promise<{ taskId: string }>;
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['agent-tasks'] }),
   });
 }
