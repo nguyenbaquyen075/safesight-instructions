@@ -1,6 +1,6 @@
 # 04 — Danh sách chức năng
 
-Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tìm / xem / sửa / xoá), **Advanced** (kỹ thuật cao), **Other** (nhập/xuất, thông báo, báo cáo…). Size: S / M / L. Phase: `v0.6` = đã có; `P1` / `P2` / `P3` = ưu tiên trong [lộ trình](../../wiki/07-lo-trinh-phat-trien.md).
+Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tìm / xem / sửa / xoá), **Advanced** (kỹ thuật cao), **Other** (nhập/xuất, thông báo, báo cáo…). Size: S / M / L. Phase: `v0.6` = đã có; `v0.8` = subagent theo camera (đã có, sau v0.6); `P1` / `P2` / `P3` = ưu tiên trong [lộ trình](../../wiki/07-lo-trinh-phat-trien.md).
 
 | Trace code | Data object | Module | Function | Size | Type | Description / Objective / Remarks | Phase |
 |---|---|---|---|---|---|---|---|
@@ -53,6 +53,9 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-AGENT-05 | AgentEvent | Agent | Hỏi đáp về hệ thống / vi phạm / camera / công trường | M | Advanced | Trang `/agent` và tab Agent trong modal | v0.6 |
 | F-AGENT-06 | AgentSettings | Agent | Bật / tắt agent, chọn model, trần token | S | Basic | Kill switch; tắt thì chỉ ghi nhận | v0.6 |
 | F-AGENT-07 | AgentEvent | Agent | Xem dòng thời gian và hàng đợi | S | Basic | Audit mọi tool call, verdict, action | v0.6 |
+| F-AGENT-08 | CameraAgent | Agent | Bật / tắt subagent camera, đặt nhịp tổng hợp và trần token riêng | M | Basic | Thẻ camera trên `/agent`; nhịp 5–1440 phút; trần camera kiểm sau kill switch và trần toàn cục | v0.8 |
+| F-AGENT-09 | CameraAgent | Agent | Trí nhớ theo camera | M | Advanced | Tool `remember_camera` ghi tối đa 20 ghi chú × 300 ký tự; hiện trên thẻ và panel camera; xoá có xác nhận | v0.8 |
+| F-AGENT-10 | AgentTask | Agent | Tổng hợp ngay theo camera | S | Workflow | Xếp `camera.digest` (gộp với lượt đang chờ) + poke; trả `taskId` | v0.8 |
 | F-RF-01 | — | Kiểm thử Roboflow | Đối chiếu model cloud trên ảnh tĩnh | S | Other | Kéo thả ảnh, 2 workflow, mỗi lần 1 credit | v0.6 |
 | F-USER-01 | User | Người dùng | Xem danh sách người dùng | S | Basic | | v0.6 |
 | F-USER-02 | User | Người dùng | Sửa vai trò và công trường được gán | S | Basic | `role`, `assignedSites` | v0.6 |

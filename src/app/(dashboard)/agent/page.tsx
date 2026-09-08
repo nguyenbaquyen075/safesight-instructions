@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT
 'use client';
 import { useState } from 'react';
-import { Bot, Activity, ListTodo, Settings2 } from 'lucide-react';
+import { Bot, Activity, ListTodo, Settings2, Cctv } from 'lucide-react';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { AgentTimeline } from '@/components/agent/AgentTimeline';
 import { AskAgentBox } from '@/components/agent/AskAgentBox';
-import { useAgentEvents, useAgentSettings, useAgentTasks, useSaveAgentSettings } from '@/hooks/use-agent';
+import { CameraAgentCard } from '@/components/agent/CameraAgentCard';
+import { useAgentEvents, useAgentSettings, useAgentTasks, useCameraAgents, useSaveAgentSettings } from '@/hooks/use-agent';
 import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
@@ -19,6 +20,7 @@ export default function AgentPage() {
   const { data: open = [], isLoading: tasksLoading, isError: tasksError } = useAgentTasks({ status: 'open', limit: 30 });
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = useAgentSettings();
   const save = useSaveAgentSettings();
+  const { data: cameraAgents = [], isLoading: camerasLoading, isError: camerasError } = useCameraAgents();
   const sweep = events.find(e => e.type === 'health');
 
   const update = (data: Parameters<typeof save.mutate>[0]) => save.mutate(data, { onSuccess: () => toast('Đã lưu cài đặt agent', 'success'), onError: () => toast('Lưu thất bại', 'error') });
@@ -71,6 +73,23 @@ export default function AgentPage() {
             )}
           </SettingCard>
         </div>
+      </div>
+
+      <div>
+        <div className="flex items-center gap-2 mb-4">
+          <Cctv className="w-4 h-4 text-[var(--text-muted)]" />
+          <div className="min-w-0">
+            <h2 className="text-xl font-bold text-[var(--text-primary)]">Subagent theo camera</h2>
+            <p className="text-sm text-[var(--text-muted)]">Mỗi camera có một subagent riêng: bật/tắt, nhịp tổng hợp, trần token và trí nhớ tích luỹ.</p>
+          </div>
+        </div>
+        {camerasLoading
+          ? <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{[0, 1, 2].map(i => <div key={i} className="h-72 rounded-2xl bg-[var(--surface-elevated)] animate-pulse" />)}</div>
+          : camerasError
+            ? <p className="text-sm text-[var(--danger)]">Không tải được subagent camera.</p>
+            : cameraAgents.length === 0
+              ? <p className="text-sm text-[var(--text-muted)]">Chưa có camera nào trong phạm vi của bạn.</p>
+              : <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">{cameraAgents.map(a => <CameraAgentCard key={a.cameraId} agent={a} />)}</div>}
       </div>
 
       <SettingCard>

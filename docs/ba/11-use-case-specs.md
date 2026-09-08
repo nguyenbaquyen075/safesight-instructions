@@ -187,6 +187,21 @@ Mỗi use case gồm Summary và Business information. Mã use case theo [09-use
 | Trigger | Trang `/agent` |
 | Post-condition | `AgentSettings` (1 dòng, id cố định) cập nhật; agent đọc lại ở tick kế tiếp (≤ 20 giây) |
 
+## UC-28 Cấu hình subagent camera
+
+| Trường | Nội dung |
+|---|---|
+| Use case name | Cấu hình subagent camera |
+| Use case ID | UC-28 |
+| Description | Quản trị bật / tắt subagent của từng camera, đặt nhịp tổng hợp và trần token riêng, xem và xoá trí nhớ camera, hoặc yêu cầu tổng hợp ngay |
+| Actor | Quản trị tổ chức, Quản trị hệ thống; Quản lý công trường chỉ được "Tổng hợp ngay" trong công trường được gán |
+| Priority | Trung bình |
+| Trigger | Mục "Subagent theo camera" trên trang `/agent`, hoặc tab Agent trong modal camera (chỉ xem) |
+| Pre-condition | Đăng nhập, camera nằm trong phạm vi site được phép |
+| Post-condition | `CameraAgent` được upsert; `AgentEvent action { action: 'camera-agent.settings', changes, userId }` được ghi; "Tổng hợp ngay" xếp `AgentTask kind=camera.digest` và trả `taskId` |
+
+**Business rule:** kill switch toàn cục thắng mọi thứ, tắt subagent chỉ ảnh hưởng camera đó (vi phạm của camera tắt vẫn được ghi nhận là "bỏ qua" kèm lý do). Trần token camera mặc định 300.000/ngày, kiểm **sau** trần toàn cục 2.000.000/ngày; chạm trần thì phiên của camera đó dừng tới nửa đêm. `remember_camera` tối đa 3 lần/phiên; trí nhớ giữ tối đa 20 ghi chú, mỗi ghi chú ≤ 300 ký tự, ghi chú cũ nhất bị đẩy ra. Mọi thay đổi cài đặt subagent camera đều ghi `AgentEvent action` kèm `userId`.
+
 ## Use case danh mục (rút gọn)
 
 | ID | Use case | Actor | Trigger | Post-condition | Business rule |

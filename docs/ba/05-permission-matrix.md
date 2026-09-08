@@ -39,6 +39,9 @@
 | Xem trang Agent, hỏi đáp toàn hệ thống | O | O | O | X | X | X | X |
 | Hỏi agent trong modal vi phạm / camera / công trường | O | O | O | O | O | X | X |
 | Bật / tắt agent, chọn model, trần token | O | O | X | X | X | X | X |
+| Bật / tắt và cài đặt subagent camera (nhịp tổng hợp, trần token, xoá trí nhớ) | O | O | X | X | X | X | X |
+| Tổng hợp ngay theo camera | O | O | O* | X | X | X | X |
+| Xem thẻ subagent camera và trí nhớ camera | O | O | O***** | O***** | O***** | X | X |
 | Quét sức khoẻ, tự khắc phục, leo thang | X | X | X | X | X | X | O** |
 | Kiểm thử Roboflow (tốn credit) | O | O | X | X | X | X | X |
 | Xem / sửa / xoá người dùng | O | O | X | X | X | X | X |
@@ -50,5 +53,6 @@
 - `O**` Agent: chỉ đổi trạng thái camera (`ONLINE` / `DEGRADED` / `OFFLINE`) và khởi động lại engine, dọn snapshot trong giới hạn tần suất `LIMITS`; không tạo/xoá camera. Kill switch tắt thì chỉ ghi nhận.
 - `O***` Agent: chỉ tự chuyển sang `false_positive` khi band VERIFIED báo oan; các band khác chỉ ghi phán quyết.
 - `O****` Gửi Telegram: hệ thống gửi theo quy tắc khi API nhận vi phạm; agent leo thang khi VERIFIED thật và hết cooldown.
+- `O*****` Xem subagent camera: `GET /api/agent/cameras` chỉ trả camera thuộc `allowedSiteIds` của người dùng. Quản trị hệ thống / tổ chức / quản lý công trường xem lưới thẻ trên `/agent`; cán bộ an toàn và giám sát viên không vào được `/agent` nên chỉ xem qua tab Agent trong modal camera.
 
 **Điểm cần lưu ý cho giai đoạn sau:** API vi phạm/camera/công trường đã yêu cầu đăng nhập và lọc theo `assignedSites`, nhưng chưa phân biệt vai trò trong cùng phạm vi site; nếu nghiệp vụ cần hạn chế "Xoá vi phạm" cho quản trị, đưa vào sprint sau (xem [15-implementation-rules.md](15-implementation-rules.md)).
