@@ -33,6 +33,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-VIO-03 | Violation | Vi phạm | Cập nhật trạng thái vi phạm | S | Workflow | open → under_review → resolved / false_positive | v0.6 |
 | F-VIO-04 | Violation | Vi phạm | Xoá vi phạm | S | Basic | Có xác nhận, không hoàn tác | v0.6 |
 | F-VIO-05 | Violation | Vi phạm | Tiếp nhận vi phạm từ AI | S | Workflow | `POST /api/violations`, header `X-AI-Engine-Secret` | v0.6 |
+| F-VIO-06 | CorrectiveAction | Vi phạm | Giao và theo dõi việc khắc phục | M | Workflow | Nút "Giao xử lý" trong modal vi phạm (người xử lý, mô tả, hạn mặc định +24 h); nút "Đã khắc phục" kèm ghi chú bằng chứng; mục "Việc khắc phục" ở `/reports`; agent leo thang việc quá hạn một lần (`capa.overdue`) | v0.11 |
 | F-ALR-01 | Alert | Thông báo | Xem danh sách cảnh báo | S | Basic | Sinh từ vi phạm thật | v0.6 |
 | F-ALR-02 | Alert | Thông báo | Xác nhận cảnh báo | S | Workflow | new → acknowledged | v0.6 |
 | F-ALR-03 | Alert | Thông báo | Đánh dấu đã đọc tất cả | S | Other | Chưa có | P2 |

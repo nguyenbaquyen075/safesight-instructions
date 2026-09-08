@@ -4,11 +4,13 @@ import { emit } from '../lib/audit';
 import { LIMITS, rateLimit } from '../lib/guard';
 import { PRIORITY, scheduleTask } from '../lib/tasks';
 import { sendOpsAlert } from '../lib/notify';
-import type { Finding } from './health';
+import type { Finding, OverdueAction } from './health';
 
 export interface ActionContext { sessionId: string; taskId: string; repeats: Map<string, number>; paused: boolean }
 
 const OPS_ALERT_AFTER = 3;
+/** Số việc khắc phục quá hạn được nêu tên trong lý do leo thang (phần còn lại chỉ đếm). */
+const NAMED_OVERDUE_ACTIONS = 5;
 
 async function setCameraStatus(cameraId: string, status: 'ONLINE' | 'DEGRADED' | 'OFFLINE'): Promise<boolean> {
   // Đọc trước: camera đã đúng trạng thái thì không phải hành động, và không được tiêu suất rate-limit —
@@ -55,6 +57,20 @@ export async function applyFindings(findings: Finding[], ctx: ActionContext): Pr
       case 'disk.pressure': {
         await scheduleTask({ kind: 'snapshot.cleanup', subjectType: 'system', reason: `Ảnh vi phạm ${Math.round(Number(f.detail.bytes) / 1048576)}MB vượt trần ${f.detail.maxMb}MB`, dueAt: new Date(), priority: PRIORITY['snapshot.cleanup'] });
         done.push('xếp lịch dọn ảnh'); mine.push('xếp lịch dọn ảnh');
+        break;
+      }
+      case 'capa.overdue': {
+        const overdue = (f.detail.actions ?? []) as OverdueAction[];
+        if (overdue.length === 0) break;
+        const named = overdue.slice(0, NAMED_OVERDUE_ACTIONS)
+          .map(a => `${a.assigneeName} (vi phạm ${a.violationId})`)
+          .join('; ');
+        await scheduleTask({ kind: 'ops.escalate', subjectType: 'system', reason: `${overdue.length} việc khắc phục quá hạn chưa xong: ${named}`, dueAt: new Date(), priority: PRIORITY['ops.escalate'] });
+        // Đánh dấu NGAY để vòng quét sau (60s) không báo lại đúng những việc này. Đánh dấu cả
+        // những việc không được nêu tên: task leo thang đã tính đủ số lượng, người xử lý mở
+        // trang báo cáo là thấy hết.
+        await prisma.correctiveAction.updateMany({ where: { id: { in: overdue.map(a => a.id) } }, data: { escalatedAt: new Date() } });
+        done.push(`leo thang ${overdue.length} việc khắc phục quá hạn`); mine.push(`leo thang ${overdue.length} việc khắc phục quá hạn`);
         break;
       }
       case 'bridge.down':

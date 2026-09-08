@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MIT
 
 import { useMemo, useState } from 'react';
-import { Download, FileText, Printer } from 'lucide-react';
+import { ClipboardCheck, Download, FileText, Printer } from 'lucide-react';
 import { SectionHeader, SettingCard, InputGroup } from '@/components/settings/ui';
 import { useSites } from '@/hooks/use-sites';
 import { useCameras } from '@/hooks/use-cameras';
 import { useViolationReport } from '@/hooks/use-reports';
 import { useAgentEvents } from '@/hooks/use-agent';
+import { useOpenCorrectiveActions } from '@/hooks/use-violations';
 import { getViolationTypeLabel } from '@/lib/utils';
 import { ViolationStatus } from '@/types/enums';
 import type { Violation } from '@/types/models';
@@ -24,6 +25,9 @@ const SEVERITY_LABELS: Record<string, string> = { critical: 'Nghiêm trọng', h
 // ngày rộng; CSV vẫn xuất đủ số dòng API trả về. Cần xem hết trên màn hình thì
 // thêm phân trang sau.
 const MAX_TABLE_ROWS = 200;
+
+// Danh sách việc quá hạn chỉ liệt kê 20 dòng đầu (đã sắp theo hạn cũ nhất); phần còn lại chỉ đếm.
+const MAX_OVERDUE_ROWS = 20;
 
 // Ngày theo giờ máy người dùng (toISOString sẽ lệch một ngày ở múi giờ +07).
 function toDateInput(d: Date): string {
@@ -70,6 +74,7 @@ export default function ReportsPage() {
   const { data: cameras = [] } = useCameras(siteId ? { siteId } : undefined);
   const { data: report, isLoading, isError } = useViolationReport({ siteId, cameraId, from, to });
   const { data: reportEvents = [] } = useAgentEvents({ type: 'report', limit: 1 });
+  const { data: openActions = [], isLoading: actionsLoading, isError: actionsError } = useOpenCorrectiveActions(siteId ? { siteId } : undefined);
 
   const rows = report?.rows ?? [];
   const byCamera = report?.byCamera ?? [];
@@ -77,6 +82,20 @@ export default function ReportsPage() {
     (acc, r) => ({ total: acc.total + r.total, real: acc.real + r.real, falsePositive: acc.falsePositive + r.falsePositive, open: acc.open + r.open }),
     { total: 0, real: 0, falsePositive: 0, open: 0 },
   );
+  const siteNameById = useMemo(() => new Map(sites.map(s => [s.id, s.name])), [sites]);
+  // Gộp theo công trường ở client: API đã lọc theo quyền và chỉ trả việc còn mở (tối đa 200 dòng).
+  const actionsBySite = useMemo(() => {
+    const bySite = new Map<string, { siteId: string; open: number; overdue: number }>();
+    for (const a of openActions) {
+      const row = bySite.get(a.siteId) ?? { siteId: a.siteId, open: 0, overdue: 0 };
+      row.open += 1;
+      if (a.overdue) row.overdue += 1;
+      bySite.set(a.siteId, row);
+    }
+    return [...bySite.values()].sort((a, b) => b.overdue - a.overdue || b.open - a.open);
+  }, [openActions]);
+  const overdueActions = useMemo(() => openActions.filter(a => a.overdue), [openActions]);
+
   const weekly = reportEvents[0];
   const weeklyText = typeof weekly?.data.text === 'string' ? weekly.data.text : '';
 
@@ -217,6 +236,60 @@ export default function ReportsPage() {
           </SettingCard>
         </>
       )}
+
+      <SettingCard>
+        <div className="flex items-baseline justify-between flex-wrap gap-2 mb-4">
+          <h3 className="font-black flex items-center gap-2"><ClipboardCheck className="w-4 h-4" /> Việc khắc phục</h3>
+          <p className="text-xs text-[var(--text-muted)]">Việc còn mở theo công trường{siteId ? '' : ' (mọi công trường bạn được xem)'}</p>
+        </div>
+        {actionsError ? (
+          <p className="text-sm text-[var(--danger)]">Không tải được việc khắc phục. Thử lại sau.</p>
+        ) : actionsLoading ? (
+          <div className="h-24 rounded-2xl bg-[var(--surface-elevated)] animate-pulse" />
+        ) : actionsBySite.length === 0 ? (
+          <p className="text-sm text-[var(--text-muted)]">Không còn việc khắc phục nào đang mở.</p>
+        ) : (
+          <div className="space-y-5">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[420px] text-sm">
+                <thead>
+                  <tr className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] border-b border-[var(--border)]">
+                    <th className="text-left py-2 pr-4">Công trường</th>
+                    <th className="text-right py-2 pr-4">Đang mở</th>
+                    <th className="text-right py-2">Quá hạn</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {actionsBySite.map(r => (
+                    <tr key={r.siteId} className="data-row border-b border-[var(--border-subtle)]">
+                      <td className="py-2 pr-4 font-medium text-[var(--text-primary)]">{siteNameById.get(r.siteId) ?? r.siteId}</td>
+                      <td className="py-2 pr-4 text-right font-bold">{r.open}</td>
+                      <td className="py-2 text-right font-bold text-[var(--danger)]">{r.overdue}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {overdueActions.length > 0 && (
+              <div className="space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Đang quá hạn</h4>
+                <ul className="space-y-2">
+                  {overdueActions.slice(0, MAX_OVERDUE_ROWS).map(a => (
+                    <li key={a.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-1 rounded-xl border border-[var(--border-subtle)] px-3 py-2">
+                      <span className="font-medium text-[var(--text-primary)]">{a.assigneeName}</span>
+                      <span className="text-[var(--text-secondary)] break-words min-w-0">{a.description}</span>
+                      <span className="ml-auto text-xs font-bold text-[var(--danger)] whitespace-nowrap">Hạn {new Date(a.dueAt).toLocaleString('vi-VN')}</span>
+                    </li>
+                  ))}
+                </ul>
+                {overdueActions.length > MAX_OVERDUE_ROWS && (
+                  <p className="text-xs text-[var(--text-muted)]">... và {overdueActions.length - MAX_OVERDUE_ROWS} việc quá hạn khác.</p>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+      </SettingCard>
 
       <SettingCard>
         <div className="flex items-baseline justify-between flex-wrap gap-2 mb-3">
