@@ -170,6 +170,17 @@ npm run test:agent   # node --test agent/test/*.test.ts trên SQLite tạm
 | `AGENT_PORT` | tuỳ chọn | Mặc định `4002` |
 | `SNAPSHOT_MAX_MB` | tuỳ chọn | Mặc định `2048` — ngưỡng `disk.pressure` cho `public/snapshots` |
 
+Kiểm thử (`agent/test/*.test.ts`), file mới thêm để lấp khoảng trống test:
+- `usage.test.ts` — `dailyTokensUsed()` (`agent/lib/usage.ts`): cộng token trong ngày, bỏ qua
+  JSON hỏng, row thiếu `usage`, row hôm qua và event không phải `session.ended`.
+- `escalate.test.ts` — `makeEscalate()` (`agent/tools/escalate.ts`): chặn khi chưa VERIFIED,
+  chưa đủ nghiêm trọng, hết lượt leo thang trong phiên, agent tạm dừng; và đường vận hành
+  (không có `violationId`) gọi `sendOpsAlert` + tăng `ctx.spent.escalations`.
+- `agent-bridge.test.ts` — `enqueueAgentTask()` (`src/lib/agent-bridge.ts`): gộp task trùng
+  đang chờ, không gộp vào task đang lease hoặc đã xong.
+- `violation-status.test.ts` — bất biến status viết HOA (route `PATCH
+  src/app/api/violations/[id]/route.ts`): SQLite phân biệt hoa/thường trên cột TEXT.
+
 `npm run dev` (`dev-all.sh`) tự chạy agent là tiến trình thứ 4, sau bridge và trước Next.
 Lúc khởi động in 4 dòng `[agent] on/off <capability> (<nguồn>)` rồi `✅ Agent HTTP nội bộ:
 http://127.0.0.1:4002`.
