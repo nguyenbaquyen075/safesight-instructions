@@ -115,7 +115,19 @@ Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut 
 | 3 | Sửa · Assigned Sites | checkbox nhiều lựa chọn (danh mục Site) + Select All | Không | site hiện tại | Áp dụng cho Quản lý công trường |
 | 4 | Xoá | icon | — | — | Xác nhận trước khi xoá |
 
-Màn cập nhật: không sửa email và mật khẩu tại đây (P2: đổi mật khẩu).
+Màn cập nhật (`UserEditDialog`): không sửa email và mật khẩu tại đây — đổi mật khẩu tự phục vụ ở `/profile` (SCR-18).
+
+## SCR-17 Người dùng — dialog "Thêm người dùng" (`AddUserDialog`)
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Họ và Tên | free text | Có | trống | |
+| 2 | Email | free text (email) | Có | trống | 409 nếu trùng email đã có |
+| 3 | Mật khẩu | password | Có | trống | Tối thiểu 8 ký tự; băm bcrypt trước khi lưu |
+| 4 | Vai trò | dropdown fix cứng (`UserRole`) | Có | Giám sát viên | 5 vai trò |
+| 5 | Công trường được gán | checkbox nhiều lựa chọn (danh mục Site) | Không | rỗng | |
+
+`orgId` của user mới lấy theo tổ chức của người tạo (không hiển thị, tự động).
 
 ## SCR-13 Cài đặt (`/settings`) — tab Giám sát: Thêm / sửa camera
 
@@ -176,3 +188,22 @@ Trường bắt buộc: 1, 2, 4, 5 (có điều kiện) → 4 ≤ 5.
 | 2 | Địa chỉ Email | free text (email) | Có | email | Không sửa |
 | 3 | Tên Công ty | free text | Không | tên tổ chức | Hiện chưa lưu (P2) |
 | 4 | Ngành nghề | free text | Không | trống | Hiện chưa lưu (P2) |
+
+## SCR-18 Hồ sơ cá nhân (`/profile`)
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Họ và Tên, Email, Vai trò | text chỉ đọc | — | thông tin session | Không sửa tại đây (đổi ở `/users`, cần quyền admin) |
+| 2 | Mật khẩu Hiện tại | password | Có | trống | So khớp bcrypt với `passwordHash` |
+| 3 | Mật khẩu Mới | password | Có | trống | Tối thiểu 8 ký tự |
+| 4 | Xác nhận Mật khẩu Mới | password | Có | trống | Phải khớp mục 3 (kiểm phía client) |
+
+Tài khoản dev cứng (`admin@safesight.ai`, không có dòng `User` trong DB) không đổi được mật khẩu — API trả lỗi rõ ràng. Quên mật khẩu (khi không nhớ mật khẩu cũ, cần gửi email) chưa làm, để backlog.
+
+## SCR-19 Cài đặt — tab Nhật ký (`AuditLogCard`)
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Bảng nhật ký | table | — | 100 dòng mới nhất | Cột: Thời gian, Người dùng, Hành động, Đối tượng, Chi tiết |
+
+Trạng thái tải: skeleton khi đang tải, thông báo lỗi màu đỏ khi tải hỏng, dòng chữ nhạt khi rỗng.

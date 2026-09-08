@@ -7,6 +7,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { alertRuleSchema } from '@/lib/validation/alert-rule';
 import { assertSiteAccess, ORG_WIDE_ROLES } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 
 function serializeRule(rule: AlertRuleRow) {
   return {
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
         recipients: JSON.stringify(recipients),
       },
     });
+    const session = await auth();
+    if (session) await logAudit({ session, action: 'alert-rule.create', resource: 'alert-rule', resourceId: rule.id, details: rule.name, request });
     return NextResponse.json(serializeRule(rule), { status: 201 });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {

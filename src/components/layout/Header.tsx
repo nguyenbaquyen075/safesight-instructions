@@ -4,7 +4,8 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Bell, Search, User } from 'lucide-react';
+import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
+import { Bell, Search, User, UserCircle, Settings } from 'lucide-react';
 import { toast } from '@/lib/toast';
 
 interface HeaderProps {
@@ -56,16 +57,45 @@ export function Header({ title, subtitle }: HeaderProps) {
         </div>
 
         {/* User Avatar */}
-        <Link
-          href="/settings"
-          id="header-user-menu"
-          className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[var(--surface)] transition-colors"
-          aria-label="Menu người dùng"
-        >
-          <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
-            <User className="w-4 h-4 text-white" />
-          </div>
-        </Link>
+        <DropdownMenu.Root>
+          <DropdownMenu.Trigger asChild>
+            <button
+              id="header-user-menu"
+              className="flex items-center gap-2 p-1.5 rounded-lg hover:bg-[var(--surface)] transition-colors focus:outline-none"
+              aria-label="Menu người dùng"
+            >
+              <div className="w-8 h-8 rounded-full gradient-primary flex items-center justify-center">
+                <User className="w-4 h-4 text-white" />
+              </div>
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Portal>
+            <DropdownMenu.Content
+              align="end"
+              sideOffset={8}
+              className="z-50 min-w-[180px] rounded-lg border border-[var(--border)] bg-[var(--surface)] p-1.5 shadow-2xl data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0"
+            >
+              <DropdownMenu.Item asChild>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] cursor-pointer outline-none"
+                >
+                  <UserCircle className="w-4 h-4 text-[var(--text-muted)]" />
+                  Hồ sơ
+                </Link>
+              </DropdownMenu.Item>
+              <DropdownMenu.Item asChild>
+                <Link
+                  href="/settings"
+                  className="flex items-center gap-2 px-3 py-2 rounded-md text-sm text-[var(--text-primary)] hover:bg-[var(--surface-hover)] cursor-pointer outline-none"
+                >
+                  <Settings className="w-4 h-4 text-[var(--text-muted)]" />
+                  Cài đặt
+                </Link>
+              </DropdownMenu.Item>
+            </DropdownMenu.Content>
+          </DropdownMenu.Portal>
+        </DropdownMenu.Root>
       </div>
     </header>
   );

@@ -2,9 +2,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import type { AlertRule as AlertRuleRow } from '@prisma/client';
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { alertRuleObjectSchema, alertRuleSchema } from '@/lib/validation/alert-rule';
 import { assertSiteAccess } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 
 function serializeRule(rule: AlertRuleRow) {
   return {
@@ -59,6 +61,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       recipients: JSON.stringify(recipients),
     },
   });
+
+  const session = await auth();
+  if (session) await logAudit({ session, action: 'alert-rule.update', resource: 'alert-rule', resourceId: id, details: JSON.stringify(parsedPatch.data), request });
+
   return NextResponse.json(serializeRule(updated));
 }
 
@@ -71,5 +77,9 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
   if (authError) return authError;
 
   await prisma.alertRule.delete({ where: { id } });
+
+  const session = await auth();
+  if (session) await logAudit({ session, action: 'alert-rule.delete', resource: 'alert-rule', resourceId: id, details: existing.name, request });
+
   return NextResponse.json({ success: true });
 }

@@ -9,6 +9,7 @@ import { UserRole } from '@/types/enums';
 import { useUsers, useUpdateUser, useDeleteUser } from '@/hooks/use-users';
 import { UserTable } from '@/components/users/UserTable';
 import { UserEditDialog } from '@/components/users/UserEditDialog';
+import { AddUserDialog } from '@/components/users/AddUserDialog';
 import { toast } from '@/lib/toast';
 import type { User } from '@/types/models';
 
@@ -17,6 +18,7 @@ export default function UsersPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const { data: session } = useSession();
   const userRole = session?.user?.role as UserRole;
   const isAdmin = userRole === UserRole.SUPER_ADMIN || userRole === UserRole.ORG_ADMIN;
@@ -81,11 +83,11 @@ export default function UsersPage() {
 
         {isAdmin && (
           <button
-            onClick={() => toast('Đã gửi lời mời người dùng mới (demo)', 'success')}
+            onClick={() => setIsAddDialogOpen(true)}
             className="flex items-center gap-2 px-4 py-2 bg-[var(--primary)] hover:bg-[var(--primary-hover)] text-white rounded-lg font-medium transition-all shadow-lg shadow-[var(--primary)]/20 animate-fade-up shrink-0 whitespace-nowrap"
           >
             <UserPlus className="w-4 h-4" />
-            Mời Người dùng
+            Thêm Người dùng
           </button>
         )}
       </div>
@@ -173,12 +175,15 @@ export default function UsersPage() {
       />
 
       {/* Edit Dialog */}
-      <UserEditDialog 
+      <UserEditDialog
         user={selectedUser}
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
         onSave={handleSave}
       />
+
+      {/* Add Dialog */}
+      <AddUserDialog isOpen={isAddDialogOpen} onClose={() => setIsAddDialogOpen(false)} />
     </div>
   );
 }

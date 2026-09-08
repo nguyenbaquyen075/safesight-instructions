@@ -25,12 +25,18 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, Zalo OA, quy tắc cảnh báo |
+| `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo, tab "Nhật ký" (`AuditLogCard`, đọc `GET /api/audit-log`) |
 | `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), ô hỏi toàn hệ thống, capabilities |
-| `/reports`, `/profile` | — | — | ❌ Chưa có |
+| `/profile` | `(dashboard)/profile/page.tsx` | tất cả (không có trong `PAGE_ROLES` → mở cho mọi vai trò) | Xem tên/email/vai trò (chỉ đọc) + form đổi mật khẩu (`PATCH /api/users/me/password`); vào từ menu avatar ở Header |
+| `/reports` | — | — | ❌ Chưa có |
+
+Quên mật khẩu (đặt lại khi không nhớ mật khẩu cũ) chưa làm — cần gửi email, để lại backlog.
 
 ## Danh mục API route (`src/app/api/`)
 
 Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middleware (`src/proxy.ts`) **không** chạy trên `/api`, nên mỗi handler tự kiểm quyền bằng `src/lib/auth/site-access.ts`: `requireSession()` (401 khi chưa đăng nhập), `allowedSiteIds()` (null = vai trò toàn tổ chức SUPER_ADMIN/ORG_ADMIN, ngược lại là `assignedSites`), `assertSiteAccess()` (403 khi đụng site ngoài phạm vi). Danh sách vi phạm/camera/công trường lọc sẵn theo `allowedSiteIds()`; xin `?siteId=` ngoài phạm vi trả 403.
+
+`src/lib/audit-log.ts` (`logAudit({ session, action, resource, resourceId?, details?, request? })`) ghi 1 dòng `AuditLog` cho mọi POST/PATCH/DELETE đáng chú ý (người dùng, camera, quy tắc cảnh báo, Telegram, cài đặt agent, subagent camera); IP lấy từ header `x-forwarded-for` (hop đầu), mặc định `'local'`. Không bao giờ throw — audit log hỏng không được làm hỏng thao tác chính.
 
 | Route | Method | Ghi chú |
 |---|---|---|
@@ -41,22 +47,26 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma) |
 | `/api/cameras/[id]/zones` | GET, PUT | Vùng nhận diện (Zone `type=MONITORING`) của camera; `assertSiteAccess`. PUT thay TOÀN BỘ danh sách (`{ zones: [{ name?, points: [{x,y}] }] }`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. AI engine tự đọc lại bảng `Zone` mỗi 60s |
+| `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`); POST ghi `AuditLog` |
+| `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma); PATCH/DELETE ghi `AuditLog` |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
-| `/api/users`, `/api/users/[id]` | GET · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`) |
-| `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site |
-| `/api/alert-rules/[id]` | PATCH, DELETE | |
-| `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt |
+| `/api/users`, `/api/users/[id]` | GET, POST · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`). POST: zod `createUserSchema` (`src/lib/user-shape.ts`: `name`, `email`, `password` ≥ 8, `role` enum, `assignedSites`), băm mật khẩu bằng `bcryptjs`, `orgId` lấy theo tổ chức của người tạo (fallback tổ chức đầu tiên cho tài khoản dev cứng không có dòng User), 409 khi email trùng. POST/PATCH/DELETE đều ghi `AuditLog` |
+| `/api/users/me/password` | PATCH | `{ currentPassword, newPassword ≥ 8 }`; xác minh mật khẩu cũ bằng bcrypt, 400 khi sai hoặc khi tài khoản không có `passwordHash` (tài khoản dev cứng); ghi `AuditLog` |
+| `/api/audit-log` | GET | SUPER_ADMIN/ORG_ADMIN; `?limit` (mặc định 50, tối đa 200) `&resource` |
+| `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site; POST ghi `AuditLog` |
+| `/api/alert-rules/[id]` | PATCH, DELETE | Cả 2 ghi `AuditLog` |
+| `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt; POST ghi `AuditLog` (không log token thô) |
 | `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
 | `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt |
 | `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
-| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN |
+| `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN; PATCH ghi `AuditLog` |
 | `/api/agent/ask` | POST | `{ subjectType?, subjectId?, sessionId?, message }` → ghi `AgentEvent`, tạo/nối `AgentTask kind=ask`, poke agent, trả `sessionId` |
 | `/api/agent/cameras` | GET | Cần session; mỗi camera trong phạm vi site → cài đặt subagent + `memory[]` + `openViolations`, `reviewed24h`, `falsePositiveRate24h`. Camera chưa có dòng `CameraAgent` trả giá trị mặc định với `exists: false` (**không** upsert khi đọc) |
-| `/api/agent/cameras/[id]` | PATCH | SUPER_ADMIN/ORG_ADMIN; `{ isEnabled?, digestEveryMin? 5–1440, dailyTokenCap? ≥ 0, clearMemory?: true }`; upsert `CameraAgent`, `clearMemory` đặt `memory = '[]'`; ghi `AgentEvent action { action: 'camera-agent.settings', changes, userId }` |
+| `/api/agent/cameras/[id]` | PATCH | SUPER_ADMIN/ORG_ADMIN; `{ isEnabled?, digestEveryMin? 5–1440, dailyTokenCap? ≥ 0, clearMemory?: true }`; upsert `CameraAgent`, `clearMemory` đặt `memory = '[]'`; ghi `AgentEvent action { action: 'camera-agent.settings', changes, userId }` và `AuditLog` |
 | `/api/agent/cameras/[id]/digest` | POST | `assertSiteAccess` theo site của camera; xếp `AgentTask kind=camera.digest` (priority 60, gộp với lần hẹn đang chờ) + poke; trả 202 `{ taskId }`, 404 khi camera không tồn tại |
 
 ## React Query hooks (`src/hooks/`)
@@ -66,7 +76,8 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `useViolations`, `useOpenViolationCount` | `use-violations.ts` | `/api/violations`, `/api/violations/count` |
 | `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
-| `useUsers` | `use-users.ts` | `/api/users` |
+| `useUsers`, `useUser`, `useCreateUser`, `useUpdateUser`, `useDeleteUser`, `useChangePassword` | `use-users.ts` | `/api/users`, `/api/users/me/password` |
+| `useAuditLog` | `use-audit-log.ts` | `/api/audit-log` |
 | `useAlertRules` + mutation | `use-alert-rules.ts` | `/api/alert-rules` |
 | `useTelegramSettings` + mutation | `use-telegram-settings.ts` | `/api/settings/telegram` |
 | `useZaloSettings` + mutation | `use-zalo-settings.ts` | `/api/settings/zalo` |
@@ -86,6 +97,8 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 - **alerts/** — `AlertsTable.tsx`
 - **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `ZaloOaCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx` (người nhận nhập theo từng kênh đang bật), `ui.tsx`
 - **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
+- **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx`, `AuditLogCard.tsx`, `ui.tsx`
+- **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`, `AddUserDialog.tsx`
 - **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx`, `CameraAgentCard.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`). `SubjectAgentPanel` với `subjectType="camera"` hiện thêm khối đầu panel: trạng thái subagent (bật/tắt), token hôm nay/trần, digest gần nhất và **toàn bộ** trí nhớ camera — lấy từ `useCameraAgents()` lọc theo `cameraId` (không gọi API này ở modal vi phạm/công trường)
 - **ui/** — shadcn/Radix primitives, `Toaster.tsx` · **Providers.tsx** — React Query + session
 
