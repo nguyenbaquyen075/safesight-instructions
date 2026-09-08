@@ -10,11 +10,12 @@ import { preambleFor } from './lib/preamble';
 import { toolsFor } from './lib/toolsets';
 import { newToolContext } from './lib/tool-context';
 import { dailyTokensUsed } from './lib/usage';
+import { LlmHttpError, openAiClient } from './lib/llm/openai';
 import type { LeasedTask } from './lib/tasks';
 
-export interface RunParams { model: string; effort: string; system: Awaited<ReturnType<typeof systemBlocks>>; tools: unknown[]; messages: unknown[]; maxIterations: number }
-export interface Turn { content: unknown[]; usage: { input_tokens: number; output_tokens: number; cache_read_input_tokens?: number | null }; stop_reason: string | null }
-export interface SessionClient { run(params: RunParams): AsyncIterable<Turn> }
+// Kiểu chung của mọi provider nằm ở lib/llm/types; re-export để nơi gọi cũ vẫn import từ '../session'.
+export type { RunParams, Turn, SessionClient } from './lib/llm/types';
+import type { SessionClient, Turn } from './lib/llm/types';
 
 export class SessionError extends Error {
   retryAfterMs: number | null;
@@ -38,7 +39,7 @@ export function msUntilMidnight(now = new Date()): number {
 
 // Lớp mỏng bọc SDK: mọi thứ Anthropic-specific ở đây, để phần còn lại test được bằng client giả.
 export function anthropicClient(): SessionClient {
-  const client = new Anthropic({ apiKey: env.anthropicKey });
+  const client = new Anthropic({ apiKey: env.llmKey });
   return {
     async *run(p) {
       const runner = client.beta.messages.toolRunner({
@@ -53,6 +54,12 @@ export function anthropicClient(): SessionClient {
 }
 
 export function mapError(error: unknown): SessionError {
+  if (error instanceof LlmHttpError) {
+    if (error.status === 401 || error.status === 403) { latchClaudeOff(error.message); return new SessionError(`LLM từ chối request: ${error.message}`, null, true); }
+    if (error.status === 429) return new SessionError('429: quá giới hạn LLM', 60_000, false);
+    if (error.status === 400) return new SessionError(`LLM từ chối request: ${error.message}`, null, true);
+    return new SessionError(`LLM lỗi ${error.status}`, error.status >= 500 ? 60_000 : 30_000, false);
+  }
   if (error instanceof Anthropic.RateLimitError) return new SessionError('429: quá giới hạn Claude', 60_000, false);
   if (error instanceof Anthropic.AuthenticationError) { latchClaudeOff(error.message); return new SessionError(`Claude từ chối request: ${error.message}`, null, true); }
   if (error instanceof Anthropic.BadRequestError) return new SessionError(`Claude từ chối request: ${error.message}`, null, true);
@@ -72,14 +79,14 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
   if (!settings.isEnabled) return skipped('agent đang tạm dừng');
   const off = claudeLatchedOff();
   if (off) return skipped(`Claude bị tắt tới lần khởi động sau: ${off}`);
-  if (!opts.client && !env.anthropicKey) return skipped('không có ANTHROPIC_API_KEY — lane nghiên cứu tạm dừng');
+  if (!opts.client && !env.llmKey) return skipped(`không có ${env.llmProvider === 'openai' ? 'LLM_API_KEY' : 'ANTHROPIC_API_KEY'} — lane nghiên cứu tạm dừng`);
   // Chạm trần: hoàn lượt (refundAttempt) và hẹn lại sau nửa đêm, không tiêu lần thử của task.
   if ((await dailyTokensUsed()) >= settings.dailyTokenCap) throw new SessionError('đã chạm trần token trong ngày', msUntilMidnight(), false, true);
 
   await prisma.agentTask.updateMany({ where: { id: task.id, finishedAt: null }, data: { sessionId } });
   const ctx = newToolContext(task, sessionId);
   const effort = task.kind === 'shift.report' ? 'high' : settings.reviewEffort;
-  const client = opts.client ?? anthropicClient();
+  const client = opts.client ?? (env.llmProvider === 'openai' ? openAiClient() : anthropicClient());
   const messages = [{ role: 'user', content: await preambleFor(task, { userMessage: opts.userMessage, sessionId }) }];
   await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget } });
 

@@ -38,7 +38,8 @@ export async function capabilities(): Promise<Capability[]> {
   const heartbeat = await readHeartbeat();
   const engineFresh = heartbeat ? Date.now() - new Date(heartbeat.at).getTime() < 30_000 : false;
   return [
-    { id: 'CLAUDE', from: 'ANTHROPIC_API_KEY', label: 'Claude', enabled: env.anthropicKey !== null && claudeLatchedOff() === null,
+    { id: 'CLAUDE', from: env.llmProvider === 'openai' ? 'LLM_PROVIDER=openai' : 'ANTHROPIC_API_KEY',
+      label: env.llmProvider === 'openai' ? 'LLM (openai)' : 'Claude', enabled: env.llmKey !== null && claudeLatchedOff() === null,
       gives: 'lane nghiên cứu: review vi phạm bằng ảnh, báo cáo ca, trả lời câu hỏi' },
     { id: 'TELEGRAM', from: 'Cài đặt → Thông báo', label: 'Telegram', enabled: !!(telegram?.isEnabled && telegram.botTokenEncrypted),
       gives: 'gửi cảnh báo tới người phụ trách theo AlertRule' },

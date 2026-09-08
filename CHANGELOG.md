@@ -15,6 +15,10 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
 
+### Sửa
+- Lane nghiên cứu của agent chạy được trên endpoint tương thích OpenAI (`LLM_PROVIDER=openai`): trước đây key dạng proxy `/chat/completions` làm mọi phiên hỏng với `Cannot read properties of undefined (reading 'filter')` vì luôn đi đường Anthropic Messages. Thêm `LLM_BASE_URL`, `LLM_API_KEY`, `LLM_MODEL_DEFAULT`, `LLM_IMAGE_INPUT`.
+- Trang `/agent` hiển thị đúng model đang dùng khi model không nằm trong hai lựa chọn Claude có sẵn.
+
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
 
