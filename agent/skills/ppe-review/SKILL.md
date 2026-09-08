@@ -1,5 +1,6 @@
 ---
-description: Đọc ảnh vi phạm PPE đúng cách — mũ, áo, găng, giày, và các bẫy thường gặp.
+name: ppe-review
+description: Dùng khi đọc ảnh vi phạm PPE (mũ, áo, găng, giày) để kết luận vi phạm hay báo oan.
 ---
 # Review PPE
 

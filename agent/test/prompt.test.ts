@@ -12,7 +12,18 @@ const ctx: ToolContext = { sessionId: 's', taskId: null, taskKind: 'violation.re
 test('systemBlocks has instructions plus 4 skills, cache_control on the last block, stable content', async () => {
   const a = await systemBlocks(); const b = await systemBlocks();
   assert.equal(a.length, 2); assert.ok(a[1].cache_control); assert.equal(a[1].text, b[1].text);
-  for (const name of ['evidence.md', 'ppe-review.md', 'escalation.md', 'data-boundaries.md']) assert.ok(a[1].text.includes(`skill: ${name}`));
+  for (const name of ['evidence', 'ppe-review', 'escalation', 'data-boundaries']) assert.ok(a[1].text.includes(name));
+});
+
+test('systemBlocks strips SKILL.md frontmatter and prepends an index table built from it', async () => {
+  const a = await systemBlocks();
+  assert.ok(!a[1].text.includes('---\nname:'), 'frontmatter phải bị bỏ khỏi nội dung ghép vào prompt');
+  assert.match(a[1].text, /\| Skill \| Dùng khi \|/);
+  for (const name of ['evidence', 'ppe-review', 'escalation', 'data-boundaries']) {
+    const indexLine = a[1].text.split('\n').find(l => l.startsWith(`| ${name} |`));
+    assert.ok(indexLine, `bảng chỉ mục phải có dòng cho ${name}`);
+    assert.match(indexLine!, /Dùng khi/);
+  }
 });
 
 test('toolsFor: review includes record_verdict, digest does not; ask includes everything', () => {

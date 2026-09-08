@@ -1,5 +1,6 @@
 ---
-description: Những gì không bao giờ được làm với dữ liệu người lao động.
+name: data-boundaries
+description: Dùng khi thao tác dữ liệu, ảnh, hoặc ghi chú liên quan người lao động, hoặc cân nhắc gửi thông tin ra ngoài hệ thống.
 ---
 # Ranh giới dữ liệu
 
