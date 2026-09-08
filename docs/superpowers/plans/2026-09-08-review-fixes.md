@@ -18,3 +18,13 @@ Mỗi nhánh tách từ `main`, làm trong worktree riêng, phải xanh `npm run
 | `fix/sidebar-alert-badge-from-db` | arch/violations/dual-store-localstorage-vs-db (phần nhỏ) | Sidebar badge đếm từ `/api/violations`, sites page bỏ ghi `safesight_alerts` |
 
 Hoãn (ghi vào lộ trình): `arch/ppe-tracker/god-method-process-frame` (refactor AI core cần nghiệm thu model, không làm trong đợt fix).
+
+## Đợt 2 (2026-09-08, sau khi chạy security-review, code-review, ponytail-review, review-experience trên `ab4244d`)
+
+| Nhánh | Lỗi | Phạm vi |
+|---|---|---|
+| `fix/api-session-scope` | GET `violations`, `violations/[id]`, `cameras`, `cameras/[id]`, `sites`, `sites/[id]`, `users` trả 200 không cần cookie (middleware bỏ qua `/api`); list không scope theo site; Sidebar poll cả bảng | `auth()` cho mọi GET, scope `assignedSites` cho vai trò không org-wide, filter đẩy vào Prisma, `GET /api/violations/count`, Sidebar dùng count |
+| `fix/deploy-engine-env` | bind mount uid (container `app` vs host), migration từ named volume, engine nuốt 401 bridge, `mock_yolo.js` thiếu header, `BRIDGE_PORT` thừa | compose `user:`, entrypoint, wiki/03 migration, `yolo_inference.py` log 1 lần, `mock_yolo.js`, bỏ `BRIDGE_PORT` |
+| `fix/agent-hardening-2` | non-Linux phantom `engine.stalled`; heartbeat >5 phút chặn restart engine treo; model mặc định `claude-opus-5` gửi tới proxy OpenAI; `anthropicClient` bỏ `LLM_BASE_URL`; race `ask` reuse vs `retireExhausted`; error event gán session cũ; cleanup xoá bằng chứng vi phạm còn mở; `openai.ts` gọn (BetaRunnableTool, APIError.generate, bỏ zod/override thừa, ảnh cũ thay stub) | `agent/direct/health.ts`, `actions.ts`, `cleanup.ts`, `agent/lib/settings.ts`, `agent/session.ts`, `agent/lib/llm/openai.ts`, `agent/main.ts`, `src/app/api/agent/{ask,settings}/route.ts` |
+| `chore/conventions-round-2` | tiêu đề test tiếng Việt (health, openai-client), alias `anthropicKey`, `NavItem.badge` chết, helper test trùng, MODELS trùng, khối `nextjs-agent-rules` tự chèn vào AGENTS.md, badge không trừ "đã đọc" | `agentRules: false` + pointer docs Next trong Knowledge discovery, các file test, `Sidebar.tsx`, `agent/page.tsx` |
+| `fix/ux-round-2` | theo báo cáo review-experience | TBD |
