@@ -44,7 +44,10 @@ export async function applyFindings(findings: Finding[], ctx: ActionContext): Pr
       }
       case 'engine.stalled': {
         const pid = Number(f.detail.pid);
-        if (rateLimit('engine-restart', LIMITS.engineRestartPerHour, 3_600_000) && Number.isFinite(pid) && pid > 1) {
+        // pid đã xác nhận không còn là tiến trình engine (chết, hoặc bị hệ điều hành tái sử
+        // dụng cho tiến trình khác) -> không có gì để SIGTERM, và không được tiêu suất rate-limit.
+        if (f.detail.pidAlive !== true || !Number.isFinite(pid) || pid <= 1) break;
+        if (rateLimit('engine-restart', LIMITS.engineRestartPerHour, 3_600_000)) {
           try { process.kill(pid, 'SIGTERM'); done.push(`SIGTERM AI engine pid ${pid} (dev-all.sh tự chạy lại)`); mine.push(`SIGTERM AI engine pid ${pid} (dev-all.sh tự chạy lại)`); } catch { /* pid đã chết */ }
         }
         break;

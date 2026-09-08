@@ -15,6 +15,17 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
 
+### Sửa
+- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt và hệ điều hành cấp lại
+  pid cũ cho tiến trình khác: kiểm `/proc/<pid>/cmdline` phải chứa `yolo_inference.py` trước
+  khi coi là engine, và heartbeat quá cũ (>5 phút) luôn bị coi là "engine đã mất". Pid không
+  hợp lệ không còn tiêu mất suất `engine-restart` (3 lần/giờ). `yolo_inference.py` xoá
+  `.heartbeat.json` khi thoát thay vì để lại file cũ.
+- `health.probe` (đổi nguồn/trạng thái camera) không còn đẩy lùi lịch `health.sweep` định kỳ
+  đang chờ 60s mỗi lần chạy.
+- `snapshot.cleanup` bỏ luật giữ ảnh 30 ngày (không bao giờ khớp vì engine xoá sạch ảnh mỗi
+  lần khởi động) — chỉ còn giữ ảnh mới hơn 24h, nên đĩa đầy thật sự được dọn.
+
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
 
