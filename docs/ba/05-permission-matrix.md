@@ -44,8 +44,9 @@
 | Xem thẻ subagent camera và trí nhớ camera | O | O | O***** | O***** | O***** | X | X |
 | Quét sức khoẻ, tự khắc phục, leo thang | X | X | X | X | X | X | O** |
 | Kiểm thử Roboflow (tốn credit) | O | O | X | X | X | X | X |
-| Xem / sửa / xoá người dùng | O | O | X | X | X | X | X |
-| Xem Cài đặt (tài khoản, giám sát, thông báo) | O | O | X | X | X | X | X |
+| Xem / sửa / xoá / tạo người dùng | O | O | X | X | X | X | X |
+| Xem Cài đặt (tài khoản, giám sát, thông báo, nhật ký) | O | O | X | X | X | X | X |
+| Xem / sửa hồ sơ cá nhân, đổi mật khẩu | O | O | O | O | O | X | X |
 
 **Ghi chú điều kiện**
 

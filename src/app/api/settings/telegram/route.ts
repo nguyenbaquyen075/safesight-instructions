@@ -6,6 +6,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { encrypt } from '@/lib/crypto';
 import { ORG_WIDE_ROLES } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 
 async function getOrCreateSettings() {
   const existing = await prisma.telegramSettings.findFirst();
@@ -47,5 +48,8 @@ export async function POST(request: NextRequest) {
   if (parsed.data.isEnabled !== undefined) data.isEnabled = parsed.data.isEnabled;
 
   const updated = await prisma.telegramSettings.update({ where: { id: settings.id }, data });
+
+  await logAudit({ session, action: 'settings.telegram.update', resource: 'settings', details: JSON.stringify({ ...parsed.data, botToken: parsed.data.botToken ? '(đã đổi)' : undefined }), request });
+
   return NextResponse.json({ isEnabled: updated.isEnabled, hasToken: !!updated.botTokenEncrypted });
 }

@@ -18,16 +18,18 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Video
+  Video,
+  ScrollText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { TelegramBotCard } from '@/components/settings/TelegramBotCard';
 import { AlertRulesCard } from '@/components/settings/AlertRulesCard';
 import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard';
+import { AuditLogCard } from '@/components/settings/AuditLogCard';
 
 export default function SettingsPage() {
-  const [activeTab, setActiveTab] = useState<'profile' | 'cameras' | 'monitoring' | 'notifications' | 'security'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'cameras' | 'monitoring' | 'notifications' | 'security' | 'audit'>('profile');
   const [isSaving, setIsSaving] = useState(false);
   const [notification, setNotification] = useState<{ id: number; title: string; desc: string; type: 'success' | 'danger' | 'warning' } | null>(null);
 
@@ -50,6 +52,7 @@ export default function SettingsPage() {
     { id: 'monitoring', label: 'Giám sát AI', icon: Sliders },
     { id: 'notifications', label: 'Thông báo', icon: Bell },
     { id: 'security', label: 'Bảo mật', icon: Shield },
+    { id: 'audit', label: 'Nhật ký', icon: ScrollText },
   ] as const;
 
   return (
@@ -312,6 +315,12 @@ export default function SettingsPage() {
                   </div>
                 </div>
               </SettingCard>
+            </div>
+          )}
+
+          {activeTab === 'audit' && (
+            <div className="space-y-6 animate-fade-up">
+              <AuditLogCard />
             </div>
           )}
         </div>

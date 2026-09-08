@@ -2,10 +2,12 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { toCameraDTO, DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { isValidCameraSource } from '@/lib/camera-source';
 import { allowedSiteIds, assertSiteAccess, requireSession } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 
 export async function GET(request: NextRequest) {
   const gate = await requireSession();
@@ -71,6 +73,9 @@ export async function POST(request: NextRequest) {
       status: 'ONLINE',
     },
   });
+
+  const session = await auth();
+  if (session) await logAudit({ session, action: 'camera.create', resource: 'camera', resourceId: camera.id, details: camera.name, request });
 
   return NextResponse.json(toCameraDTO(camera, site.name), { status: 201 });
 }

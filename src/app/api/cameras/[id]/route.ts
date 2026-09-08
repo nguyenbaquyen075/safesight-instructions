@@ -2,11 +2,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
+import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { toCameraDTO, DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { isValidCameraSource } from '@/lib/camera-source';
 import { assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
+import { logAudit } from '@/lib/audit-log';
 
 export async function GET(
   request: NextRequest,
@@ -85,6 +87,9 @@ export async function PATCH(
     .then(() => pokeAgent('/internal/dispatch'))
     .catch(err => console.warn('[cameras] không xếp được health.probe', err instanceof Error ? err.message : String(err)));
 
+  const session = await auth();
+  if (session) await logAudit({ session, action: 'camera.update', resource: 'camera', resourceId: id, details: JSON.stringify(parsed.data), request });
+
   return NextResponse.json(toCameraDTO(camera, camera.site.name));
 }
 
@@ -106,5 +111,9 @@ export async function DELETE(
   // CameraAgent.id = Camera.id nhưng cố tình KHÔNG khai quan hệ Prisma (spec §2, giữ
   // SQLite đơn giản) nên phải tự xoá, không thì subagent cũ sống lại khi id được dùng lại.
   await prisma.cameraAgent.deleteMany({ where: { id } });
+
+  const session = await auth();
+  if (session) await logAudit({ session, action: 'camera.delete', resource: 'camera', resourceId: id, details: existing.name, request });
+
   return NextResponse.json({ success: true });
 }

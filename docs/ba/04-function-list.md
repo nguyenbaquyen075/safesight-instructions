@@ -1,12 +1,12 @@
 # 04 — Danh sách chức năng
 
-Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tìm / xem / sửa / xoá), **Advanced** (kỹ thuật cao), **Other** (nhập/xuất, thông báo, báo cáo…). Size: S / M / L. Phase: `v0.6` = đã có; `v0.8` = subagent theo camera (đã có, sau v0.6); `P1` / `P2` / `P3` = ưu tiên trong [lộ trình](../../wiki/07-lo-trinh-phat-trien.md).
+Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tìm / xem / sửa / xoá), **Advanced** (kỹ thuật cao), **Other** (nhập/xuất, thông báo, báo cáo…). Size: S / M / L. Phase: `v0.6` = đã có; `v0.8` = subagent theo camera (đã có, sau v0.6); `v0.9` = tạo người dùng, đổi mật khẩu, nhật ký thao tác (đã có, sau v0.8); `P1` / `P2` / `P3` = ưu tiên trong [lộ trình](../../wiki/07-lo-trinh-phat-trien.md).
 
 | Trace code | Data object | Module | Function | Size | Type | Description / Objective / Remarks | Phase |
 |---|---|---|---|---|---|---|---|
 | F-AUTH-01 | User | Xác thực | Đăng nhập | S | Basic | NextAuth Credentials, JWT, vai trò trong session | v0.6 |
 | F-AUTH-02 | User | Xác thực | Đăng xuất | S | Basic | Xoá session | v0.6 |
-| F-AUTH-03 | User | Xác thực | Đổi mật khẩu | S | Basic | Chưa có UI; API PATCH user có `passwordHash` | P2 |
+| F-AUTH-03 | User | Xác thực | Đổi mật khẩu | S | Basic | Trang `/profile`; `PATCH /api/users/me/password` xác minh mật khẩu cũ bằng bcrypt | v0.9 |
 | F-AUTH-04 | User | Xác thực | Quên mật khẩu | M | Basic | Cần kênh email, chưa nối | P3 |
 | F-AUTH-05 | User | Xác thực | Chặn trang theo vai trò | S | Workflow | `PAGE_ROLES`: Sidebar ẩn menu, layout chặn URL trực tiếp | v0.6 |
 | F-DASH-01 | Violation | Trang chủ | Xem KPI tuân thủ | M | Advanced | KPI, xu hướng tuân thủ, donut theo loại vi phạm, dòng thời gian cảnh báo tính từ vi phạm thật | v0.6 |
@@ -60,8 +60,8 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-USER-01 | User | Người dùng | Xem danh sách người dùng | S | Basic | | v0.6 |
 | F-USER-02 | User | Người dùng | Sửa vai trò và công trường được gán | S | Basic | `role`, `assignedSites` | v0.6 |
 | F-USER-03 | User | Người dùng | Xoá người dùng | S | Basic | | v0.6 |
-| F-USER-04 | User | Người dùng | Tạo người dùng | S | Basic | API POST chưa có | P2 |
+| F-USER-04 | User | Người dùng | Tạo người dùng | S | Basic | Dialog "Thêm người dùng" trên `/users`; `POST /api/users` (mật khẩu bcrypt, 409 khi email trùng) | v0.9 |
 | F-SET-01 | Organization | Thiết lập | Xem tài khoản và tổ chức | S | Basic | Tab hiển thị, chưa lưu | P2 |
 | F-SET-02 | — | Thiết lập | Bật / tắt loại phát hiện AI | S | Basic | Tab Giám sát AI hiện là mẫu tĩnh | P3 |
-| F-PROF-01 | User | Hồ sơ cá nhân | Xem / cập nhật hồ sơ | S | Basic | Trang `/profile` chưa có | P2 |
-| F-AUD-01 | AuditLog | Quản trị | Xem nhật ký thao tác | S | Basic | Bảng có, UI chưa | P2 |
+| F-PROF-01 | User | Hồ sơ cá nhân | Xem / cập nhật hồ sơ | S | Basic | Trang `/profile`: tên/email/vai trò chỉ đọc + đổi mật khẩu; vào từ menu avatar Header | v0.9 |
+| F-AUD-01 | AuditLog | Quản trị | Xem nhật ký thao tác | S | Basic | Tab "Nhật ký" trong `/settings`; `logAudit()` ghi ở users/cameras/alert-rules/Telegram/agent settings | v0.9 |

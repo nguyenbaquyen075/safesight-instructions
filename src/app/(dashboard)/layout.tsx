@@ -39,6 +39,7 @@ export default function DashboardLayout({
     if (pathname.startsWith('/agent')) return { title: 'Agent giám sát', subtitle: 'Trực vận hành và cán bộ an toàn tự động' };
     if (pathname.startsWith('/users')) return { title: 'Quản lý Người dùng', subtitle: 'Phân quyền và kiểm soát truy cập' };
     if (pathname.startsWith('/settings')) return { title: 'Cài đặt', subtitle: 'Cấu hình cá nhân và hệ thống' };
+    if (pathname.startsWith('/profile')) return { title: 'Hồ sơ Cá nhân', subtitle: 'Thông tin tài khoản và đổi mật khẩu' };
     return { title: 'SafeSight AI', subtitle: 'Nền tảng An toàn Xây dựng' };
   };
 
