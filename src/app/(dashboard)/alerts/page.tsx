@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT
 
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { 
   Bell, 
   Search, 
@@ -20,48 +20,30 @@ import { cn, getViolationTypeLabel } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useViolations } from '@/hooks/use-violations';
 import { useMounted } from '@/hooks/use-mounted';
+import { useReadAlertIds, persistReadAlertIds } from '@/hooks/use-read-alerts';
 import { ViolationDetailModal } from '@/components/violations/ViolationDetailModal';
 import { Severity } from '@/types/enums';
 import type { Violation } from '@/types/models';
 
 type SeverityFilter = 'TẤT CẢ' | 'NGHIÊM TRỌNG' | 'CAO' | 'TRUNG BÌNH' | 'THẤP';
 
-const READ_KEY = 'safesight_read_alerts';
-
 export default function AlertsPage() {
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
   const [search, setSearch] = useState('');
   const mounted = useMounted();
-  const [readIds, setReadIds] = useState<Set<string>>(new Set());
+  const readIds = useReadAlertIds();
   const [selectedAlert, setSelectedAlert] = useState<Violation | null>(null);
   const { data: allAlerts = [] } = useViolations();
 
-  useEffect(() => {
-    // Nạp trạng thái "đã đọc" từ localStorage SAU khi hydrate (đọc lúc render sẽ lệch
-    // server/client). Chuyển sang useSyncExternalStore là refactor riêng vì persistRead
-    // cũng ghi state này.
-    try {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setReadIds(new Set(JSON.parse(localStorage.getItem(READ_KEY) || '[]')));
-    } catch {
-      setReadIds(new Set());
-    }
-  }, []);
-
   if (!mounted) return null;
-
-  const persistRead = (ids: Set<string>) => {
-    setReadIds(ids);
-    localStorage.setItem(READ_KEY, JSON.stringify(Array.from(ids)));
-  };
 
   const markRead = (id: string) => {
     if (readIds.has(id)) return;
-    persistRead(new Set(readIds).add(id));
+    persistReadAlertIds(new Set(readIds).add(id));
   };
 
   const markAllRead = () => {
-    persistRead(new Set([...readIds, ...filteredAlerts.map(a => a.id)]));
+    persistReadAlertIds(new Set([...readIds, ...filteredAlerts.map(a => a.id)]));
     toast('Đã đánh dấu tất cả thông báo là đã đọc', 'success');
   };
 

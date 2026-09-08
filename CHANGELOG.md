@@ -21,6 +21,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Badge "Thông báo" ở Sidebar đếm vi phạm `open` từ DB thay vì `localStorage` + hằng 11; trang Công trường không ghi thông báo vào `safesight_alerts` nữa.
 - `docker-compose.yml` dùng bind mount `./data` và `./public/snapshots` để AI engine và agent chạy trên máy chủ dùng chung DB/ảnh với container.
 - `snapshot.cleanup` chỉ giữ ảnh mới hơn 24h (bỏ luật 30 ngày không bao giờ khớp vì engine xoá ảnh mỗi lần khởi động).
+- `agent/test/escalate.test.ts`: gộp hai helper `run`/`runWithCtx` trùng thân hàm thành một `run` nhận `ctx` tuỳ chọn.
+- Tách logic đọc/ghi `localStorage['safesight_read_alerts']` ở `/alerts` thành hook dùng chung `useReadAlertIds()`/`persistReadAlertIds()` (`src/hooks/use-read-alerts.ts`), chuẩn bị cho badge Sidebar trừ đi các thông báo đã đọc.
 
 ### Sửa
 - Ghi Violation/Alert không còn văng `P1008 SocketTimeout` khi nhiều camera cùng báo vi phạm: `src/lib/prisma.ts` đặt `PRAGMA busy_timeout=5000` + `journal_mode=WAL` khi mở SQLite (tái hiện 8 writer × 30 ghi: 20/240 → 240/240 thành công).
@@ -32,6 +34,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Chạm trần token trong ngày luôn phát `session.ended (stop: skipped)` để panel hỏi-đáp không treo; event `error` gắn đúng `sessionId` của task; vòng lặp agent thoát ngay khi nhận SIGTERM; `PATCH /api/cameras/[id]` đánh thức agent sau khi ghi task; hỏi tiếp vào task `ask` đã hết lượt thử reset `attempts`.
 - JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách vi phạm; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
 - Badge Sidebar không còn hiện số "0" rời khi không có vi phạm.
+- `next dev` không còn tự chèn block `nextjs-agent-rules` vào `AGENTS.md` (Next.js 16.3 agent-file generation): đặt `agentRules: false` trong `next.config.ts`.
 
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
