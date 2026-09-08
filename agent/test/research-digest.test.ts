@@ -23,7 +23,8 @@ test.beforeEach(async () => {
   await prisma.violation.deleteMany({ where: { cameraId: CAM } });
   await prisma.agentEvent.deleteMany({ where: { taskId: task.id } });
   await prisma.cameraAgent.deleteMany({ where: { id: CAM } });
-  await prisma.cameraAgent.create({ data: { id: CAM, usageDay: localDay(), lastDigestAt: new Date() } });
+  // Mốc cũ hơn hiện tại để khẳng định lastDigestAt được đẩy lên THỰC SỰ (không phải bằng nhau).
+  await prisma.cameraAgent.create({ data: { id: CAM, usageDay: localDay(), lastDigestAt: new Date(Date.now() - 60_000) } });
 });
 
 test('a digest with no activity since the last one finishes without opening a session', async () => {
@@ -31,7 +32,7 @@ test('a digest with no activity since the last one finishes without opening a se
   const outcome = await runResearch(task, { client: fakeClient() });
   assert.match(outcome, /không có hoạt động/);
   const after = (await getCameraAgent(CAM)).lastDigestAt!;
-  assert.ok(after.getTime() >= before.getTime(), 'lastDigestAt phải được cập nhật');
+  assert.ok(after.getTime() > before.getTime(), 'lastDigestAt phải được đẩy lên mốc mới');
   assert.equal(await prisma.agentEvent.count({ where: { taskId: task.id, type: 'session.started' } }), 0);
   const skipped = await prisma.agentEvent.findFirst({ where: { taskId: task.id, type: 'action' } });
   assert.equal(JSON.parse(skipped!.data).action, 'camera.digest.skipped');

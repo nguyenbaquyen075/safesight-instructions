@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readdir } from 'node:fs/promises';
+import path from 'node:path';
 import { systemBlocks } from '../lib/prompt';
 import { toolsFor } from '../lib/toolsets';
 import { preambleFor } from '../lib/preamble';
@@ -9,21 +11,27 @@ import { prisma } from '../lib/db';
 
 const ctx: ToolContext = { sessionId: 's', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() } };
 
-test('systemBlocks has instructions plus 4 skills, cache_control on the last block, stable content', async () => {
+// Nguồn sự thật là thư mục skill, không phải một danh sách chép tay trong test: thêm skill mới
+// thì test tự bao luôn thay vì lặng lẽ bỏ sót.
+const skillNames = async (): Promise<string[]> =>
+  (await readdir(path.resolve(process.cwd(), 'agent/skills'), { withFileTypes: true })).filter(d => d.isDirectory()).map(d => d.name).sort();
+
+const indexLineFor = (text: string, name: string): string | undefined =>
+  text.split('\n').find(l => l.startsWith(`| ${name} |`));
+
+test('systemBlocks returns instructions plus one cached skills block with an index row per skill', async () => {
   const a = await systemBlocks(); const b = await systemBlocks();
   assert.equal(a.length, 2); assert.ok(a[1].cache_control); assert.equal(a[1].text, b[1].text);
-  for (const name of ['evidence', 'ppe-review', 'escalation', 'data-boundaries']) assert.ok(a[1].text.includes(name));
+  const names = await skillNames();
+  assert.ok(names.length > 0, 'phải có ít nhất một skill');
+  for (const name of names) assert.ok(indexLineFor(a[1].text, name), `bảng chỉ mục phải có dòng cho ${name}`);
 });
 
 test('systemBlocks strips SKILL.md frontmatter and prepends an index table built from it', async () => {
   const a = await systemBlocks();
   assert.ok(!a[1].text.includes('---\nname:'), 'frontmatter phải bị bỏ khỏi nội dung ghép vào prompt');
   assert.match(a[1].text, /\| Skill \| Dùng khi \|/);
-  for (const name of ['evidence', 'ppe-review', 'escalation', 'data-boundaries']) {
-    const indexLine = a[1].text.split('\n').find(l => l.startsWith(`| ${name} |`));
-    assert.ok(indexLine, `bảng chỉ mục phải có dòng cho ${name}`);
-    assert.match(indexLine!, /Dùng khi/);
-  }
+  for (const name of await skillNames()) assert.match(indexLineFor(a[1].text, name)!, /Dùng khi/);
 });
 
 test('toolsFor: review includes record_verdict, digest does not; ask includes everything', () => {

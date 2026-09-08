@@ -232,6 +232,9 @@ Skill hiện có:
   camera, món thiếu, lần thứ mấy.
 - `data-boundaries` — không suy đoán danh tính người, không mô tả đặc điểm cá nhân ngoài
   PPE, không gửi ảnh/đoạn văn ra ngoài ngoài Telegram đã cấu hình.
+- `remembering-camera-context` — dùng khi phiên thuộc một camera và sắp gọi
+  `remember_camera`, hoặc khi trí nhớ cũ mâu thuẫn với điều vừa quan sát: cái gì bền thì
+  ghi, một ghi chú một sự thật, sửa ghi chú sai bằng `replaceIndex` thay vì thêm mới.
 
 Thêm skill mới: tạo thư mục `agent/skills/<name>/SKILL.md` với frontmatter `name`/
 `description` theo chuẩn trên rồi viết nội dung; loader tự nhặt, không cần sửa code.

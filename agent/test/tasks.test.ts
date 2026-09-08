@@ -118,6 +118,18 @@ test('retireExhausted closes tasks that exceed MAX_ATTEMPTS', async () => {
   assert.match(row!.outcome ?? '', /3 lần/);
 });
 
+// Hai case dưới tự tạo camera/site/org riêng (tiền tố -one / -rec): dọn đúng phần của mình,
+// không đụng dữ liệu của file test khác.
+const OWN_CAMERAS = ['cam-one-a', 'cam-one-b', 'cam-rec-on', 'cam-rec-off'];
+test.after(async () => {
+  await prisma.agentTask.deleteMany({ where: { subjectId: { in: OWN_CAMERAS } } });
+  await prisma.violation.deleteMany({ where: { cameraId: { in: OWN_CAMERAS } } });
+  await prisma.cameraAgent.deleteMany({ where: { id: { in: OWN_CAMERAS } } });
+  await prisma.camera.deleteMany({ where: { id: { in: OWN_CAMERAS } } });
+  await prisma.site.deleteMany({ where: { id: { in: ['site-one', 'site-rec'] } } });
+  await prisma.organization.deleteMany({ where: { id: { in: ['org-one', 'org-rec'] } } });
+});
+
 test('claimDue with onePerCamera leases at most one research task per camera', async () => {
   await prisma.organization.upsert({ where: { id: 'org-one' }, update: {}, create: { id: 'org-one', name: 'One Org' } });
   await prisma.site.upsert({ where: { id: 'site-one' }, update: {}, create: { id: 'site-one', orgId: 'org-one', name: 'Site One', address: 'x', lat: 0, lng: 0 } });

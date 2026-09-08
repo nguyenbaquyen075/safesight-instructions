@@ -99,18 +99,19 @@ export async function claimDue(limit: number, lane: Lane, now = new Date(), opts
   const until = new Date(now.getTime() + LEASE_MS);
   const claimedCameras = new Set<string>();
   for (const task of due) {
+    let cameraId: string | null = null;
     if (opts.onePerCamera) {
-      const cameraId = await cameraIdOf(task);
-      if (cameraId) {
-        if (claimedCameras.has(cameraId)) continue;
-        claimedCameras.add(cameraId);
-      }
+      cameraId = await cameraIdOf(task);
+      // Chỉ đánh dấu SAU khi lease thành công: lease trượt (worker khác/lease cũ) mà đã đánh dấu
+      // thì camera đó mất lượt oan trong vòng này.
+      if (cameraId && claimedCameras.has(cameraId)) continue;
     }
     const { count } = await prisma.agentTask.updateMany({
       where: { id: task.id, OR: [{ leasedUntil: null }, { leasedUntil: { lt: now } }] },
       data: { leasedUntil: until, startedAt: task.startedAt ?? now, attempts: { increment: 1 } },
     });
     if (count === 1) {
+      if (cameraId) claimedCameras.add(cameraId);
       leased.push({
         id: task.id, kind: task.kind, subjectType: task.subjectType, subjectId: task.subjectId,
         reason: task.reason, budget: task.budget, attempts: task.attempts + 1, priority: task.priority, dueAt: task.dueAt,

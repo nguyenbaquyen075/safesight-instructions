@@ -127,7 +127,14 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
     throw mapped;
   } finally {
     // Token đã tiêu là đã tiêu: cộng cả khi phiên lỗi giữa chừng, nếu không camera có thể chạy vượt trần.
-    if (cameraId) await addCameraTokens(cameraId, usage.input_tokens + usage.output_tokens);
+    // Lỗi ở đây (DB khoá) không được thay thế SessionError đang bay ra từ catch — chỉ cảnh báo.
+    if (cameraId) {
+      try {
+        await addCameraTokens(cameraId, usage.input_tokens + usage.output_tokens);
+      } catch (error) {
+        console.warn('[agent] không cộng được token cho camera', cameraId, error instanceof Error ? error.message : String(error));
+      }
+    }
   }
   if (stop === 'refusal') finalText = 'Claude từ chối lượt này (stop_reason=refusal); không có phán quyết.';
   if (stop === 'max_tokens') finalText = finalText ? `${finalText}\n(kết luận bị cắt vì max_tokens)` : '(kết luận bị cắt vì max_tokens)';

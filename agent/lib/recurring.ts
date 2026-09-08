@@ -2,7 +2,9 @@
 import { prisma } from './db';
 import { ensureTask } from './tasks';
 import { getAgentSettings } from './settings';
-import { getCameraAgent } from './camera-agent';
+
+// Bằng @default của CameraAgent.digestEveryMin trong schema: dùng khi camera chưa có dòng subagent.
+const DEFAULT_DIGEST_EVERY_MIN = 30;
 
 // Lưới an toàn mỗi vòng: nếu vì lý do gì (crash giữa chừng, task bị retire) không còn sweep/báo cáo/digest
 // đang chờ thì tạo lại. ensureTask không đổi dueAt của task đang chờ, nên không làm nhịp dày hơn.
@@ -15,15 +17,17 @@ export async function ensureRecurring(now = new Date()): Promise<void> {
   await ensureTask({ kind: 'shift.report', subjectType: 'system', reason: `Báo cáo ca lúc ${settings.shiftReportAt}`, dueAt: due });
 
   // Mỗi camera ONLINE có subagent bật được hẹn một lượt tổng hợp; mốc tính từ digest gần nhất.
+  // CHỈ ĐỌC: camera chưa có dòng CameraAgent thì dùng mặc định của schema — dòng đó do runSession
+  // tạo lười khi phiên đầu tiên chạy. ensureRecurring chạy mỗi 20s nên không được ghi gì ở đây.
   const cameras = await prisma.camera.findMany({ where: { status: 'ONLINE' }, select: { id: true } });
   for (const camera of cameras) {
-    const cameraAgent = await getCameraAgent(camera.id, now);
-    if (!cameraAgent.isEnabled) continue;
-    const from = cameraAgent.lastDigestAt ?? now;
+    const cameraAgent = await prisma.cameraAgent.findUnique({ where: { id: camera.id } });
+    if (cameraAgent && !cameraAgent.isEnabled) continue;
+    const from = cameraAgent?.lastDigestAt ?? now;
     await ensureTask({
       kind: 'camera.digest', subjectType: 'camera', subjectId: camera.id,
       reason: 'Tổng hợp định kỳ camera',
-      dueAt: new Date(from.getTime() + cameraAgent.digestEveryMin * 60_000),
+      dueAt: new Date(from.getTime() + (cameraAgent?.digestEveryMin ?? DEFAULT_DIGEST_EVERY_MIN) * 60_000),
     });
   }
 }

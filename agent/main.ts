@@ -55,7 +55,11 @@ async function tick(): Promise<void> {
   for (const task of await claimDue(DIRECT_BATCH, 'direct')) await runOne(task, runDirect);
   // Mỗi camera nhiều nhất một task/lượt (onePerCamera) nên các phiên nghiên cứu chạy song song được.
   const research = await claimDue(RESEARCH_BATCH, 'research', new Date(), { onePerCamera: true });
-  await Promise.allSettled(research.map(t => runOne(t, task => runResearch(task))));
+  const results = await Promise.allSettled(research.map(t => runOne(t, task => runResearch(task))));
+  // runOne đã tự bắt lỗi, nhưng nếu chính nó hỏng (vd. DB) thì allSettled nuốt mất — log ra để còn thấy.
+  for (const r of results) {
+    if (r.status === 'rejected') console.error('[agent] research task lỗi', r.reason instanceof Error ? r.reason.message : String(r.reason));
+  }
   await ensureRecurring();
 }
 
