@@ -227,7 +227,7 @@ mỗi kênh mỗi người nhận. `sent = true` nếu ít nhất một kênh g�
 người nhận, ok/error) để agent ghi vào `AgentEvent`. Cảnh báo vận hành **không** ghi bảng
 `Alert` (khác với `notifyViolation`) vì `Alert.violationId` bắt buộc và ở đây không có vi phạm
 nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`action: 'escalate.ops'` /
-`'ops.telegram'`), không ở trang `/alerts`.
+`'ops.alert'`), không ở trang `/alerts`.
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
