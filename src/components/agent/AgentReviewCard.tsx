@@ -28,9 +28,11 @@ function ReviewFeedbackRow({ violationId, feedback }: { violationId: string; fee
     return (
       <div className="rounded-xl border border-[var(--border)] px-3 py-2 space-y-1">
         <div className="flex items-center justify-between gap-2 flex-wrap">
-          <span className="text-xs text-[var(--text-secondary)]">
-            Bạn đã đánh giá: <strong className={saved.correct ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>{saved.correct ? 'Đúng' : 'Sai'}</strong>
-            <span className="text-[var(--text-muted)]"> · {new Date(saved.at).toLocaleString('vi-VN')}</span>
+          <span className="text-xs text-[var(--text-secondary)] break-words min-w-0">
+            {/* Phản hồi cũ (trước v0.11.0) không lưu tên người chấm -> không nêu tên bừa. */}
+            {saved.userName ? `${saved.userName} đã đánh giá lúc ` : 'Đã đánh giá lúc '}
+            <span className="text-[var(--text-muted)]">{new Date(saved.at).toLocaleString('vi-VN')}</span>
+            : <strong className={saved.correct ? 'text-[var(--success)]' : 'text-[var(--danger)]'}>{saved.correct ? 'Đúng' : 'Sai'}</strong>
           </span>
           <button type="button" onClick={() => { setEditing(true); setWrong(!saved.correct); }} className="text-xs font-bold text-[var(--primary)] underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)] rounded">Sửa</button>
         </div>

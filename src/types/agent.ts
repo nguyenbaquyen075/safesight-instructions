@@ -21,7 +21,7 @@ export interface AgentReview {
 }
 
 // Người xác nhận phán quyết trên của agent đúng hay sai (cột Violation.reviewFeedback).
-export interface ReviewFeedback { correct: boolean; note?: string; userId: string; at: string }
+export interface ReviewFeedback { correct: boolean; note?: string; userId: string; userName?: string; at: string }
 
 export const OBSERVATION_LABELS: Record<string, string> = {
   'snapshot.no-person': 'khung đỏ không có người',

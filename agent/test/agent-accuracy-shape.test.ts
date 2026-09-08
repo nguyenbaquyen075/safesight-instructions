@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { AGENT_FEEDBACK_CSV_HEADER, accuracyRange, agentAccuracy, csvRow, reviewFeedbackSchema } from '@/lib/agent-accuracy-shape';
+import { AGENT_FEEDBACK_CSV_HEADER, accuracyRange, agentAccuracy, buildReviewFeedback, csvRow, reviewFeedbackSchema } from '@/lib/agent-accuracy-shape';
 
 // Phần thuần của GET /api/stats/agent-accuracy, PATCH /api/violations/[id]/feedback và
 // GET /api/reports/agent-feedback (route handler cần auth() nên không test trực tiếp được,
@@ -23,10 +23,20 @@ test('agentAccuracy totals count reviewed violations, those with feedback and th
 
 test('agentAccuracy groups by camera and by violation type', () => {
   const { byCamera, byType } = agentAccuracy(ROWS);
+  // Sắp xếp tất định: sai nhiều trước, rồi review nhiều, rồi tên tăng dần — bảng không
+  // nhảy thứ tự giữa hai lần tải chỉ vì thứ tự dòng trong DB đổi.
   assert.deepEqual(byCamera, [
     { cameraId: 'cam-a', name: 'Cổng chính', reviewed: 3, withFeedback: 2, wrong: 1 },
     { cameraId: 'cam-b', name: 'Bãi vật tư', reviewed: 1, withFeedback: 1, wrong: 1 },
   ]);
+  // Cùng wrong và cùng reviewed -> xếp theo tên; đảo thứ tự dòng vào không đổi kết quả.
+  assert.deepEqual(agentAccuracy([...ROWS].reverse()).byCamera.map(r => r.cameraId), ['cam-a', 'cam-b']);
+  const tie = [
+    { cameraId: 'cam-z', cameraName: 'Zulu', type: 'safety_vest', agentReview: review('VERIFIED'), reviewFeedback: null },
+    { cameraId: 'cam-m', cameraName: 'Mike', type: 'hard_hat', agentReview: review('VERIFIED'), reviewFeedback: null },
+  ];
+  assert.deepEqual(agentAccuracy(tie).byCamera.map(r => r.name), ['Mike', 'Zulu']);
+  assert.deepEqual(agentAccuracy(tie).byType.map(r => r.type), ['hard_hat', 'safety_vest']);
   assert.deepEqual(byType, [
     { type: 'hard_hat', reviewed: 2, withFeedback: 2, wrong: 1 },
     { type: 'safety_vest', reviewed: 2, withFeedback: 1, wrong: 1 },
@@ -82,4 +92,14 @@ test('accuracyRange defaults to the last 30 whole days and clamps a range that i
   assert.deepEqual(accuracyRange('2026-09-05', '2026-09-01', now).gte, new Date('2026-09-01T00:00:00.000Z'));
   // Xin 10 năm -> chỉ quét tối đa 366 ngày.
   assert.deepEqual(accuracyRange('2016-01-01', '2026-09-08', now).gte, new Date('2025-09-07T00:00:00.000Z'));
+});
+
+test('buildReviewFeedback stamps the reviewer name, id and time onto the stored JSON', () => {
+  const at = new Date('2026-09-08T02:00:00.000Z');
+  assert.deepEqual(buildReviewFeedback({ correct: false, note: 'người có mũ' }, { id: 'u-1', name: 'Nguyễn Văn A', email: 'a@safesight.ai' }, at),
+    { correct: false, note: 'người có mũ', userId: 'u-1', userName: 'Nguyễn Văn A', at: '2026-09-08T02:00:00.000Z' });
+  // Không có tên thì lấy email; không có cả hai thì bỏ hẳn userName (dòng cũ hiện "Đã đánh giá lúc …").
+  assert.equal(buildReviewFeedback({ correct: true }, { id: 'u-2', email: 'b@safesight.ai' }, at).userName, 'b@safesight.ai');
+  assert.equal('userName' in buildReviewFeedback({ correct: true }, { id: 'u-3' }, at), false);
+  assert.equal('note' in buildReviewFeedback({ correct: true }, { id: 'u-3' }, at), false);
 });

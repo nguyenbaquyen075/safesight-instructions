@@ -4,9 +4,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { assertSiteAccess, requireSession } from '@/lib/auth/site-access';
 import { logAudit } from '@/lib/audit-log';
-import { reviewFeedbackSchema } from '@/lib/agent-accuracy-shape';
+import { buildReviewFeedback, reviewFeedbackSchema } from '@/lib/agent-accuracy-shape';
 import { toViolationDTO } from '@/lib/violation-shape';
-import type { ReviewFeedback } from '@/types/agent';
 
 // Người chấm phán quyết của agent: đúng hay sai. Ghi đè được (bấm nhầm thì bấm lại) —
 // mỗi vi phạm chỉ giữ phản hồi mới nhất, lịch sử nằm ở AuditLog.
@@ -29,12 +28,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const parsed = reviewFeedbackSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
 
-  const feedback: ReviewFeedback = {
-    correct: parsed.data.correct,
-    ...(parsed.data.note ? { note: parsed.data.note } : {}),
-    userId: gate.session.user.id,
-    at: new Date().toISOString(),
-  };
+  const feedback = buildReviewFeedback(parsed.data, gate.session.user);
   const updated = await prisma.violation.update({
     where: { id },
     data: { reviewFeedback: JSON.stringify(feedback) },

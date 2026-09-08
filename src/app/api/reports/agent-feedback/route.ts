@@ -2,14 +2,10 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { AGENT_FEEDBACK_CSV_HEADER, accuracyRange, csvRow } from '@/lib/agent-accuracy-shape';
+import { AGENT_FEEDBACK_CSV_HEADER, MAX_FEEDBACK_ROWS, accuracyRange, csvRow } from '@/lib/agent-accuracy-shape';
 import { allowedSiteIds, requireSession } from '@/lib/auth/site-access';
 import { parseJsonOr } from '@/lib/violation-shape';
 import type { AgentReview, ReviewFeedback } from '@/types/agent';
-
-// Trần số dòng: file để nạp vào training/, không phải kho lưu trữ — 20k dòng đã là vài tháng
-// phản hồi và vẫn dựng được trong bộ nhớ. Cần nhiều hơn thì thu hẹp khoảng ngày.
-const MAX_ROWS = 20_000;
 
 // Bộ dữ liệu retrain: mỗi dòng là một vi phạm agent đã phán quyết VÀ người đã chấm đúng/sai.
 export async function GET(request: NextRequest) {
@@ -31,7 +27,7 @@ export async function GET(request: NextRequest) {
       reviewFeedback: { not: null },
     },
     orderBy: { detectedAt: 'desc' },
-    take: MAX_ROWS,
+    take: MAX_FEEDBACK_ROWS,
     select: { id: true, cameraId: true, type: true, detectedAt: true, snapshotUrl: true, clipUrl: true, agentReview: true, reviewFeedback: true },
   });
 
@@ -44,11 +40,15 @@ export async function GET(request: NextRequest) {
   }
 
   const day = (d: Date) => d.toISOString().slice(0, 10);
+  // Chạm trần = file THIẾU dòng cũ nhất. Nói rõ bằng header và bằng đuôi "-partial" trong tên
+  // file, để người tải không tưởng đây là toàn bộ khoảng ngày đã chọn.
+  const truncated = rows.length === MAX_FEEDBACK_ROWS;
   // BOM để Excel bản tiếng Việt không đọc hỏng dấu (giống CSV dựng ở /reports).
   return new NextResponse(`﻿${lines.join('\n')}\n`, {
     headers: {
       'Content-Type': 'text/csv; charset=utf-8',
-      'Content-Disposition': `attachment; filename="phan-hoi-agent-${day(gte)}-den-${day(lte)}.csv"`,
+      'Content-Disposition': `attachment; filename="phan-hoi-agent-${day(gte)}-den-${day(lte)}${truncated ? '-partial' : ''}.csv"`,
+      ...(truncated ? { 'X-Truncated': 'true' } : {}),
     },
   });
 }

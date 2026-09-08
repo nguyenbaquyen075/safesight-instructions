@@ -2,7 +2,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { accuracyRange, agentAccuracy } from '@/lib/agent-accuracy-shape';
+import { MAX_FEEDBACK_ROWS, accuracyRange, agentAccuracy } from '@/lib/agent-accuracy-shape';
 import { allowedSiteIds, requireSession } from '@/lib/auth/site-access';
 
 // Độ chính xác của agent theo camera và theo loại vi phạm, dựng từ phản hồi của người
@@ -26,6 +26,9 @@ export async function GET(request: NextRequest) {
       agentReview: { not: null },
     },
     select: { cameraId: true, type: true, agentReview: true, reviewFeedback: true, camera: { select: { name: true } } },
+    // Cùng trần với CSV: một URL xin 366 ngày của cả tổ chức không được kéo cả bảng.
+    orderBy: { detectedAt: 'desc' },
+    take: MAX_FEEDBACK_ROWS,
   });
 
   return NextResponse.json(agentAccuracy(rows.map(r => ({ ...r, cameraName: r.camera.name }))));

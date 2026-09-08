@@ -98,6 +98,10 @@ Các cột trong file:
 | `humanCorrect` | `true` = agent đúng, `false` = người bảo agent SAI |
 | `note` | Ghi chú của người ("người có mũ, bị cột che") — lý do sai |
 
+File chỉ chứa tối đa **20.000 dòng mới nhất**. Chạm trần thì tên file có đuôi `-partial` và
+phản hồi trả kèm header `X-Truncated: true` — nghĩa là các phản hồi CŨ NHẤT trong khoảng đã
+chọn bị cắt; xuất lại theo từng khoảng ngày hẹp hơn nếu cần đủ.
+
 **Nạp vào `training/`:**
 1. Lọc các dòng `humanCorrect = false`: đó là những ảnh model/agent đang đọc sai — nhóm theo `type`
    để biết lớp nào yếu (thường vẫn là `safety_gloves` / `safety_footwear`).

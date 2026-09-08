@@ -12,6 +12,23 @@ export const reviewFeedbackSchema = z.object({
 });
 export type ReviewFeedbackInput = z.infer<typeof reviewFeedbackSchema>;
 
+/** Ghi phản hồi kèm NGƯỜI chấm: giao diện phải nói rõ ai đã đánh giá, không phải "bạn".
+ *  Người dùng không có tên lẫn email thì bỏ hẳn `userName` — dòng cũ hiện "Đã đánh giá lúc …". */
+export function buildReviewFeedback(
+  input: ReviewFeedbackInput,
+  user: { id: string; name?: string | null; email?: string | null },
+  at: Date = new Date(),
+): ReviewFeedback {
+  const userName = user.name ?? user.email ?? undefined;
+  return {
+    correct: input.correct,
+    ...(input.note ? { note: input.note } : {}),
+    userId: user.id,
+    ...(userName ? { userName } : {}),
+    at: at.toISOString(),
+  };
+}
+
 export interface AccuracyBucket {
   reviewed: number;      // vi phạm agent đã phán quyết
   withFeedback: number;  // trong đó số vi phạm người đã xác nhận đúng/sai
@@ -64,7 +81,14 @@ export function agentAccuracy(rows: AccuracyInputRow[]): AgentAccuracy {
     byType.set(row.type, type);
   }
 
-  return { totals, byCamera: [...byCamera.values()], byType: [...byType.values()] };
+  // Sai nhiều nhất lên đầu (chỗ cần xem trước), rồi review nhiều, rồi tên/loại tăng dần —
+  // thứ tự dòng trong DB không được làm bảng nhảy giữa hai lần tải.
+  const rank = (a: AccuracyBucket, b: AccuracyBucket) => b.wrong - a.wrong || b.reviewed - a.reviewed;
+  return {
+    totals,
+    byCamera: [...byCamera.values()].sort((a, b) => rank(a, b) || a.name.localeCompare(b.name, 'vi')),
+    byType: [...byType.values()].sort((a, b) => rank(a, b) || a.type.localeCompare(b.type)),
+  };
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -88,6 +112,10 @@ export function accuracyRange(fromRaw: string | null, toRaw: string | null, now:
     lte: new Date(`${to.toISOString().slice(0, 10)}T23:59:59.999Z`),
   };
 }
+
+// Trần số dòng cho cả hai truy vấn phản hồi (thống kê và CSV): file để nạp vào training/ và
+// một thẻ trên trang, không phải kho lưu trữ — 20k dòng đã là vài tháng phản hồi.
+export const MAX_FEEDBACK_ROWS = 20_000;
 
 export const AGENT_FEEDBACK_CSV_HEADER = ['violationId', 'cameraId', 'type', 'detectedAt', 'snapshotUrl', 'clipUrl', 'agentVerdict', 'band', 'humanCorrect', 'note'] as const;
 

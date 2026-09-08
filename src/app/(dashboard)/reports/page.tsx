@@ -151,12 +151,14 @@ export default function ReportsPage() {
                 route CSV thay vì dựng lại ở trình duyệt như nút "Xuất CSV" ở trên. */}
             <a
               href={`/api/reports/agent-feedback?${new URLSearchParams({ ...(siteId ? { siteId } : {}), from, to }).toString()}`}
+              download
               target="_blank"
               rel="noopener noreferrer"
               className="basis-full inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
             >
               <Download className="w-4 h-4" /> Xuất phản hồi agent (CSV)
             </a>
+            <p className="basis-full text-xs text-[var(--text-muted)]">File mở ở tab mới và cần quyền xem công trường đang chọn.</p>
           </div>
         </div>
       </SettingCard>
