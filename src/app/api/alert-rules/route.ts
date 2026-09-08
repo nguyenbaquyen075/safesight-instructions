@@ -6,7 +6,7 @@ import type { AlertRule as AlertRuleRow } from '@prisma/client';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { alertRuleSchema } from '@/lib/validation/alert-rule';
-import { assertSiteAccess, ORG_WIDE_ROLES } from '@/lib/auth/site-access';
+import { ALERT_RULE_WRITE_ROLES, assertSiteAccess, ORG_WIDE_ROLES, requireSession } from '@/lib/auth/site-access';
 import { logAudit } from '@/lib/audit-log';
 
 function serializeRule(rule: AlertRuleRow) {
@@ -54,6 +54,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+  if (!ALERT_RULE_WRITE_ROLES.includes(gate.session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const body = await request.json().catch(() => ({}));
   const parsed = alertRuleSchema.safeParse(body);
   if (!parsed.success) {
@@ -73,8 +79,7 @@ export async function POST(request: NextRequest) {
         recipients: JSON.stringify(recipients),
       },
     });
-    const session = await auth();
-    if (session) await logAudit({ session, action: 'alert-rule.create', resource: 'alert-rule', resourceId: rule.id, details: rule.name, request });
+    await logAudit({ session: gate.session, action: 'alert-rule.create', resource: 'alert-rule', resourceId: rule.id, details: rule.name, request });
     return NextResponse.json(serializeRule(rule), { status: 201 });
   } catch (err) {
     if (err instanceof Prisma.PrismaClientKnownRequestError && err.code === 'P2003') {

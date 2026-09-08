@@ -5,7 +5,7 @@ import { createHmac } from 'node:crypto';
 import { AlertChannel } from '../../src/types/enums';
 import { senderFor, SENDABLE_CHANNELS } from '../../src/lib/alert-channels';
 import { stripHtml } from '../../src/lib/alert-channels/zalo';
-import { signWebhookBody, postWebhook } from '../../src/lib/webhook';
+import { signWebhookBody, postWebhook, isPrivateAddress } from '../../src/lib/webhook';
 import {
   chatIdSchema,
   zaloUserIdSchema,
@@ -36,6 +36,9 @@ test('senderFor returns undefined for channels that are not wired yet', () => {
 
 /* ===== webhook signature ===== */
 
+// postWebhook phân giải tên miền trước khi gửi; test không được đụng DNS thật.
+const publicLookup = async () => ({ address: '93.184.216.34' });
+
 test('signWebhookBody matches an HMAC-SHA256 computed independently', () => {
   const body = JSON.stringify({ event: 'violation', id: 'v-1' });
   const expected = 'sha256=' + createHmac('sha256', 'top-secret').update(body).digest('hex');
@@ -59,6 +62,7 @@ test('postWebhook sends signed JSON and reports success', async () => {
   const result = await postWebhook('https://hooks.example.com/safesight', payload, {
     secret: 'top-secret',
     fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: publicLookup,
   });
 
   assert.deepEqual(result, { ok: true });
@@ -76,6 +80,7 @@ test('postWebhook reports the HTTP status when the endpoint rejects', async () =
   const result = await postWebhook('https://hooks.example.com/x', { a: 1 }, {
     secret: 's',
     fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: publicLookup,
   });
   assert.equal(result.ok, false);
   assert.match(result.error ?? '', /500/);
@@ -88,6 +93,7 @@ test('postWebhook reports a thrown network error instead of throwing', async () 
   const result = await postWebhook('https://hooks.example.com/x', { a: 1 }, {
     secret: 's',
     fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: publicLookup,
   });
   assert.deepEqual(result, { ok: false, error: 'boom' });
 });
@@ -101,9 +107,65 @@ test('postWebhook refuses to send unsigned when no secret is configured', async 
   const result = await postWebhook('https://hooks.example.com/x', { a: 1 }, {
     secret: undefined,
     fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: publicLookup,
   });
   assert.equal(result.ok, false);
   assert.equal(called, false);
+});
+
+/* ===== SSRF: chặn dải mạng nội bộ ===== */
+
+test('isPrivateAddress blocks loopback, private, link-local and CGNAT ranges', () => {
+  for (const ip of [
+    '127.0.0.1', '127.9.9.9', '10.0.0.1', '10.255.255.255', '172.16.0.1', '172.31.255.254',
+    '192.168.1.10', '169.254.169.254', '100.64.0.1', '0.0.0.0',
+    '::1', 'fd00::1', 'fe80::1', '::ffff:127.0.0.1', '::ffff:192.168.0.1',
+  ]) {
+    assert.equal(isPrivateAddress(ip), true, `${ip} phải bị chặn`);
+  }
+});
+
+test('isPrivateAddress allows public addresses', () => {
+  for (const ip of ['93.184.216.34', '8.8.8.8', '172.32.0.1', '172.15.255.255', '11.0.0.1', '2606:4700::1111']) {
+    assert.equal(isPrivateAddress(ip), false, `${ip} phải được đi qua`);
+  }
+});
+
+test('isPrivateAddress fails closed on anything that is not an IP', () => {
+  assert.equal(isPrivateAddress(''), true);
+  assert.equal(isPrivateAddress('localhost'), true);
+  assert.equal(isPrivateAddress('999.1.1.1'), true);
+});
+
+test('postWebhook refuses to send when the hostname resolves to a private address', async () => {
+  let called = false;
+  const fetchImpl = async () => {
+    called = true;
+    return new Response('ok');
+  };
+  const result = await postWebhook('https://internal.example.com/x', { a: 1 }, {
+    secret: 's',
+    fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: async () => ({ address: '169.254.169.254' }),
+  });
+  assert.equal(result.ok, false);
+  assert.equal(called, false);
+});
+
+test('postWebhook does not follow redirects', async () => {
+  let init: RequestInit = {};
+  const fetchImpl = async (_url: string | URL | Request, got?: RequestInit) => {
+    init = got ?? {};
+    return new Response(null, { status: 302 });
+  };
+  const result = await postWebhook('https://hooks.example.com/x', { a: 1 }, {
+    secret: 's',
+    fetchImpl: fetchImpl as typeof fetch,
+    lookupImpl: publicLookup,
+  });
+  assert.equal(init.redirect, 'manual');
+  assert.equal(result.ok, false);
+  assert.match(result.error ?? '', /302/);
 });
 
 /* ===== recipient validators ===== */

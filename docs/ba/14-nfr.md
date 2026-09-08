@@ -7,10 +7,11 @@ Trạng thái: ✅ đã đáp ứng ở v0.6.0 · 🟡 một phần · 🔲 chư
 | ID | Yêu cầu | Trạng thái | Ghi chú |
 |---|---|---|---|
 | NFR-01 | Chế độ xác thực: đăng nhập bằng email + mật khẩu (bcrypt), session JWT có vai trò; mọi trang và API (trừ `/login`, `/api/auth`) yêu cầu đăng nhập | ✅ | NextAuth v5 Credentials |
-| NFR-02 | Phân quyền theo vai trò cho trang (`PAGE_ROLES`) và theo công trường cho API (`requireSession`/`allowedSiteIds`/`assertSiteAccess`): vi phạm, camera, công trường, quy tắc cảnh báo đều cần session và lọc theo `assignedSites`; `/api/users` chỉ SUPER_ADMIN/ORG_ADMIN | ✅ | Xoá vi phạm chưa giới hạn vai trò trong cùng site |
+| NFR-02 | Phân quyền theo vai trò cho trang (`PAGE_ROLES`) và theo công trường cho API (`requireSession`/`allowedSiteIds`/`assertSiteAccess`): vi phạm, camera, công trường, quy tắc cảnh báo đều cần session và lọc theo `assignedSites`; `/api/users` (cả `[id]`) chỉ SUPER_ADMIN/ORG_ADMIN và chỉ SUPER_ADMIN cấp được vai trò `SUPER_ADMIN`, không tự đổi vai trò / tự xoá; ghi quy tắc cảnh báo thêm `ALERT_RULE_WRITE_ROLES`, `PUT` vùng nhận diện chỉ SUPER_ADMIN/ORG_ADMIN | ✅ | Xoá vi phạm chưa giới hạn vai trò trong cùng site |
 | NFR-03 | AI Engine ghi vi phạm bằng bí mật dùng chung `X-AI-Engine-Secret`; sai thì 401 | ✅ | |
 | NFR-04 | Bí mật (bot token Telegram) mã hoá AES-256-GCM khi lưu, không trả lại client | ✅ | Khoá `TELEGRAM_ENCRYPT_KEY` |
 | NFR-05 | Khoá API bên thứ ba (Roboflow, Anthropic) chỉ ở server, không lộ ra trình duyệt | ✅ | |
+| NFR-26 | Webhook cảnh báo chống SSRF: chỉ `https`, phân giải tên miền rồi chặn dải loopback / nội bộ / link-local (`isPrivateAddress`), không đi theo chuyển hướng (`redirect: 'manual'`) | ✅ | Unit test dải mạng trong `agent/test/alert-channels.test.ts`; chưa pin DNS nên còn khe TOCTOU |
 | NFR-06 | Video camera xử lý tại chỗ, không đưa luồng video lên cloud; Roboflow chỉ cho ảnh tĩnh do người dùng chọn | ✅ | Quy tắc dự án |
 | NFR-07 | Agent bị kill switch, giới hạn tần suất hành động, trần token / ngày toàn cục và trần riêng từng camera (`CameraAgent.dailyTokenCap`, mặc định 300k); `remember_camera` ≤ 3 lần/phiên; mọi hành động ghi audit `AgentEvent` | ✅ | |
 | NFR-08 | YOLO Bridge có xác thực trước khi mở ra ngoài localhost | 🔲 | Lộ trình P3 |

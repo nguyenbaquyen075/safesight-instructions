@@ -10,10 +10,11 @@ const DEFAULT_DAYS = 7;
 // response ở mức vài MB thay vì tải cả bảng vi phạm về trình duyệt.
 const MAX_ROWS = 2000;
 
-// Khoảng ngày do người dùng nhập ("2026-09-01") -> nguyên ngày theo giờ máy chủ.
+// Khoảng ngày do người dùng nhập ("2026-09-01") -> nguyên ngày theo UTC, cùng quy
+// ước với /api/stats/compliance; không dùng giờ máy chủ vì ngày do trình duyệt sinh.
 function parseRange(from: string | null, to: string | null): { start: Date; end: Date } {
-  const end = to ? new Date(`${to}T23:59:59.999`) : new Date();
-  const start = from ? new Date(`${from}T00:00:00.000`) : new Date(end.getTime() - DEFAULT_DAYS * 86_400_000);
+  const end = to ? new Date(`${to}T23:59:59.999Z`) : new Date();
+  const start = from ? new Date(`${from}T00:00:00.000Z`) : new Date(end.getTime() - DEFAULT_DAYS * 86_400_000);
   return {
     start: Number.isNaN(start.getTime()) ? new Date(Date.now() - DEFAULT_DAYS * 86_400_000) : start,
     end: Number.isNaN(end.getTime()) ? new Date() : end,

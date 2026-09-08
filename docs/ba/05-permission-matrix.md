@@ -25,6 +25,7 @@
 | Xem camera trực tiếp | O | O | O | O | O | X | O |
 | Thêm / sửa / xoá camera | O | O | X | X | X | X | O** |
 | Gán video mẫu cho camera | O | O | X | X | X | X | X |
+| Vẽ / sửa vùng nhận diện của camera | O | O | X | X | X | X | X |
 | Nhắc nhở qua loa công trường (mic) | O | O | O | O | O | X | X |
 | Nhận và phát audio tại loa | O | O | O | O | O | X | X |
 | Tiếp nhận vi phạm từ AI | X | X | X | X | X | O | X |
@@ -45,16 +46,19 @@
 | Xem thẻ subagent camera và trí nhớ camera | O | O | O***** | O***** | O***** | X | X |
 | Quét sức khoẻ, tự khắc phục, leo thang | X | X | X | X | X | X | O** |
 | Kiểm thử Roboflow (tốn credit) | O | O | X | X | X | X | X |
-| Xem / sửa / xoá / tạo người dùng | O | O | X | X | X | X | X |
+| Xem / sửa / xoá / tạo người dùng | O | O****** | X | X | X | X | X |
 | Xem Cài đặt (tài khoản, giám sát, thông báo, nhật ký) | O | O | X | X | X | X | X |
 | Xem / sửa hồ sơ cá nhân, đổi mật khẩu | O | O | O | O | O | X | X |
 
 **Ghi chú điều kiện**
 
 - `O*` Quản lý công trường: chỉ trên công trường có trong `assignedSites` (API kiểm bằng `assertSiteAccess`); trang `/sites` mở cho vai trò này nhưng thao tác theo site được gán.
+- Ghi quy tắc cảnh báo (`POST /api/alert-rules`, `PATCH`/`DELETE /api/alert-rules/[id]`) kiểm cả vai trò (`ALERT_RULE_WRITE_ROLES` = quản trị hệ thống / tổ chức / quản lý công trường) lẫn phạm vi site; cán bộ an toàn và giám sát viên chỉ đọc.
+- Vùng nhận diện: `GET /api/cameras/[id]/zones` mở cho mọi vai trò có quyền xem công trường đó (trình sửa vùng cần đọc), `PUT` chỉ quản trị hệ thống / tổ chức và ghi `AuditLog` `camera.zones.update`.
 - `O**` Agent: chỉ đổi trạng thái camera (`ONLINE` / `DEGRADED` / `OFFLINE`) và khởi động lại engine, dọn snapshot trong giới hạn tần suất `LIMITS`; không tạo/xoá camera. Kill switch tắt thì chỉ ghi nhận.
 - `O***` Agent: chỉ tự chuyển sang `false_positive` khi band VERIFIED báo oan; các band khác chỉ ghi phán quyết.
 - `O****` Gửi Telegram: hệ thống gửi theo quy tắc khi API nhận vi phạm; agent leo thang khi VERIFIED thật và hết cooldown.
+- `O******` Quản trị tổ chức chỉ cấp được các vai trò từ quản lý công trường trở xuống; **chỉ quản trị hệ thống mới cấp được vai trò `SUPER_ADMIN`** (`assignableRoles` trong `src/lib/auth/permissions.ts`, áp cho `POST /api/users`, `PATCH /api/users/[id]` và danh sách vai trò trong dialog). Không ai được tự đổi vai trò hoặc tự xoá tài khoản của chính mình.
 - `O*****` Xem subagent camera: `GET /api/agent/cameras` chỉ trả camera thuộc `allowedSiteIds` của người dùng. Quản trị hệ thống / tổ chức / quản lý công trường xem lưới thẻ trên `/agent`; cán bộ an toàn và giám sát viên không vào được `/agent` nên chỉ xem qua tab Agent trong modal camera.
 
-**Điểm cần lưu ý cho giai đoạn sau:** API vi phạm/camera/công trường đã yêu cầu đăng nhập và lọc theo `assignedSites`, nhưng chưa phân biệt vai trò trong cùng phạm vi site; nếu nghiệp vụ cần hạn chế "Xoá vi phạm" cho quản trị, đưa vào sprint sau (xem [15-implementation-rules.md](15-implementation-rules.md)).
+**Điểm cần lưu ý cho giai đoạn sau:** API vi phạm/camera/công trường đã yêu cầu đăng nhập và lọc theo `assignedSites`, nhưng ngoài quy tắc cảnh báo và vùng nhận diện thì chưa phân biệt vai trò trong cùng phạm vi site; nếu nghiệp vụ cần hạn chế "Xoá vi phạm" cho quản trị, đưa vào sprint sau (xem [15-implementation-rules.md](15-implementation-rules.md)).

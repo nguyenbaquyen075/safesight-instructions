@@ -50,24 +50,24 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`) |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma) |
-| `/api/cameras/[id]/zones` | GET, PUT | Vùng nhận diện (Zone `type=MONITORING`) của camera; `assertSiteAccess`. PUT thay TOÀN BỘ danh sách (`{ zones: [{ name?, points: [{x,y}] }] }`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. AI engine tự đọc lại bảng `Zone` mỗi 60s |
+| `/api/cameras/[id]/zones` | GET, PUT | Vùng nhận diện (Zone `type=MONITORING`) của camera; `assertSiteAccess`. GET mở cho mọi vai trò có quyền xem site đó; PUT thêm điều kiện SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/settings']` — lối vào duy nhất trên giao diện) và ghi `AuditLog` `camera.zones.update`. PUT thay TOÀN BỘ danh sách (`{ zones: [{ name?, points: [{x,y}] }] }`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. AI engine tự đọc lại bảng `Zone` mỗi 60s |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`); POST ghi `AuditLog` |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma); PATCH/DELETE ghi `AuditLog` |
-| `/api/observations` | POST | Chỉ cho AI engine (header `X-AI-Engine-Secret`, không session): `{ observations: [{ cameraId, minute (ISO phút), persons, personSeconds }] }` tối đa 200 dòng; upsert `ObservationStat` theo `(cameraId, minute)` nên gửi lại cùng một phút không nhân đôi mẫu số; `siteId` suy từ Camera, camera đã xoá thì bỏ qua dòng đó. Trả 201 `{ upserted }` |
+| `/api/observations` | POST | Chỉ cho AI engine (header `X-AI-Engine-Secret`, không session): `{ observations: [{ cameraId, minute (ISO phút), persons, personSeconds }] }` tối đa 200 dòng; upsert `ObservationStat` theo `(cameraId, minute)` trong **một** `$transaction` cho cả lô nên gửi lại cùng một phút không nhân đôi mẫu số; `siteId` suy từ Camera, camera đã xoá thì bỏ qua dòng đó. Trả 201 `{ upserted }` |
 | `/api/stats/compliance` | GET | Cần session; `?siteId&from&to` (mặc định 30 ngày, trần 366 ngày) → mảng theo ngày `{ day, personMinutes, violations, complianceRate }`; `complianceRate` = `1 − vi_phạm / max(phút_người, 1)` (0–1), `null` khi ngày đó chưa có quan sát. Hàm thuần `complianceByDay()` ở `src/lib/compliance-shape.ts` |
 | `/api/videos` | GET, POST | Liệt kê / tải video mẫu vào `public/videos/` |
 | `/api/sites`, `/api/sites/[id]` | GET | Công trường; cần session, chỉ trả site trong `assignedSites` |
-| `/api/users`, `/api/users/[id]` | GET, POST · GET, PATCH, DELETE | Người dùng; chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`). POST: zod `createUserSchema` (`src/lib/user-shape.ts`: `name`, `email`, `password` ≥ 8, `role` enum, `assignedSites`), băm mật khẩu bằng `bcryptjs`, `orgId` lấy theo tổ chức của người tạo (fallback tổ chức đầu tiên cho tài khoản dev cứng không có dòng User), 409 khi email trùng. POST/PATCH/DELETE đều ghi `AuditLog` |
+| `/api/users`, `/api/users/[id]` | GET, POST · GET, PATCH, DELETE | Người dùng; cả 5 method chỉ SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/users']`). Chỉ SUPER_ADMIN mới cấp được vai trò `SUPER_ADMIN` (`assignableRoles` trong `src/lib/auth/permissions.ts`); PATCH không cho tự đổi vai trò của chính mình và DELETE không cho tự xoá (403). POST: zod `createUserSchema` (`src/lib/user-shape.ts`: `name`, `email`, `password` ≥ 8, `role` enum, `assignedSites`), băm mật khẩu bằng `bcryptjs`, `orgId` lấy theo tổ chức của người tạo (fallback tổ chức đầu tiên cho tài khoản dev cứng không có dòng User), 409 khi email trùng. POST/PATCH/DELETE đều ghi `AuditLog` |
 | `/api/users/me/password` | PATCH | `{ currentPassword, newPassword ≥ 8 }`; xác minh mật khẩu cũ bằng bcrypt, 400 khi sai hoặc khi tài khoản không có `passwordHash` (tài khoản dev cứng); ghi `AuditLog` |
 | `/api/audit-log` | GET | SUPER_ADMIN/ORG_ADMIN; `?limit` (mặc định 50, tối đa 200) `&resource` |
-| `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site; POST ghi `AuditLog` |
-| `/api/alert-rules/[id]` | PATCH, DELETE | Cả 2 ghi `AuditLog` |
+| `/api/alert-rules` | GET, POST | Quy tắc cảnh báo theo site; POST cần vai trò `ALERT_RULE_WRITE_ROLES` (SUPER_ADMIN/ORG_ADMIN/SITE_MANAGER) **và** `assertSiteAccess`, ghi `AuditLog` |
+| `/api/alert-rules/[id]` | PATCH, DELETE | Cùng điều kiện vai trò + site như POST; cả 2 ghi `AuditLog` |
 | `/api/settings/telegram` | GET, POST | Lưu bot token (mã hoá) + bật/tắt; POST ghi `AuditLog` (không log token thô) |
 | `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
-| `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt |
+| `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt; POST ghi `AuditLog` (không log token thô) |
 | `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
 | `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
-| `/api/reports/violations` | GET | Cần session; `?siteId&cameraId&from&to` (mặc định 7 ngày, `siteId` ngoài phạm vi → 403) → `{ range, byCamera, rows }`, `rows` tối đa 2.000 dòng mới nhất. Gộp theo camera bằng `buildReportSummary` trong `src/lib/report-shape.ts` |
+| `/api/reports/violations` | GET | Cần session; `?siteId&cameraId&from&to` (mặc định 7 ngày, biên ngày tính theo UTC như `/api/stats/compliance`, `siteId` ngoài phạm vi → 403) → `{ range, byCamera, rows }`, `rows` tối đa 2.000 dòng mới nhất. Gộp theo camera bằng `buildReportSummary` trong `src/lib/report-shape.ts` |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |
 | `/api/agent/events` | GET | `?sessionId\|subjectType&subjectId&since` |
 | `/api/agent/settings` | GET, PATCH | SUPER_ADMIN/ORG_ADMIN; PATCH ghi `AuditLog` |

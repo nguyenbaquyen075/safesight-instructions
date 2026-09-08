@@ -2,7 +2,8 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { assertSiteAccess } from '@/lib/auth/site-access';
+import { ORG_WIDE_ROLES, assertSiteAccess, requireSession } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 import {
   MONITORING_ZONE_TYPE,
   defaultZoneName,
@@ -41,6 +42,14 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 // AI xét lại cả khung hình). AI engine đọc thẳng bảng Zone mỗi 60s nên không cần
 // báo cho tiến trình nào cả.
 export async function PUT(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  // Sửa vùng = đổi phạm vi AI được phép nhìn -> chỉ quản trị, khớp PAGE_ROLES['/settings']
+  // (lối vào duy nhất trên giao diện). GET giữ nguyên để trình sửa vùng đọc được.
+  const gate = await requireSession();
+  if (gate instanceof NextResponse) return gate;
+  if (!ORG_WIDE_ROLES.includes(gate.session.user.role)) {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  }
+
   const { id } = await params;
   const camera = await loadCamera(id);
   if (camera instanceof NextResponse) return camera;
@@ -62,6 +71,8 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
       },
     })),
   ]);
+
+  await logAudit({ session: gate.session, action: 'camera.zones.update', resource: 'camera', resourceId: id, details: `${parsed.data.zones.length} vùng`, request });
 
   return NextResponse.json({ zones: await listZones(id) });
 }
