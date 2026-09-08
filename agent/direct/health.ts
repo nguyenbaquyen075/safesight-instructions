@@ -5,7 +5,7 @@ import { env } from '../lib/env';
 import { prisma } from '../lib/db';
 import { readHeartbeat } from '../lib/capabilities';
 
-export const THRESHOLDS = { cameraStalledMs: 90_000, cameraOfflineMs: 600_000, heartbeatStaleMs: 30_000, heartbeatGoneMs: 300_000, bridgeFailStreak: 3 } as const;
+export const THRESHOLDS = { cameraStalledMs: 90_000, cameraOfflineMs: 600_000, heartbeatStaleMs: 30_000, bridgeFailStreak: 3 } as const;
 
 export const MODEL_FILES = [
   { file: 'ppe_multiclass.pt', required: true },
@@ -32,20 +32,13 @@ function processAlive(pid: number): boolean {
   catch (error) { return (error as NodeJS.ErrnoException).code === 'EPERM'; } // có tiến trình nhưng không đủ quyền gửi tín hiệu = vẫn sống
 }
 
-let loggedNonLinuxIdentityCheck = false;
-
 // "Còn sống" không đủ: pid có thể đã bị hệ điều hành tái sử dụng cho tiến trình khác sau khi
-// engine đã tắt. Đọc /proc/<pid>/cmdline để chắc pid đó thật sự là yolo_inference.py trước khi
-// coi nó là "engine đang chạy" — false trên mọi lỗi và trên hệ ngoài Linux (không có /proc).
+// engine đã tắt. Trên Linux đọc /proc/<pid>/cmdline để chắc pid đó thật sự là yolo_inference.py.
+// Ngoài Linux không có /proc: chỉ kiểm còn sống — coi engine khoẻ là "đã mất" thì mỗi vòng quét
+// lại sinh engine.stalled giả và leo thang cho trực vận hành.
 async function isEngineProcess(pid: number): Promise<boolean> {
   if (!processAlive(pid)) return false;
-  if (process.platform !== 'linux') {
-    if (!loggedNonLinuxIdentityCheck) {
-      console.warn('[health] không kiểm được danh tính tiến trình ngoài Linux — coi pid như engine đã mất');
-      loggedNonLinuxIdentityCheck = true;
-    }
-    return false;
-  }
+  if (process.platform !== 'linux') return true;
   try {
     const cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf8');
     return cmdline.includes('yolo_inference.py');
@@ -114,11 +107,11 @@ export function decide(s: HealthSignals, opts: { snapshotMaxMb: number; bridgeFa
   if (s.heartbeat) {
     const parsedAt = Date.parse(s.heartbeat.at);
     const age = Number.isNaN(parsedAt) ? Number.POSITIVE_INFINITY : s.now - parsedAt;
-    // Heartbeat quá cũ (>5 phút) -> engine coi như đã mất dù bước kiểm danh tính pid nói khác
-    // (phòng hờ trùng hợp pid cũ được cấp lại đúng cho một tiến trình yolo_inference.py mới).
-    const pidAlive = age > THRESHOLDS.heartbeatGoneMs ? false : s.pidAlive;
-    if (age > THRESHOLDS.heartbeatStaleMs || !pidAlive) {
-      out.push({ code: 'engine.stalled', subjectType: 'system', subjectId: null, detail: { pid: s.heartbeat.pid, heartbeatAgeMs: age, pidAlive } });
+    // Không hạ pidAlive theo tuổi heartbeat nữa: bước kiểm danh tính (cmdline) đã loại pid bị tái
+    // sử dụng, còn engine treo thật (pid sống, kẹt trong cv2/torch) phải giữ pidAlive=true thì
+    // actions.ts mới SIGTERM được — hạ về false sau 5 phút làm nó không bao giờ được khởi động lại.
+    if (age > THRESHOLDS.heartbeatStaleMs || !s.pidAlive) {
+      out.push({ code: 'engine.stalled', subjectType: 'system', subjectId: null, detail: { pid: s.heartbeat.pid, heartbeatAgeMs: age, pidAlive: s.pidAlive } });
     }
   }
 

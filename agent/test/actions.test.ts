@@ -13,23 +13,25 @@ import type { LeasedTask } from '../lib/tasks';
 const DAY = 86_400_000;
 const now = Date.parse('2026-09-07T10:00:00Z');
 
-test('pickCleanup deletes oldest files first, skips files under 24h or files with no referencing Violation', () => {
+test('pickCleanup deletes oldest files first, skips files under 24h, unreferenced files, and files whose violation is still open', () => {
   const files = [
-    { name: 'violation_b.jpg', mtimeMs: now - 35 * DAY, referenced: true },
-    { name: 'violation_a.jpg', mtimeMs: now - 40 * DAY, referenced: true },
-    { name: 'violation_c.jpg', mtimeMs: now - 2 * DAY, referenced: true },
-    { name: 'violation_d.jpg', mtimeMs: now - 50 * DAY, referenced: false },
-    { name: 'violation_e.jpg', mtimeMs: now - 1000, referenced: true },
+    { name: 'violation_b.jpg', mtimeMs: now - 35 * DAY, referenced: true, closed: true },
+    { name: 'violation_a.jpg', mtimeMs: now - 40 * DAY, referenced: true, closed: true },
+    { name: 'violation_c.jpg', mtimeMs: now - 2 * DAY, referenced: true, closed: true },
+    { name: 'violation_d.jpg', mtimeMs: now - 50 * DAY, referenced: false, closed: false },
+    { name: 'violation_e.jpg', mtimeMs: now - 1000, referenced: true, closed: true },
+    // Vi phạm còn OPEN/UNDER_REVIEW: ảnh là bằng chứng của hồ sơ chưa xử lý xong, dù cũ 60 ngày cũng giữ.
+    { name: 'violation_f.jpg', mtimeMs: now - 60 * DAY, referenced: true, closed: false },
   ];
-  const sizes = { 'violation_a.jpg': 100, 'violation_b.jpg': 100, 'violation_c.jpg': 100, 'violation_d.jpg': 100, 'violation_e.jpg': 100 };
+  const sizes = { 'violation_a.jpg': 100, 'violation_b.jpg': 100, 'violation_c.jpg': 100, 'violation_d.jpg': 100, 'violation_e.jpg': 100, 'violation_f.jpg': 100 };
   assert.deepEqual(pickCleanup(files, now, 150, sizes), ['violation_a.jpg', 'violation_b.jpg']);
   // Không còn luật giữ 30 ngày (yolo_inference.py xoá sạch ảnh mỗi lần khởi động nên ảnh không
   // bao giờ sống đủ 30 ngày) — chỉ còn luật giữ 24h, nên violation_c.jpg (2 ngày) cũng bị chọn.
   assert.deepEqual(pickCleanup(files, now, 1000, sizes), ['violation_a.jpg', 'violation_b.jpg', 'violation_c.jpg']);
 });
 
-test('pickCleanup selects a referenced file that is only 2 days old', () => {
-  const files = [{ name: 'violation_c.jpg', mtimeMs: now - 2 * DAY, referenced: true }];
+test('pickCleanup selects a closed violation snapshot that is only 2 days old', () => {
+  const files = [{ name: 'violation_c.jpg', mtimeMs: now - 2 * DAY, referenced: true, closed: true }];
   assert.deepEqual(pickCleanup(files, now, 1, { 'violation_c.jpg': 100 }), ['violation_c.jpg']);
 });
 

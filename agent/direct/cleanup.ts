@@ -8,15 +8,19 @@ import { checkPaused } from '../lib/guard';
 import type { LeasedTask } from '../lib/tasks';
 
 const DAY = 86_400_000;
+const CLOSED = new Set(['RESOLVED', 'FALSE_POSITIVE']);
 
-// Thuần: chọn file xoá tới khi giải phóng đủ targetBytes. Chỉ file đã có Violation tham chiếu
-// (ảnh chưa tham chiếu có thể đang được ghi) và > 24h (bằng chứng mới, không bao giờ đụng).
+// Thuần: chọn file xoá tới khi giải phóng đủ targetBytes. Ba điều kiện cùng lúc:
+// - đã có Violation tham chiếu (ảnh chưa tham chiếu có thể đang được ghi),
+// - vi phạm đó đã ĐÓNG (RESOLVED/FALSE_POSITIVE) — ảnh của vi phạm còn OPEN/UNDER_REVIEW là bằng
+//   chứng của hồ sơ chưa xử lý xong, không được xoá dù đĩa đầy,
+// - cũ hơn 24h (bằng chứng mới, không bao giờ đụng).
 // Không giữ thêm theo tuổi (từng là 30 ngày): yolo_inference.py xoá sạch violation_*.jpg mỗi
 // lần engine khởi động nên ảnh không bao giờ sống đủ 30 ngày — luật đó khiến cleanup luôn xoá 0
 // file và disk.pressure lặp lại mỗi sweep.
-export function pickCleanup(files: { name: string; mtimeMs: number; referenced: boolean }[], now: number, targetBytes: number, sizes: Record<string, number>): string[] {
+export function pickCleanup(files: { name: string; mtimeMs: number; referenced: boolean; closed: boolean }[], now: number, targetBytes: number, sizes: Record<string, number>): string[] {
   const eligible = files
-    .filter(f => f.referenced && now - f.mtimeMs > DAY)
+    .filter(f => f.referenced && f.closed && now - f.mtimeMs > DAY)
     .sort((a, b) => a.mtimeMs - b.mtimeMs);
   const out: string[] = []; let freed = 0;
   for (const f of eligible) { if (freed >= targetBytes) break; out.push(f.name); freed += sizes[f.name] ?? 0; }
@@ -32,9 +36,11 @@ export async function runCleanup(task: LeasedTask, sessionId: string): Promise<s
   }
   const names = (await readdir(env.snapshotDir)).filter(n => n.startsWith('violation_') && n.endsWith('.jpg'));
   const urls = names.map(n => `/snapshots/${n}`);
-  const referenced = new Set((await prisma.violation.findMany({ where: { snapshotUrl: { in: urls } }, select: { snapshotUrl: true } })).map(v => path.basename(v.snapshotUrl)));
+  // status: row cũ có thể ghi chữ thường (seed() đã nắn, nhưng so sánh vẫn không phân biệt hoa/thường).
+  const rows = await prisma.violation.findMany({ where: { snapshotUrl: { in: urls } }, select: { snapshotUrl: true, status: true } });
+  const closedByFile = new Map(rows.map(v => [path.basename(v.snapshotUrl), CLOSED.has(v.status.toUpperCase())]));
   const files = []; const sizes: Record<string, number> = {};
-  for (const name of names) { const s = await stat(path.join(env.snapshotDir, name)); files.push({ name, mtimeMs: s.mtimeMs, referenced: referenced.has(name) }); sizes[name] = s.size; }
+  for (const name of names) { const s = await stat(path.join(env.snapshotDir, name)); files.push({ name, mtimeMs: s.mtimeMs, referenced: closedByFile.has(name), closed: closedByFile.get(name) === true }); sizes[name] = s.size; }
   const total = Object.values(sizes).reduce((a, b) => a + b, 0);
   const target = Math.max(0, total - env.snapshotMaxMb * 1024 * 1024 * 0.8);
   const picked = pickCleanup(files, Date.now(), target, sizes);

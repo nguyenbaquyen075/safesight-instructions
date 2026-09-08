@@ -10,13 +10,16 @@ const SWEEP_EVERY_MS = 60_000;
 const repeats = new Map<string, number>();
 let bridgeFailStreak = 0;
 
-export async function runSweep(task: LeasedTask): Promise<string> {
+// probe = quét xen kẽ theo yêu cầu. Ngưỡng leo thang (streak bridge, số lần lặp) được định nghĩa
+// theo NHỊP quét định kỳ 60s, nên probe chỉ đọc chúng, không được cộng dồn vào — nếu không, đổi
+// nguồn camera vài lần liên tiếp là đủ chạm ngưỡng leo thang mà chưa có 3 vòng quét thật.
+export async function runSweep(task: LeasedTask, probe = false): Promise<string> {
   const sessionId = newSessionId();
   const signals = await collectSignals();
-  bridgeFailStreak = signals.bridge ? 0 : bridgeFailStreak + 1;
+  if (!probe) bridgeFailStreak = signals.bridge ? 0 : bridgeFailStreak + 1;
   const findings = decide(signals, { snapshotMaxMb: env.snapshotMaxMb, bridgeFailStreak });
   const paused = await checkPaused();
-  const actions = await applyFindings(findings, { sessionId, taskId: task.id, repeats, paused: paused !== null });
+  const actions = await applyFindings(findings, { sessionId, taskId: task.id, repeats: probe ? new Map() : repeats, paused: paused !== null });
   // Lặp: task mới, không cron. Chỉ sweep định kỳ mới tự hẹn lần sau — probe (task.kind ===
   // 'health.probe') chạy xen giữa hai vòng sweep, không được đẩy lùi lần hẹn định kỳ đang chờ.
   if (task.kind === 'health.sweep') {
@@ -27,5 +30,5 @@ export async function runSweep(task: LeasedTask): Promise<string> {
 
 // Kiểm một camera vừa đổi nguồn/trạng thái: sweep ngay, không chờ 60s.
 export async function runProbe(task: LeasedTask): Promise<string> {
-  return runSweep(task);
+  return runSweep(task, true);
 }

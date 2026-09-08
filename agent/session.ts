@@ -10,7 +10,7 @@ import { preambleFor } from './lib/preamble';
 import { toolsFor } from './lib/toolsets';
 import { newToolContext } from './lib/tool-context';
 import { dailyTokensUsed } from './lib/usage';
-import { LlmHttpError, openAiClient } from './lib/llm/openai';
+import { openAiClient } from './lib/llm/openai';
 import type { LeasedTask } from './lib/tasks';
 
 // Kiểu chung của mọi provider nằm ở lib/llm/types; re-export để nơi gọi cũ vẫn import từ '../session'.
@@ -20,6 +20,9 @@ import type { SessionClient, Turn } from './lib/llm/types';
 export class SessionError extends Error {
   retryAfterMs: number | null;
   fatal: boolean;
+  // Phiên thật sự đã chạy khi lỗi xảy ra — runSession trỏ task sang sessionId mới mỗi lần thử,
+  // nên task.sessionId ở main.ts là của lần TRƯỚC; gắn ở đây để event lỗi vào đúng thread.
+  sessionId?: string;
   // Lỗi "không phải lỗi của task" (chạm trần token): trả lại lượt để task không bị retire oan sau 3 ngày chạm trần.
   refundAttempt: boolean;
   constructor(message: string, retryAfterMs: number | null, fatal: boolean, refundAttempt = false) {
@@ -39,7 +42,8 @@ export function msUntilMidnight(now = new Date()): number {
 
 // Lớp mỏng bọc SDK: mọi thứ Anthropic-specific ở đây, để phần còn lại test được bằng client giả.
 export function anthropicClient(): SessionClient {
-  const client = new Anthropic({ apiKey: env.llmKey });
+  // LLM_BASE_URL/ANTHROPIC_BASE_URL cũng phải áp cho SDK: proxy định dạng Anthropic dùng chung biến này.
+  const client = new Anthropic({ apiKey: env.llmKey, baseURL: env.llmBaseUrl ?? undefined });
   return {
     async *run(p) {
       const runner = client.beta.messages.toolRunner({
@@ -54,14 +58,8 @@ export function anthropicClient(): SessionClient {
 }
 
 export function mapError(error: unknown): SessionError {
-  if (error instanceof LlmHttpError) {
-    if (error.status === 401 || error.status === 403) { latchClaudeOff(error.message); return new SessionError(`LLM từ chối request: ${error.message}`, null, true); }
-    if (error.status === 429) return new SessionError('429: quá giới hạn LLM', 60_000, false);
-    if (error.status === 400) return new SessionError(`LLM từ chối request: ${error.message}`, null, true);
-    return new SessionError(`LLM lỗi ${error.status}`, error.status >= 500 ? 60_000 : 30_000, false);
-  }
   if (error instanceof Anthropic.RateLimitError) return new SessionError('429: quá giới hạn Claude', 60_000, false);
-  if (error instanceof Anthropic.AuthenticationError) { latchClaudeOff(error.message); return new SessionError(`Claude từ chối request: ${error.message}`, null, true); }
+  if (error instanceof Anthropic.AuthenticationError || error instanceof Anthropic.PermissionDeniedError) { latchClaudeOff(error.message); return new SessionError(`Claude từ chối request: ${error.message}`, null, true); }
   if (error instanceof Anthropic.BadRequestError) return new SessionError(`Claude từ chối request: ${error.message}`, null, true);
   if (error instanceof Anthropic.APIConnectionError) return new SessionError('không nối được Claude', 30_000, false);
   if (error instanceof Anthropic.APIError) return new SessionError(`Claude lỗi ${error.status}: ${error.message}`, 60_000, false);
@@ -107,6 +105,7 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
     }
   } catch (error) {
     const mapped = mapError(error);
+    mapped.sessionId = sessionId;
     await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { message: mapped.message, fatal: mapped.fatal } });
     await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.ended', data: { usage, stop: 'error' } });
     throw mapped;

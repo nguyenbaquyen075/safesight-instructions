@@ -4,7 +4,8 @@ import assert from 'node:assert/strict';
 import http from 'node:http';
 import { betaZodTool } from '@anthropic-ai/sdk/helpers/beta/zod';
 import { z } from 'zod';
-import { openAiClient, LlmHttpError } from '../lib/llm/openai';
+import Anthropic from '@anthropic-ai/sdk';
+import { openAiClient } from '../lib/llm/openai';
 import { mapError } from '../session';
 import type { RunParams, Turn } from '../session';
 
@@ -49,7 +50,7 @@ async function collect(port: number): Promise<Turn[]> {
   return turns;
 }
 
-test('openAiClient chạy vòng lặp tool rồi trả lượt cuối, có usage và stop_reason đã quy đổi', async () => {
+test('openAiClient runs the tool loop and yields the final turn with usage and a mapped stop_reason', async () => {
   calls.length = 0;
   const s = await stub([
     { body: { choices: [{ message: { content: '', tool_calls: [{ id: 'call_1', type: 'function', function: { name: 'read_thing', arguments: '{"thingId":"thing-1"}' } }] }, finish_reason: 'tool_calls' }], usage: { prompt_tokens: 100, completion_tokens: 10 } } },
@@ -78,19 +79,26 @@ test('openAiClient chạy vòng lặp tool rồi trả lượt cuối, có usage
   } finally { await s.close(); }
 });
 
-test('lỗi HTTP thành LlmHttpError: 429 chờ 60s, 401 là fatal', async () => {
+// Lỗi ném ra từ vòng lặp (thay vì để assert.rejects nuốt) — cần chính đối tượng lỗi để map tiếp.
+async function rejection(port: number): Promise<unknown> {
+  return collect(port).then(() => new Error('không có lỗi nào được ném'), (e: unknown) => e);
+}
+
+test('an HTTP error becomes the matching SDK error: 429 waits 60s, 401 is fatal', async () => {
   const rate = await stub([{ status: 429, body: 'too many' }]);
   try {
-    await assert.rejects(collect(rate.port), (e: unknown) => e instanceof LlmHttpError && e.status === 429);
-    const mapped = mapError(new LlmHttpError(429, 'too many'));
+    const error = await rejection(rate.port);
+    assert.ok(error instanceof Anthropic.RateLimitError, 'phải là RateLimitError của SDK');
+    const mapped = mapError(error);
     assert.equal(mapped.retryAfterMs, 60_000);
     assert.equal(mapped.fatal, false);
   } finally { await rate.close(); }
 
   const denied = await stub([{ status: 401, body: 'bad key' }]);
   try {
-    await assert.rejects(collect(denied.port), (e: unknown) => e instanceof LlmHttpError && e.status === 401);
-    const mapped = mapError(new LlmHttpError(401, 'bad key'));
+    const error = await rejection(denied.port);
+    assert.ok(error instanceof Anthropic.AuthenticationError, 'phải là AuthenticationError của SDK');
+    const mapped = mapError(error);
     assert.equal(mapped.fatal, true);
     assert.equal(mapped.retryAfterMs, null);
   } finally { await denied.close(); }

@@ -21,7 +21,7 @@ export async function GET() {
 
 const updateSchema = z.object({
   isEnabled: z.boolean().optional(),
-  model: z.enum(['claude-opus-5', 'claude-sonnet-5']).optional(),
+  model: z.string().min(1).max(100).optional(), // tên model do proxy quyết định, không khoá vào danh sách Anthropic
   reviewEffort: z.enum(['low', 'medium', 'high']).optional(),
   dailyTokenCap: z.number().int().min(100_000).max(50_000_000).optional(),
   shiftReportAt: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).optional(),

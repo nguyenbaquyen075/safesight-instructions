@@ -10,6 +10,8 @@ import { toast } from '@/lib/toast';
 import { cn } from '@/lib/utils';
 
 const FILTERS = [['', 'Tất cả'], ['verdict', 'Phán quyết'], ['action', 'Hành động'], ['health', 'Sức khoẻ'], ['error', 'Lỗi']] as const;
+// Gợi ý sẵn; admin vẫn gõ được tên model bất kỳ (proxy tương thích OpenAI dùng tên riêng).
+const MODELS = ['claude-opus-5', 'claude-sonnet-5'];
 
 export default function AgentPage() {
   const [type, setType] = useState<string>('');
@@ -60,7 +62,7 @@ export default function AgentPage() {
             {settingsLoading ? <div className="h-40 rounded-xl bg-[var(--surface-elevated)] animate-pulse" /> : settingsError ? <p className="text-sm text-[var(--danger)]">Không tải được cài đặt.</p> : settings && (
               <div className="space-y-4">
                 <Switch enabled={settings.isEnabled} onChange={v => update({ isEnabled: v })} label="Bật agent" description="Tắt: chỉ ghi nhận, không hành động." />
-                <InputGroup label="Model"><select value={settings.model} onChange={e => update({ model: e.target.value })} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm"><option value="claude-opus-5">claude-opus-5</option><option value="claude-sonnet-5">claude-sonnet-5</option>{!['claude-opus-5', 'claude-sonnet-5'].includes(settings.model) && <option value={settings.model}>{settings.model}</option>}</select></InputGroup>
+                <InputGroup label="Model"><input key={`model-${settings.model}`} list="agent-models" defaultValue={settings.model} onBlur={e => { const v = e.target.value.trim(); if (v && v !== settings.model) update({ model: v }); }} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" /><datalist id="agent-models">{[...new Set([...MODELS, settings.model])].map(m => <option key={m} value={m} />)}</datalist></InputGroup>
                 <InputGroup label="Độ kỹ khi review"><select value={settings.reviewEffort} onChange={e => update({ reviewEffort: e.target.value })} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm"><option value="low">low</option><option value="medium">medium</option><option value="high">high</option></select></InputGroup>
                 {/* key theo giá trị server để input tự remount sau refetch, tránh lưu lại giá trị cũ trong DOM */}
                 <InputGroup label="Trần token / ngày"><input key={`cap-${settings.dailyTokenCap}`} type="number" defaultValue={settings.dailyTokenCap} onBlur={e => { const v = Number(e.target.value); if (Number.isFinite(v) && v !== settings.dailyTokenCap) update({ dailyTokenCap: v }); }} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" /></InputGroup>

@@ -27,10 +27,16 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Lane nghiên cứu không còn hỏng `Cannot read properties of undefined (reading 'filter')` khi key là proxy `/chat/completions`.
 - Tài khoản dev cứng `admin@safesight.ai` chỉ còn hoạt động ngoài production (hoặc khi `ALLOW_DEV_LOGIN=true`); trang đăng nhập ẩn gợi ý ở production.
 - `POST /detections` của YOLO Bridge yêu cầu header `X-AI-Engine-Secret` khi `AI_ENGINE_SECRET` được đặt; engine gửi kèm header; image bridge có `dotenv`.
-- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt: kiểm `/proc/<pid>/cmdline` chứa `yolo_inference.py`, heartbeat quá 5 phút coi là engine đã mất, pid không hợp lệ không tiêu suất `engine-restart`; `yolo_inference.py` xoá `.heartbeat.json` khi thoát.
-- `health.probe` không còn đẩy lùi lịch `health.sweep` định kỳ.
-- Chạm trần token trong ngày luôn phát `session.ended (stop: skipped)` để panel hỏi-đáp không treo; event `error` gắn đúng `sessionId` của task; vòng lặp agent thoát ngay khi nhận SIGTERM; `PATCH /api/cameras/[id]` đánh thức agent sau khi ghi task; hỏi tiếp vào task `ask` đã hết lượt thử reset `attempts`.
-- JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách vi phạm; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
+- Agent trực vận hành không còn SIGTERM một pid lạ khi engine đã tắt: kiểm `/proc/<pid>/cmdline` chứa `yolo_inference.py` (ngoài Linux không có `/proc` nên chỉ kiểm còn sống, thay vì báo `engine.stalled` giả mỗi vòng quét), pid không hợp lệ không tiêu suất `engine-restart`; `yolo_inference.py` ghi `.heartbeat.json` ngay khi khởi động (trước lúc nạp model) và xoá khi thoát.
+- Engine treo thật (pid còn sống, kẹt trong cv2/torch) lại được khởi động lại: bỏ luật hạ `detail.pidAlive` về `false` khi heartbeat quá 5 phút — luật đó làm `actions.ts` không bao giờ SIGTERM nữa sau mốc đó.
+- `health.probe` không còn đẩy lùi lịch `health.sweep` định kỳ, và không còn cộng dồn bộ đếm leo thang (`bridgeFailStreak`, `repeats`) vốn định nghĩa theo nhịp quét 60s.
+- Chạm trần token trong ngày luôn phát `session.ended (stop: skipped)` để panel hỏi-đáp không treo; event `error` gắn đúng `sessionId` của task; vòng lặp agent thoát ngay khi nhận SIGTERM; `PATCH /api/cameras/[id]` đánh thức agent sau khi ghi task; hỏi tiếp vào task `ask` đã hết lượt thử tạo task mới thay vì reset `attempts` (đua với `retireExhausted`), nhánh nối lại dùng `updateMany` kèm `finishedAt: null`.
+- JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách vi phạm; `seed()` của agent chuẩn hoá `Violation.status` về chữ HOA một lần lúc khởi động thay vì so sánh không phân biệt hoa/thường ở từng chỗ gọi.
+- Lane nghiên cứu chạy được trên proxy tương thích OpenAI: model mặc định `claude-opus-5` do route Next tạo bị nắn về `LLM_MODEL_DEFAULT` lúc worker khởi động, `PATCH /api/agent/settings` nhận tên model tự do, ô Model trên `/agent` là `<input list>` + `<datalist>` nên admin gõ được tên bất kỳ.
+- `LLM_BASE_URL`/`ANTHROPIC_BASE_URL` giờ áp cả cho chế độ `anthropic` (`new Anthropic({ baseURL })`), không chỉ chế độ `openai`.
+- Event `error` gắn đúng `sessionId` của phiên vừa chạy (`SessionError.sessionId`), không phải phiên của lần thử trước.
+- `snapshot.cleanup` không xoá ảnh của vi phạm còn `OPEN`/`UNDER_REVIEW`: chỉ xoá ảnh đã tham chiếu, vi phạm đã đóng (`RESOLVED`/`FALSE_POSITIVE`) và cũ hơn 24h.
+- `agent/lib/llm/openai.ts` gọn lại quanh SDK: dùng `BetaRunnableTool`/`tool.parse` thay khai báo tool cục bộ, ném `Anthropic.APIError.generate(...)` nên `mapError` dùng chung một nhánh cho hai provider (thêm `PermissionDeniedError`), và với `LLM_IMAGE_INPUT=true` mỗi ảnh chỉ tải lên một lần mỗi phiên.
 - Badge Sidebar không còn hiện số "0" rời khi không có vi phạm.
 
 ### Loại bỏ

@@ -6,7 +6,8 @@ import { emit, newSessionId } from './lib/audit';
 import { runDirect } from './direct/index';
 import { runResearch, SessionError } from './research/index';
 import { startHttp } from './channels/http';
-import { getAgentSettings } from './lib/settings';
+import { applyModelDefault, getAgentSettings } from './lib/settings';
+import { prisma } from './lib/db';
 
 const TICK_MS = 20_000;
 const DIRECT_BATCH = 20;
@@ -38,8 +39,10 @@ async function runOne(task: LeasedTask, run: (t: LeasedTask) => Promise<string>)
     await completeTask(task.id, outcome);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    // task.sessionId nếu task đã có thread (vd. 'ask' nối lại) — gắn lỗi vào đúng thread panel đang poll, không tạo phiên rời rạc.
-    await emit({ sessionId: task.sessionId ?? newSessionId(), taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { kind: task.kind, message } });
+    // Ưu tiên phiên mà runSession vừa chạy (SessionError.sessionId); nếu không có thì task.sessionId
+    // (task đã có thread, vd. 'ask' nối lại) — gắn lỗi vào đúng thread panel đang poll.
+    const sessionId = (error instanceof SessionError ? error.sessionId : undefined) ?? task.sessionId ?? newSessionId();
+    await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { kind: task.kind, message } });
     if (error instanceof SessionError && error.fatal) { await completeTask(task.id, `lỗi không thử lại: ${message}`); return; }
     const delay = error instanceof SessionError && error.retryAfterMs ? error.retryAfterMs : 30_000 * task.attempts;
     await releaseTask(task.id, delay, `lỗi: ${message}`, { refundAttempt: error instanceof SessionError && error.refundAttempt });
@@ -65,6 +68,12 @@ async function ensureRecurring(): Promise<void> {
 }
 
 async function seed(): Promise<void> {
+  // Row Violation cũ có thể ghi status chữ thường; SQLite phân biệt hoa/thường trên cột TEXT.
+  // Nắn một lần lúc khởi động (idempotent) để mọi nơi so sánh bằng chữ HOA thẳng, không phải
+  // rải idiom không-phân-biệt-hoa-thường ở từng chỗ gọi.
+  const normalized = await prisma.$executeRawUnsafe('UPDATE "Violation" SET status = upper(status) WHERE status <> upper(status)');
+  if (normalized) console.log(`[agent] chuẩn hoá ${normalized} dòng Violation.status về chữ HOA`);
+  await applyModelDefault();
   await ensureTask({ kind: 'health.sweep', subjectType: 'system', reason: 'Quét sức khoẻ định kỳ', dueAt: new Date() });
   await ensureRecurring();
 }

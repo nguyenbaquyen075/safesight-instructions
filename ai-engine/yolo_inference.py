@@ -283,6 +283,17 @@ def clear_snapshots():
         pass
 
 
+def write_heartbeat(streams: int = 0, fps: float = 0.0):
+    """Ghi .heartbeat.json (pid, thời điểm, số luồng, fps) cho agent trực vận hành."""
+    try:
+        os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+        with open(HEARTBEAT_PATH, "w", encoding="utf-8") as f:
+            json.dump({"pid": os.getpid(), "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+                       "streams": streams, "fps": fps}, f)
+    except OSError:
+        pass
+
+
 # Khi TẮT dự án (Ctrl+C / kill / thoát) -> tự dọn ảnh
 atexit.register(clear_snapshots)
 signal.signal(signal.SIGTERM, lambda *_: sys.exit(0))
@@ -297,6 +308,9 @@ def run_inference():
         return
 
     clear_snapshots()  # bắt đầu chạy -> xoá sạch ảnh cũ, bắt lại từ đầu
+    # Ghi heartbeat NGAY, trước khi nạp model (mất vài chục giây): nếu chờ tới vòng lặp đầu tiên
+    # thì trong khoảng đó agent vẫn đọc heartbeat cũ và SIGTERM nhầm pid của lần chạy trước.
+    write_heartbeat()
 
     def make_tracker():
         return PPEViolationTracker(
@@ -464,13 +478,7 @@ def run_inference():
 
         _hb_frames += 1
         if time.time() - _hb_last >= 5.0:
-            try:
-                os.makedirs(SNAPSHOT_DIR, exist_ok=True)
-                with open(HEARTBEAT_PATH, "w", encoding="utf-8") as f:
-                    json.dump({"pid": os.getpid(), "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
-                               "streams": len(streams), "fps": round(_hb_frames / max(time.time() - _hb_last, 1e-6), 1)}, f)
-            except OSError:
-                pass
+            write_heartbeat(len(streams), round(_hb_frames / max(time.time() - _hb_last, 1e-6), 1))
             _hb_last, _hb_frames = time.time(), 0
 
         # Small delay to throttle CPU
