@@ -125,6 +125,46 @@ mkdir -p data
 docker run --rm -v <tên-volume-ở-trên>:/from -v "$PWD/data":/to alpine cp -a /from/. /to/
 ```
 
+## Chuyển sang PostgreSQL
+
+SQLite đủ cho dev và cho một máy chủ nhỏ, nhưng chỉ cho **một tiến trình ghi tại một thời điểm**. Nhiều worker agent, nhiều bản dashboard sau load balancer thì phải dùng PostgreSQL.
+
+Prisma 7 nhúng query compiler theo provider **lúc `prisma generate`**, nên một bản Prisma Client chỉ nói được một loại DB. Vì vậy thứ tự các bước dưới đây quan trọng: **chép dữ liệu xong rồi mới đổi client**.
+
+```bash
+# 0. Bật Postgres (compose profile "pg"); .env cần POSTGRES_PASSWORD và DATABASE_URL
+docker compose --profile pg up -d postgres
+
+# 1. Tạo bảng bên Postgres (không đụng tới client đang có)
+POSTGRES_URL='postgresql://safesight:<mat_khau>@127.0.0.1:5432/safesight'
+DATABASE_URL="$POSTGRES_URL" npm run db:pg:push
+
+# 2. Chép dữ liệu SQLite -> Postgres (script vẫn dùng client SQLite hiện tại, nên phải chạy TRƯỚC bước 3)
+SQLITE_URL=file:./data/dev.db POSTGRES_URL="$POSTGRES_URL" npm run db:pg:migrate-data
+
+# 3. Đổi Prisma Client sang bản Postgres (quay lại dev SQLite: chạy `npx prisma generate`)
+npm run db:pg:generate
+```
+
+`scripts/sqlite-to-postgres.mjs` chép **16 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
+
+Với Docker, `.env` cần thêm (xem `.env.docker.example`):
+
+```bash
+DATABASE_URL=postgresql://safesight:<mat_khau>@postgres:5432/safesight
+POSTGRES_PASSWORD=<mat_khau>
+PRISMA_SCHEMA=prisma/postgres/schema.prisma       # build arg: sinh client bản Postgres
+BUILD_DATABASE_URL=postgresql://build/build       # URL giả, chỉ để `next build` chọn đúng adapter
+```
+
+rồi **dựng lại image** (`docker compose build dashboard`) vì client Postgres phải được sinh trong image, và chạy `docker compose --profile pg up -d`. Service `postgres` (image `postgres:16-alpine`, volume `pgdata`) chỉ mở cổng ra `127.0.0.1:5432` để AI engine và agent chạy ngoài container vẫn nối được. Không bật profile thì toàn bộ ngăn xếp chạy SQLite y như trước.
+
+Chưa nghiệm thu trên PostgreSQL thật: máy phát triển hiện không có Postgres, nên phần này mới chỉ được kiểm bằng đọc lại mã và test SQLite.
+
+## Nhiều worker agent
+
+Có thể chạy nhiều tiến trình `agent/main.ts` (mỗi tiến trình một `AGENT_PORT` khác nhau). Điều kiện: DB phải là PostgreSQL — xem mục "Nhiều worker" trong [09 — Agent](09-agent.md#nhiều-worker).
+
 ## Lưu ý Prisma 7.10 với trợ lý AI
 
 Từ Prisma CLI 7.10, `prisma db push --accept-data-loss` (nằm trong `npm run test:agent`, chạy trên file tạm `agent-test.db`) từ chối chạy khi phát hiện được gọi bởi Claude Code và yêu cầu người vận hành đồng ý rõ ràng; phiên AI phải đặt biến `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` đúng nội dung câu đồng ý. Chạy tay trong terminal hoặc trên CI không bị ảnh hưởng.
@@ -137,6 +177,9 @@ Từ Prisma CLI 7.10, `prisma db push --accept-data-loss` (nằm trong `npm run 
 | `npm run dev:web` / `dev:bridge` / `dev:yolo` / `dev:agent` | Chạy riêng từng tiến trình |
 | `npm run test:agent` | Test agent (`node --test agent/test/*.test.ts`) trên SQLite tạm |
 | `npm run db:seed` | Seed org/site/camera (`prisma/seed.mjs`) |
+| `npm run db:pg:push` | Tạo bảng trên PostgreSQL (`prisma/postgres/schema.prisma`) |
+| `npm run db:pg:migrate-data` | Chép dữ liệu SQLite → PostgreSQL (`SQLITE_URL`, `POSTGRES_URL`) |
+| `npm run db:pg:generate` | Sinh Prisma Client bản PostgreSQL (**thay** client SQLite đang có) |
 | `npm run build` / `npm run start` | Build và chạy bản production |
 | `npm run lint` | ESLint |
 

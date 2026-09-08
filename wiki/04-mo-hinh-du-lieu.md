@@ -75,7 +75,18 @@ Một người thiếu nhiều món chỉ ghi **một** Violation theo món nghi
 
 ## Dev SQLite ↔ Production PostgreSQL
 
-Đầu `schema.prisma` ghi rõ: dev dùng `sqlite`, không enum/mảng native. `package.json` đã cài cả `@prisma/adapter-libsql` (dev) và `@prisma/adapter-pg` (prod). Khi lên Postgres cần đổi provider, khôi phục enum/array, và cập nhật `docs/ba/SRS.md` + wiki này.
+Có **hai file schema với y hệt model**, chỉ khác dòng `provider` của datasource:
+
+| File | Provider | Dùng khi |
+|---|---|---|
+| `prisma/schema.prisma` | `sqlite` | Dev và bản Docker mặc định |
+| `prisma/postgres/schema.prisma` | `postgresql` | Production |
+
+Cố ý **không** khôi phục enum/mảng native ở bản Postgres: giữ `String` + JSON-trong-`String` nên kiểu TypeScript sinh ra giống hệt nhau và mã nguồn không phải rẽ nhánh theo DB. Test `agent/test/schema-parity.test.ts` so hai file sau khi bỏ chú thích và chuẩn hoá dòng `provider` — sửa một file mà quên file kia là test đỏ ngay.
+
+`src/lib/prisma.ts` (`createAdapter`) chọn adapter theo **lược đồ của `DATABASE_URL`**: `postgres://`/`postgresql://` → `PrismaPg`, `file:` → `PrismaLibSqlWal`. `prisma/seed.mjs` làm y như vậy. Không có biến cấu hình riêng nào để quên đồng bộ.
+
+Ràng buộc quan trọng của Prisma 7: query compiler được **nhúng vào client lúc `prisma generate`** theo provider của schema, nên một bản client chỉ chạy được một loại DB. Bản dựng cho Postgres phải chạy `npm run db:pg:generate` — xem [03 — Cài đặt & vận hành](03-cai-dat-va-van-hanh.md#chuyển-sang-postgresql). Đổi client bằng lệnh này sẽ **thay** client SQLite trong `node_modules`; quay lại dev thì chạy `npx prisma generate`.
 
 Dev có ba tiến trình cùng đụng vào một file SQLite: Next.js API (ghi Violation/Alert), agent worker (ghi `AgentEvent`/`AgentTask`) và AI engine Python (đọc bảng `Camera`). Mặc định libsql mở DB ở chế độ rollback-journal với `busy_timeout = 0` nên chỉ cần một tiến trình đang đọc là lệnh ghi văng ngay `SQLITE_BUSY` → Prisma `P1008`. Vì vậy `src/lib/prisma.ts` (dùng chung cho Next.js lẫn agent) đặt `PRAGMA busy_timeout=5000` rồi `PRAGMA journal_mode=WAL` ngay khi mở connection. Postgres không có hạn chế này nên khi lên prod hai PRAGMA đó chỉ còn tác dụng với nhánh SQLite.
 

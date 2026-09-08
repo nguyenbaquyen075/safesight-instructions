@@ -2,6 +2,10 @@
 # Lần chạy đầu: volume /app/data trống → chép DB đã seed (schema + Organization/Site/Camera mẫu).
 # mkdir -p phòng trường hợp bind mount host chưa tồn tại (Docker sẽ tự tạo bằng root nếu thiếu).
 set -e
+# Dùng PostgreSQL thì không có file SQLite nào để khởi tạo: bỏ qua toàn bộ phần seed bên dưới.
+case "${DATABASE_URL:-}" in
+  postgres://*|postgresql://*) exec "$@" ;;
+esac
 mkdir -p /app/data
 if [ ! -w /app/data ]; then
   echo "[entrypoint] LỖI: /app/data không ghi được bởi uid $(id -u). Nếu dùng bind mount ./data," \

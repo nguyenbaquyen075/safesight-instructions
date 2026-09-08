@@ -7,6 +7,7 @@ import 'dotenv/config';
 import path from 'path';
 import { PrismaClient } from '@prisma/client';
 import { PrismaLibSql } from '@prisma/adapter-libsql';
+import { PrismaPg } from '@prisma/adapter-pg';
 
 function resolveDbUrl() {
   const raw = process.env.DATABASE_URL;
@@ -18,7 +19,13 @@ function resolveDbUrl() {
   return raw;
 }
 
-const prisma = new PrismaClient({ adapter: new PrismaLibSql({ url: resolveDbUrl() }) });
+// Chọn adapter theo DATABASE_URL, giống src/lib/prisma.ts (seed chạy bằng node nên
+// không import được file .ts đó).
+function createAdapter(url) {
+  return /^postgres(ql)?:\/\//.test(url) ? new PrismaPg({ connectionString: url }) : new PrismaLibSql({ url });
+}
+
+const prisma = new PrismaClient({ adapter: createAdapter(resolveDbUrl()) });
 
 const sites = [
   { id: 'site-001', orgId: 'org-001', name: 'Vinhomes Grand Park - Tòa S503', address: 'Long Thạnh Mỹ, TP. Thủ Đức, TP.HCM', lat: 10.8411, lng: 106.8334, status: 'ACTIVE' },

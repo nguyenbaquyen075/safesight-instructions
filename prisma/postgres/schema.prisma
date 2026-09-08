@@ -1,0 +1,281 @@
+// SafeSight — schema PostgreSQL (production). BẢN SAO của prisma/schema.prisma, chỉ khác
+// dòng `provider` của datasource. Giữ String thay cho enum và JSON-trong-String y hệt bản
+// SQLite để mã nguồn (và kiểu TypeScript sinh ra) không lệch giữa hai môi trường.
+// agent/test/schema-parity.test.ts canh giữ sự giống nhau này — sửa một file thì sửa cả hai.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// --- Models (SQLite-compatible: no enums, no native arrays) ---
+
+model Organization {
+  id        String   @id @default(cuid())
+  name      String
+  plan      String   @default("starter")
+  logoUrl   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users User[]
+  sites Site[]
+}
+
+model Site {
+  id                String   @id @default(cuid())
+  orgId             String
+  name              String
+  address           String
+  lat               Float
+  lng               Float
+  status            String   @default("SETUP")
+  cameraCount       Int      @default(0)
+  onlineCameraCount Int      @default(0)
+  workerCount       Int      @default(0)
+  complianceRate    Float    @default(0)
+  activeAlerts      Int      @default(0)
+  todayViolations   Int      @default(0)
+  imageUrl          String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  organization Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  cameras      Camera[]
+  zones        Zone[]
+  violations   Violation[]
+  alertRules   AlertRule[]
+}
+
+model Camera {
+  id               String   @id @default(cuid())
+  siteId           String
+  name             String
+  rtspUrl          String
+  status           String   @default("OFFLINE")
+  type             String   @default("fixed")
+  location         String
+  fps              Int      @default(15)
+  resolution       String   @default("1920x1080")
+  lastHealthCheck  DateTime @default(now())
+  lastDetectionAt  DateTime?
+  thumbnailUrl     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  zones      Zone[]
+  violations Violation[]
+}
+
+model Zone {
+  id               String   @id @default(cuid())
+  siteId           String
+  cameraId         String
+  name             String
+  type             String   @default("MONITORING")
+  polygonData      String   // JSON string
+  schedule         String?  // JSON string
+  isActive         Boolean  @default(true)
+  maxOccupancy     Int?
+  currentOccupancy Int?
+  violationCount   Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  site       Site        @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  camera     Camera      @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  violations Violation[]
+}
+
+model Violation {
+  id          String   @id @default(cuid())
+  cameraId    String
+  siteId      String
+  zoneId      String?
+  type        String
+  severity    String
+  confidence  Float
+  bboxData   String   // JSON string
+  snapshotUrl String
+  clipUrl     String?
+  status      String   @default("OPEN")
+  occurrenceCount Int  @default(1) // lần vi phạm liên tục thứ mấy của người này (reset khi rời khung hình)
+  agentReview String?  // JSON: { verdict, band, observations, note, sessionId, reviewedAt }
+  detectedAt  DateTime @default(now())
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  camera Camera  @relation(fields: [cameraId], references: [id], onDelete: Cascade)
+  zone   Zone?   @relation(fields: [zoneId], references: [id], onDelete: SetNull)
+  alerts Alert[]
+}
+
+// Số người AI QUAN SÁT ĐƯỢC theo từng phút của từng camera — mẫu số để tính tỉ lệ
+// tuân thủ thật (xem src/lib/compliance-shape.ts). Ghi bởi ai-engine/yolo_inference.py
+// qua POST /api/observations, upsert theo (cameraId, minute) nên gửi lại cùng một phút
+// không nhân đôi dữ liệu. Cố ý KHÔNG khai quan hệ tới Camera/Site: bảng này chỉ được
+// đọc theo siteId + minute, thêm quan hệ chỉ để đó không dùng.
+model ObservationStat {
+  id            String   @id @default(cuid())
+  cameraId      String
+  siteId        String
+  minute        DateTime // mốc phút (giây = 0)
+  persons       Int      // số người đông nhất trong phút
+  personSeconds Int      // tổng "người × giây" trong phút
+  createdAt     DateTime @default(now())
+
+  @@unique([cameraId, minute])
+  @@index([siteId, minute])
+}
+
+model Alert {
+  id               String   @id @default(cuid())
+  violationId      String
+  ruleId          String?
+  channel         String
+  recipient       String
+  status          String   @default("NEW")
+  errorMessage    String?
+  sentAt          DateTime @default(now())
+  acknowledgedById String?
+  acknowledgedAt  DateTime?
+  escalatedAt     DateTime?
+  notes           String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  violation      Violation  @relation(fields: [violationId], references: [id], onDelete: Cascade)
+  alertRule     AlertRule? @relation(fields: [ruleId], references: [id], onDelete: SetNull)
+  acknowledgedBy User?     @relation(fields: [acknowledgedById], references: [id], onDelete: SetNull)
+}
+
+model AlertRule {
+  id              String @id @default(cuid())
+  siteId          String
+  name            String
+  violationTypes  String // JSON array
+  channels        String // JSON array
+  recipients      String // JSON array
+  threshold       Int    @default(1)
+  cooldownSec     Int    @default(300)
+  schedule        String? // JSON string
+  isActive        Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  site   Site    @relation(fields: [siteId], references: [id], onDelete: Cascade)
+  alerts Alert[]
+}
+
+model User {
+  id               String   @id @default(cuid())
+  orgId            String
+  email            String   @unique
+  passwordHash     String?
+  name             String
+  role             String   @default("SAFETY_OFFICER")
+  avatarUrl        String?
+  assignedSites    String   // JSON array
+  isActive         Boolean  @default(true)
+  twoFactorEnabled Boolean  @default(false)
+  lastLogin        DateTime?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organization       Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  acknowledgedAlerts Alert[]
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  userName   String
+  action     String
+  resource   String
+  resourceId String?
+  details    String?
+  ipAddress  String
+  createdAt  DateTime @default(now())
+}
+
+model TelegramSettings {
+  id                String   @id @default(cuid())
+  botTokenEncrypted String?
+  isEnabled         Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model ZaloSettings {
+  id                    String   @id @default(cuid())
+  accessTokenEncrypted  String?
+  isEnabled             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model AgentTask {
+  id          String    @id @default(cuid())
+  kind        String
+  subjectType String?
+  subjectId   String?
+  reason      String
+  priority    Int       @default(0)
+  budget      Int       @default(6)
+  attempts    Int       @default(0)
+  dueAt       DateTime
+  leasedUntil DateTime?
+  sessionId   String?
+  startedAt   DateTime?
+  finishedAt  DateTime?
+  outcome     String?
+  createdAt   DateTime  @default(now())
+
+  @@index([dueAt, leasedUntil])
+  @@index([subjectType, subjectId])
+}
+
+model AgentEvent {
+  id          String   @id @default(cuid())
+  sessionId   String
+  taskId      String?
+  subjectType String?
+  subjectId   String?
+  type        String
+  data        String   // JSON string
+  emittedAt   DateTime @default(now())
+
+  @@index([sessionId, emittedAt])
+  @@index([subjectType, subjectId, emittedAt])
+}
+
+model AgentSettings {
+  id            String   @id @default(cuid())
+  isEnabled     Boolean  @default(true)
+  model         String   @default("claude-opus-5")
+  reviewEffort  String   @default("medium")
+  dailyTokenCap Int      @default(2000000)
+  shiftReportAt String   @default("17:30")
+  weeklyReportAt String  @default("MON 08:00") // thứ viết tắt tiếng Anh + giờ 24h, giờ địa phương
+  updatedAt     DateTime @updatedAt
+}
+
+// Subagent riêng của một camera: bật/tắt, trí nhớ, trần token và nhịp tổng hợp riêng.
+// id = Camera.id, tạo lười khi camera đó có task đầu tiên. Không khai báo quan hệ Prisma
+// để giữ SQLite đơn giản — DELETE /api/cameras/[id] xoá dòng này tường minh.
+model CameraAgent {
+  id              String    @id // = Camera.id
+  isEnabled       Boolean   @default(true)
+  memory          String    @default("[]") // JSON: [{ at, text, sessionId }], tối đa 20 ghi chú, mỗi ghi chú ≤ 300 ký tự
+  digestEveryMin  Int       @default(30)
+  dailyTokenCap   Int       @default(300000)
+  tokensUsedToday Int       @default(0)
+  usageDay        String    @default("") // "YYYY-MM-DD" giờ địa phương; khác ngày thì reset tokensUsedToday
+  lastDigestAt    DateTime?
+  updatedAt       DateTime  @updatedAt
+}
