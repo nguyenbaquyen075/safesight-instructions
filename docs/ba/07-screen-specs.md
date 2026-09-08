@@ -48,7 +48,7 @@ Màn hình hiển thị, không có trường nhập. Thành phần: 4 thẻ KPI
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
 |---|---|---|---|---|---|
 | 1 | Tab | tab: Bằng chứng / Agent | — | Bằng chứng | |
-| 2 | Ảnh bằng chứng | image + bbox overlay | — | snapshot | Khung đỏ tại vị trí thiếu PPE; hệ thống tự sinh, không sửa |
+| 2 | Bằng chứng | video (có clip) / image (không có clip) | — | clip nếu có, không thì ảnh snapshot | Có `clipUrl` → `<video controls muted playsInline>` với ảnh snapshot làm poster; không có → ảnh snapshot khoanh khung đỏ tại vị trí thiếu PPE. Hệ thống tự sinh, không sửa |
 | 3 | Thông tin | section chỉ đọc | — | — | Camera, công trường, loại, mức, độ tin cậy, thời gian, số lần tái diễn |
 | 4 | Trạng thái | dropdown fix cứng | — | trạng thái hiện tại | Đổi → PATCH ngay, toast |
 | 5 | Mic | button (giữ để nói) | — | — | Gửi tới loa của camera này |
@@ -77,6 +77,10 @@ Màn hình hiển thị, không có trường nhập. Thành phần: 4 thẻ KPI
 
 Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut theo loại vi phạm, bảng top camera vi phạm. Bộ lọc thời gian: dropdown fix cứng 7 / 30 / 90 ngày, mặc định 7.
 
+Bên dưới các biểu đồ hiện có (v0.9): hai khối **bản đồ nhiệt vi phạm**, dùng chung nút lọc 7/30/90 ngày (mặc định 30) — riêng cho hai khối này, không ảnh hưởng các khối phía trên.
+- **Theo giờ và thứ trong tuần**: lưới 7×24 (thứ × giờ), ô càng đậm càng nhiều vi phạm rơi vào khung giờ đó; hover xem số liệu (tooltip).
+- **Theo vị trí trên camera**: dropdown chọn camera, vẽ chấm mờ tại tâm bbox từng vi phạm chồng lên ảnh xem trước `preview_<cameraId>.jpg`; ảnh lỗi/chưa có thì hiện nền xám + thông báo, chấm vẫn vẽ bình thường.
+
 ## SCR-10 Agent (`/agent`)
 
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
@@ -86,6 +90,7 @@ Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut 
 | 3 | Độ kỹ khi review | dropdown fix cứng | — | `medium` | low / medium / high |
 | 4 | Trần token / ngày | number | — | theo cài đặt | Số nguyên ≥ 0, không thập phân; lưu khi rời ô |
 | 5 | Giờ báo cáo ca | time | — | theo cài đặt | HH:mm |
+| 5b | Giờ báo cáo tuần | dropdown thứ + time | — | `MON 08:00` | Thứ 2…Chủ nhật + HH:mm; lưu ngay khi đổi thứ, lưu khi rời ô giờ |
 | 6 | Sweep gần nhất | card chỉ đọc | — | — | Thời điểm, phát hiện, hành động |
 | 7 | Hàng đợi | table chỉ đọc | — | — | kind, đối tượng, lý do, lần thử, hạn |
 | 8 | Dòng thời gian | list chỉ đọc | — | 50 sự kiện mới nhất | Icon theo loại sự kiện, giờ HH:mm:ss |
@@ -137,9 +142,15 @@ Màn cập nhật (`UserEditDialog`): không sửa email và mật khẩu tại 
 | 2 | Công trình | dropdown (danh mục Site, lọc theo tổ chức) | Có | site đầu tiên | |
 | 3 | Vị trí lắp đặt | free text | Không | trống | Ví dụ "Cổng chính" |
 | 4 | Nguồn video | radio: Webcam / RTSP / Video mẫu | Có | Video mẫu | Webcam → nhập chỉ số (`webcam:0`); RTSP → nhập URL `rtsp://user:pass@host:554/...`; Video mẫu → dropdown từ `/api/videos` kèm nút tải video ≤ 200MB |
-| 5 | Trạng thái | dropdown fix cứng (`CameraStatus`) | — | ONLINE | Khác ONLINE thì AI bỏ qua camera |
+| 5 | Vùng nhận diện | trình vẽ đa giác trên ảnh xem trước | Không | vùng đã lưu của camera | Chỉ hiện khi SỬA camera đã có. Bấm ảnh = thêm điểm, kéo = di chuyển, chuột phải lên điểm = xoá; tối đa 10 vùng, mỗi vùng 3–20 điểm. Nút "Lưu vùng" gọi `PUT /api/cameras/[id]/zones` riêng, không đi cùng nút Lưu của dialog |
+| 6 | Trạng thái | dropdown fix cứng (`CameraStatus`) | — | ONLINE | Khác ONLINE thì AI bỏ qua camera |
 
 Màn cập nhật khác thêm mới: `id` không sửa; đổi nguồn → agent thăm dò lại camera.
+
+Trạng thái của trình vẽ vùng: đang tải danh sách vùng = khối skeleton; chưa có
+`public/snapshots/preview_<id>.jpg` = "Chưa có ảnh xem trước — chạy AI engine trước"
+và nút Lưu bị khoá; vùng chưa đủ 3 điểm không được lưu (có toast nhắc). Lưu danh
+sách rỗng = xoá hết vùng, AI xét lại toàn khung hình.
 
 ## SCR-14 Cài đặt — tab Thông báo: Bot Telegram
 
@@ -150,6 +161,15 @@ Màn cập nhật khác thêm mới: `id` không sửa; đổi nguồn → agent
 | 3 | Kiểm tra kết nối | button | — | — | Gọi `getMe`; thành công hiện tên bot, thất bại hiện lỗi |
 | 4 | Lưu | button | — | — | Thiếu `TELEGRAM_ENCRYPT_KEY` → lỗi rõ ràng |
 
+Thẻ **Zalo OA** nằm ngay dưới, cùng bố cục:
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Bật cảnh báo Zalo | switch | — | tắt | |
+| 2 | Access Token | password | Có khi lưu lần đầu | "Đã cấu hình" nếu có | Mã hoá AES-256-GCM trước khi lưu; token OA hết hạn sau 25 giờ, nhập lại khi cần |
+| 3 | Kiểm tra kết nối | button | — | — | Gọi `getoa`; thành công hiện thông tin OA, thất bại hiện lỗi Zalo |
+| 4 | Lưu | button | — | — | Chỉ SUPER_ADMIN/ORG_ADMIN |
+
 ## SCR-15 Cài đặt — tab Thông báo: Quy tắc cảnh báo (dialog)
 
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
@@ -157,8 +177,8 @@ Màn cập nhật khác thêm mới: `id` không sửa; đổi nguồn → agent
 | 1 | Tên quy tắc | free text | Có | trống | Ví dụ "Cảnh báo thiếu mũ bảo hộ" |
 | 2 | Công trường | dropdown (danh mục Site được phép) | Có | site đang chọn | Quản lý công trường chỉ thấy site được gán |
 | 3 | Loại vi phạm | checkbox nhiều lựa chọn (`ViolationType`) | Không | trống = mọi loại | |
-| 4 | Kênh gửi | checkbox (`AlertChannel`) | Có | Telegram | Chỉ Telegram đã nối; chọn Telegram thì mục 5 bắt buộc |
-| 5 | Người nhận (chat_id) | danh sách free text | Có khi kênh Telegram | trống | Chỉ số, có thể `-` ở đầu cho group; ≥ 1 giá trị |
+| 4 | Kênh gửi | checkbox (`AlertChannel`) | Có | Telegram | Đã nối: Telegram, Zalo OA, Webhook; mỗi kênh bật lên hiện một ô người nhận riêng ở mục 5 và bắt buộc ≥ 1 giá trị |
+| 5 | Người nhận theo kênh | danh sách free text (một khối cho mỗi kênh đang bật) | Có với mọi kênh đã nối đang bật | trống | Telegram: chat_id chỉ số, có thể `-` ở đầu cho group. Zalo OA: user id chỉ số. Webhook: URL `https://`. Lưu chung `recipients` với tiền tố kênh (`zalo:`, `webhook:`); mục không tiền tố là chat_id Telegram của quy tắc cũ |
 | 6 | Ngưỡng (số vi phạm) | number | — | 1 | Số nguyên ≥ 1 |
 | 7 | Cooldown (giây) | number | — | 300 | Số nguyên ≥ 0 |
 | 8 | Kích hoạt quy tắc | switch | — | bật | |
@@ -192,3 +212,19 @@ Tài khoản dev cứng (`admin@safesight.ai`, không có dòng `User` trong DB)
 | 1 | Bảng nhật ký | table | — | 100 dòng mới nhất | Cột: Thời gian, Người dùng, Hành động, Đối tượng, Chi tiết |
 
 Trạng thái tải: skeleton khi đang tải, thông báo lỗi màu đỏ khi tải hỏng, dòng chữ nhạt khi rỗng.
+
+## SCR-20 Báo cáo (`/reports`)
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Công trường | dropdown động | — | Tất cả công trường | Chỉ các công trường trong phạm vi người dùng; đổi công trường thì xoá lựa chọn camera |
+| 2 | Camera | dropdown động | — | Tất cả camera | Lọc theo công trường đã chọn |
+| 3 | Từ ngày / Đến ngày | date | — | 7 ngày gần nhất | `Từ ngày` ≤ `Đến ngày` (ràng buộc bằng `min`/`max` của input) |
+| 4 | 4 ô số tổng | card chỉ đọc | — | `0` | Tổng vi phạm, vi phạm thật (`RESOLVED`), báo oan (`FALSE_POSITIVE`), còn mở (`OPEN` + `UNDER_REVIEW`) |
+| 5 | Tổng hợp theo camera | table chỉ đọc | — | — | Cột: Camera, Công trường, Tổng, Thật, Báo oan, Còn mở; camera nhiều vi phạm nhất lên đầu |
+| 6 | Chi tiết vi phạm | table chỉ đọc | — | 200 dòng mới nhất | Cột: Thời gian, Camera, Loại, Mức độ, Trạng thái; API trả tối đa 2.000 dòng |
+| 7 | Xuất CSV | button | — | — | Tắt khi không có dòng nào; file UTF-8 có BOM, xuất đủ số dòng API trả về |
+| 8 | In / PDF | button | — | — | `window.print()`; bản in bỏ sidebar/header/bộ lọc và đổi sang nền sáng |
+| 9 | Báo cáo tuần của agent | đoạn văn chỉ đọc | — | `Chưa có báo cáo tuần nào` | Sự kiện `report` mới nhất của agent, hiện theo đoạn (không render markdown thô) |
+
+Trạng thái tải: skeleton khi đang tải, thông báo lỗi màu đỏ khi tải hỏng, dòng chữ nhạt khi khoảng ngày không có vi phạm.

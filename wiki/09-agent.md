@@ -40,11 +40,13 @@ thử với outcome nêu rõ.
 | `violation.review` | nghiên cứu | 300 | `POST /api/violations` | mỗi vi phạm chốt |
 | `ops.escalate` | nghiên cứu | 250 | `health.sweep` khi không tự xử được | theo nhu cầu |
 | `shift.report` | nghiên cứu | 200 | agent tự gieo theo `shiftReportAt` | 1 lần/ngày |
+| `weekly.report` | nghiên cứu | 150 | `ensureRecurring()` theo `AgentSettings.weeklyReportAt` (`"MON 08:00"`, giờ địa phương) | 1 lần/tuần |
 | `camera.digest` | nghiên cứu | 50 | `ensureRecurring()` cho mỗi camera ONLINE có subagent bật; agent cũng tự hẹn qua `schedule_followup` | `lastDigestAt + digestEveryMin` (mặc định 30 phút; lần đầu `now + digestEveryMin`) |
 | `followup` | nghiên cứu | 0 | tool `schedule_followup` | theo lý do agent nêu |
 
-`// ponytail: SQLite không có FOR UPDATE SKIP LOCKED; một worker duy nhất. Nhiều worker
-hoặc Postgres thì thay claimDue bằng câu SQL của CRM lib/tasks.ts.`
+`claimDue()` thuê task bằng `updateMany` có điều kiện `leasedUntil` cũ nên **đúng cả khi
+chạy nhiều worker** (chỉ worker đổi được dòng mới nhận task). Đông worker thì mỗi lượt quét
+có phần lãng phí; xem mục [Nhiều worker](#nhiều-worker).
 
 ### Heartbeat và kiểm danh tính trước khi SIGTERM
 
@@ -209,7 +211,7 @@ cùng hàng đợi.
 | `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
-`camera.digest`/`shift.report`/`ops.escalate` = đọc + `write_note` + `escalate`
+`camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
 `ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ; phiên thuộc một camera
 được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
@@ -267,7 +269,11 @@ UI:
   chờ, sức khoẻ.
 - Trang `/agent` (menu "Agent", quyền SUPER_ADMIN/ORG_ADMIN/SITE_MANAGER trong
   `PAGE_ROLES`): dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt
-  (bật/tắt, model, trần token, giờ báo cáo), ô hỏi toàn hệ thống, capabilities.
+  (bật/tắt, model, trần token, giờ báo cáo ca, giờ báo cáo tuần), ô hỏi toàn hệ thống, capabilities.
+- Trang `/reports` đọc `GET /api/agent/events?type=report&limit=1` để hiện bản báo cáo tuần mới
+  nhất: cuối phiên `weekly.report`, `runSession` phát thêm `AgentEvent report { text }` bên cạnh
+  `session.ended` (agent vẫn gửi Telegram bằng `escalate` không `violationId` như `shift.report`).
+  `weekly.report` cũng chạy với `effort: 'high'` giống `shift.report`.
 - Hook React Query `src/hooks/use-agent.ts`: `useAgentTasks`, `useAgentEvents` (poll khi
   thread đang chạy), `useAgentSettings`, `useSaveAgentSettings`, `useAskAgent`.
 
@@ -284,6 +290,26 @@ npm run test:agent   # node --test agent/test/*.test.ts trên SQLite tạm
 | `AGENT_BRIDGE_SECRET` | bắt buộc để poke/ask | Next gọi `POST http://127.0.0.1:4002/internal/*`; thiếu ở Next thì không gọi (task vẫn nằm hàng đợi), thiếu ở agent thì route trả 401 |
 | `AGENT_PORT` | tuỳ chọn | Mặc định `4002` |
 | `SNAPSHOT_MAX_MB` | tuỳ chọn | Mặc định `2048` — ngưỡng `disk.pressure` cho `public/snapshots` |
+| `AGENT_WORKER_ID` | tuỳ chọn | Tên worker ghi vào `session.started`; mặc định `<hostname>-<pid>` |
+
+### Nhiều worker
+
+Chạy được **nhiều tiến trình `agent/main.ts` song song** (mỗi tiến trình một `AGENT_PORT`), với hai điều kiện:
+
+1. **DB phải là PostgreSQL.** SQLite chỉ cho một tiến trình ghi tại một thời điểm; xem [03 — Chuyển sang PostgreSQL](03-cai-dat-va-van-hanh.md#chuyển-sang-postgresql).
+2. Mỗi worker cần `AGENT_BRIDGE_SECRET` giống nhau. Next chỉ gọi `POST /internal/*` tới `http://127.0.0.1:${AGENT_PORT}` (`src/lib/agent-bridge.ts`), tức **một** worker; các worker còn lại chỉ nhận việc qua hàng đợi `AgentTask`.
+
+Những chỗ đã an toàn khi có nhiều worker:
+
+- **Hàng đợi task**: `claimDue()` thuê task bằng `updateMany` có điều kiện (lease + `finishedAt: null`), hai worker không bao giờ nhận cùng một task.
+- **Trí nhớ camera**: `rememberCamera()` ghi bằng `updateMany` chỉ khớp khi `memory` trong DB vẫn đúng bản vừa đọc (compare-and-swap); trượt thì đọc lại và thử lại một lần, nên ghi chú của cả hai worker đều còn. Cố ý so theo `memory` chứ không theo `updatedAt`: mốc thời gian chỉ tới mili-giây và bị `addCameraTokens` đụng vào liên tục.
+- **Truy vết**: mỗi `session.started` mang `workerId`, đọc `AgentEvent` là biết phiên chạy ở tiến trình nào.
+
+Những chỗ **chưa** chia sẻ giữa các worker (biết trước, chấp nhận được):
+
+- `rateLimit()` trong `agent/lib/guard.ts` đếm trong bộ nhớ tiến trình → `LIMITS.engineRestartPerHour` và `cameraStatusPerCamera5m` là trần **mỗi worker**, chạy N worker thì trần thực tế theo hệ thống là N lần. Các trần theo phiên (escalate/followup/remember) không bị ảnh hưởng vì một phiên chỉ chạy trên một worker.
+- `claudeLatchedOff()` (tắt Claude khi key hỏng) cũng theo tiến trình: một worker tắt không tắt hộ các worker khác.
+- Task định kỳ (`ensureRecurring`) do mọi worker cùng gieo; hàm gộp theo `(kind, subject)` nên không nhân đôi, nhưng vẫn nên chỉ bật lịch trên một worker nếu muốn log sạch.
 
 ### Nhà cung cấp LLM
 

@@ -114,6 +114,24 @@ model Violation {
   alerts Alert[]
 }
 
+// Số người AI QUAN SÁT ĐƯỢC theo từng phút của từng camera — mẫu số để tính tỉ lệ
+// tuân thủ thật (xem src/lib/compliance-shape.ts). Ghi bởi ai-engine/yolo_inference.py
+// qua POST /api/observations, upsert theo (cameraId, minute) nên gửi lại cùng một phút
+// không nhân đôi dữ liệu. Cố ý KHÔNG khai quan hệ tới Camera/Site: bảng này chỉ được
+// đọc theo siteId + minute, thêm quan hệ chỉ để đó không dùng.
+model ObservationStat {
+  id            String   @id @default(cuid())
+  cameraId      String
+  siteId        String
+  minute        DateTime // mốc phút (giây = 0)
+  persons       Int      // số người đông nhất trong phút
+  personSeconds Int      // tổng "người × giây" trong phút
+  createdAt     DateTime @default(now())
+
+  @@unique([cameraId, minute])
+  @@index([siteId, minute])
+}
+
 model Alert {
   id               String   @id @default(cuid())
   violationId      String
@@ -192,6 +210,14 @@ model TelegramSettings {
   updatedAt         DateTime @updatedAt
 }
 
+model ZaloSettings {
+  id                    String   @id @default(cuid())
+  accessTokenEncrypted  String?
+  isEnabled             Boolean  @default(false)
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
 model AgentTask {
   id          String    @id @default(cuid())
   kind        String
@@ -234,6 +260,7 @@ model AgentSettings {
   reviewEffort  String   @default("medium")
   dailyTokenCap Int      @default(2000000)
   shiftReportAt String   @default("17:30")
+  weeklyReportAt String  @default("MON 08:00") // thứ viết tắt tiếng Anh + giờ 24h, giờ địa phương
   updatedAt     DateTime @updatedAt
 }
 

@@ -2,6 +2,7 @@
 
 import { PrismaClient } from "@prisma/client";
 import { PrismaLibSql } from "@prisma/adapter-libsql";
+import { PrismaPg } from "@prisma/adapter-pg";
 import type { Client, Config } from "@libsql/client";
 import path from "path";
 
@@ -44,10 +45,18 @@ class PrismaLibSqlWal extends PrismaLibSql {
   }
 }
 
+/** Postgres hay SQLite là do DATABASE_URL quyết định, không có biến cấu hình riêng:
+ * `postgres://` / `postgresql://` -> PrismaPg (pool `pg`, nhiều tiến trình ghi song song
+ * là chuyện bình thường), `file:` -> PrismaLibSqlWal như dev. Prisma 7 nhúng query
+ * compiler theo provider của schema lúc `prisma generate`, nên bản dựng cho Postgres phải
+ * chạy `npm run db:pg:generate` (schema prisma/postgres/schema.prisma) — xem wiki/03. */
+export function createAdapter(url: string): PrismaLibSqlWal | PrismaPg {
+  if (/^postgres(ql)?:\/\//.test(url)) return new PrismaPg({ connectionString: url });
+  return new PrismaLibSqlWal({ url });
+}
+
 function createPrismaClient(): PrismaClient {
-  const url = resolveDbUrl();
-  const adapter = new PrismaLibSqlWal({ url });
-  return new PrismaClient({ adapter });
+  return new PrismaClient({ adapter: createAdapter(resolveDbUrl()) });
 }
 
 export const prisma: PrismaClient =

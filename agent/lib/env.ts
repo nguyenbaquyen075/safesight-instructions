@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 import { config } from 'dotenv';
 import path from 'node:path';
+import { hostname } from 'node:os';
 
 // .env.local ghi đè .env — giống thứ tự Next.js đọc. Chạy một lần khi import.
 config({ path: path.resolve(process.cwd(), '.env.local') });
@@ -17,6 +18,10 @@ const llmKey = optional('LLM_API_KEY') ?? optional('ANTHROPIC_API_KEY');
 
 export const env = {
   agentPort: Number(process.env.AGENT_PORT ?? 4002),
+  // Danh tính worker, ghi vào sự kiện session.started để đọc log biết phiên chạy ở tiến
+  // trình nào khi triển khai nhiều worker. Mặc định máy-pid là đủ phân biệt; đặt
+  // AGENT_WORKER_ID khi muốn tên ổn định (ví dụ tên replica trong docker/k8s).
+  workerId: optional('AGENT_WORKER_ID') ?? `${hostname()}-${process.pid}`,
   bridgeUrl: process.env.YOLO_BRIDGE_URL?.trim() || 'http://127.0.0.1:4001',
   bridgeSecret: optional('AGENT_BRIDGE_SECRET'),
   snapshotMaxMb: Number(process.env.SNAPSHOT_MAX_MB ?? 2048),

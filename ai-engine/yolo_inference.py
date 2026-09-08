@@ -12,6 +12,8 @@ import sys
 import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
+from clips import FrameRing, start_clip
+from zones import parse_polygon
 from env_local import load_dotenv_local
 
 load_dotenv_local()
@@ -19,19 +21,36 @@ load_dotenv_local()
 # Configuration
 BRIDGE_URL = "http://localhost:4001/detections"
 NEXT_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/violations"
+OBSERVATIONS_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/observations"
 AI_ENGINE_SECRET = os.environ.get("AI_ENGINE_SECRET", "")
 # HTTP status của bridge đã cảnh báo rồi — chỉ in 1 lần/status, khỏi spam log mỗi frame.
 _bridge_warned_statuses = set()
+_observation_warned_statuses = set()
 SNAPSHOT_DIR = "public/snapshots"
 # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
 HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
+
+# Đã kêu về DATABASE_URL PostgreSQL rồi -> chỉ kêu MỘT lần lúc khởi động, vì
+# load_zones() còn gọi lại mỗi 60s (đừng biến log thành bãi rác).
+_pg_warned = False
+
 
 def _open_db_readonly():
     """Mở file SQLite của Next.js (prisma/dev.db) chỉ để ĐỌC. Đọc THẲNG file thay vì
     gọi API /api/cameras vì tiến trình này khởi động TRƯỚC khi Next.js kịp sẵn sàng
     (xem dev-all.sh) — gọi HTTP lúc đó sẽ lỗi. Trả None nếu chưa có DB (chưa chạy
-    `npm run db:seed` / db chưa được tạo)."""
+    `npm run db:seed` / db chưa được tạo).
+
+    CHƯA hỗ trợ PostgreSQL: dashboard/agent chọn adapter theo lược đồ DATABASE_URL,
+    còn engine vẫn đọc thẳng file SQLite. Gặp URL Postgres thì báo TO rồi trả None —
+    trước đây im lặng nên vùng nhận diện và camera thật tắt mà không ai biết."""
+    global _pg_warned
     db_url = os.environ.get("DATABASE_URL", "")
+    if db_url.startswith(("postgres://", "postgresql://")):
+        if not _pg_warned:
+            _pg_warned = True
+            print("❌ AI engine CHƯA đọc được PostgreSQL — cần DATABASE_URL dạng `file:...` (SQLite). Vùng nhận diện (Zone) và camera thật sẽ KHÔNG hoạt động, chỉ còn video demo.")
+        return None
     db_path = db_url[len("file:"):] if db_url.startswith("file:") else db_url
     db_path = db_path[2:] if db_path.startswith("./") else db_path
     if not db_path or not os.path.exists(db_path):
@@ -166,9 +185,34 @@ def report_violation(cam_id, detection):
             }],
             "snapshotUrl": snapshot_url,
             "occurrenceCount": detection.get("occurrenceCount", 1),
+            # Clip chỉ gửi khi ghi được (API nhận clipUrl tuỳ chọn, không nhận null).
+            **({"clipUrl": detection["clipUrl"]} if detection.get("clipUrl") else {}),
         }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=1.0)
     except requests.exceptions.RequestException:
         pass
+
+def minute_iso(ts):
+    """Mốc PHÚT dạng ISO UTC (giây = 0) — khoá upsert của ObservationStat."""
+    return time.strftime("%Y-%m-%dT%H:%M:00.000Z", time.gmtime(ts))
+
+
+def post_observations(rows):
+    """Gửi số người quan sát được của phút vừa xong (POST /api/observations).
+
+    Gọi ở THREAD PHỤ (như write_preview): timeout 2s tuy mỗi phút mới tốn một lần
+    nhưng nó khựng MỌI luồng cùng lúc — dashboard treo (không phải từ chối) là mất
+    2s hình của tất cả camera. Lỗi mạng thì bỏ qua phút đó (mẫu số thiếu 1 phút,
+    không sao) và chỉ in cảnh báo 1 lần cho mỗi HTTP status như POST sang bridge.
+    """
+    try:
+        resp = session.post(OBSERVATIONS_API_URL, json={"observations": rows},
+                            headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=2.0)
+        if not resp.ok and resp.status_code not in _observation_warned_statuses:
+            _observation_warned_statuses.add(resp.status_code)
+            print(f"⚠️ dashboard từ chối số liệu quan sát: HTTP {resp.status_code} — kiểm tra AI_ENGINE_SECRET trong .env.local")
+    except requests.exceptions.RequestException:
+        pass
+
 
 # NGUỒN DUY NHẤT gán video cho từng camera — DÙNG CHUNG với dashboard
 # (src/data/camera-videos.json). Sửa 1 file này là cả YOLO lẫn frontend cùng đổi,
@@ -200,6 +244,54 @@ def load_video_camera_map():
         path = f"public/videos/{filename}"
         video_to_cams.setdefault(path, []).append(cam_id)
     return video_to_cams
+
+
+# Vùng nhận diện được sửa trên web (Cài đặt > Giám sát) trong lúc engine đang chạy
+# -> đọc lại DB mỗi 60s, khỏi phải khởi động lại engine.
+ZONE_REFRESH_INTERVAL = 60
+
+
+def load_zones():
+    """Đọc VÙNG LÀM VIỆC của từng camera -> {cameraId: [[(x, y), ...], ...]}.
+
+    Chỉ lấy Zone đang bật và type MONITORING (vùng "chỉ xét người trong vùng");
+    RESTRICTED/WARNING dành cho tính năng khác, chưa dùng ở đây. Toạ độ là tỉ lệ
+    0–1 theo khung hình (xem src/lib/zone-shape.ts, cùng quy ước với trình vẽ).
+    Camera không có vùng nào -> không có khoá trong dict -> xét cả khung.
+    """
+    conn = _open_db_readonly()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT cameraId, polygonData FROM Zone WHERE isActive = 1 AND type = 'MONITORING'"
+        ).fetchall()
+    except sqlite3.Error as e:
+        print(f"⚠️ Không đọc được vùng nhận diện từ DB: {e}")
+        return {}
+    finally:
+        conn.close()
+
+    zones = {}
+    for cam_id, raw in rows:
+        polygon = parse_polygon(raw)
+        if polygon:
+            zones.setdefault(cam_id, []).append(polygon)
+    return zones
+
+
+def zones_for_stream(cam_ids, zones_by_camera):
+    """Vùng áp cho MỘT luồng video. Một luồng có thể phục vụ nhiều camera demo dùng
+    chung file video: detections tính một lần rồi gửi cho tất cả, nên chỉ cần MỘT
+    camera trong nhóm chưa khai vùng là phải xét cả khung (None), không thì camera
+    đó mất người."""
+    polygons = []
+    for cam_id in cam_ids:
+        cam_zones = zones_by_camera.get(cam_id)
+        if not cam_zones:
+            return None
+        polygons.extend(cam_zones)
+    return polygons or None
 
 class RTSPStream:
     """Đọc luồng RTSP (camera IP thật) trong 1 thread riêng, luôn giữ frame MỚI
@@ -265,24 +357,54 @@ session = requests.Session()
 
 
 def clear_snapshots():
-    """Xoá toàn bộ ảnh vi phạm đã bắt — ảnh chỉ tồn tại TRONG LÚC chạy dự án."""
+    """Xoá toàn bộ bằng chứng đã bắt (ảnh + clip) — chỉ tồn tại TRONG LÚC chạy dự án."""
     if not os.path.isdir(SNAPSHOT_DIR):
         return
     removed = 0
     for name in os.listdir(SNAPSHOT_DIR):
-        if name.startswith("violation_") and name.endswith(".jpg"):
+        if ((name.startswith("violation_") and name.endswith(".jpg"))
+                or (name.startswith("clip_") and name.endswith(".mp4"))):
             try:
                 os.remove(os.path.join(SNAPSHOT_DIR, name))
                 removed += 1
             except OSError:
                 pass
     if removed:
-        print(f"🧹 Đã xoá {removed} ảnh vi phạm.")
+        print(f"🧹 Đã xoá {removed} tệp bằng chứng vi phạm.")
     # Xoá heartbeat để agent biết ngay engine đã tắt, không đợi pid cũ bị hệ điều hành tái sử dụng.
     try:
         os.remove(HEARTBEAT_PATH)
     except OSError:
         pass
+
+
+PREVIEW_INTERVAL = 30   # giây giữa 2 ảnh xem trước của cùng một camera
+PREVIEW_WIDTH = 640
+_preview_last = {}      # cameraId -> lúc ghi ảnh xem trước gần nhất
+
+
+def write_preview(cam_id, frame):
+    """Ghi public/snapshots/preview_<cameraId>.jpg làm NỀN cho trình vẽ vùng.
+
+    Dùng lại đúng khung vừa đọc (không mở thêm luồng). Thu nhỏ ngay tại đây (rẻ)
+    rồi giao phần nén JPEG + ghi đĩa cho thread phụ để vòng lặp nhận diện không
+    phải đợi ổ đĩa. Ghi ra file tạm rồi os.replace -> trình duyệt không bao giờ
+    đọc phải ảnh viết dở.
+    """
+    h, w = frame.shape[:2]
+    small = (cv2.resize(frame, (PREVIEW_WIDTH, max(1, round(h * PREVIEW_WIDTH / w))))
+             if w > PREVIEW_WIDTH else frame.copy())
+
+    def _save():
+        tmp = os.path.join(SNAPSHOT_DIR, f".preview_{cam_id}.tmp.jpg")
+        try:
+            os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+            if cv2.imwrite(tmp, small, [int(cv2.IMWRITE_JPEG_QUALITY), 80]):
+                os.replace(tmp, os.path.join(SNAPSHOT_DIR, f"preview_{cam_id}.jpg"))
+        except (OSError, cv2.error):
+            pass
+
+    threading.Thread(target=_save, daemon=True).start()
 
 
 def write_heartbeat(streams: int = 0, fps: float = 0.0):
@@ -402,7 +524,32 @@ def run_inference():
     _hb_last = time.time()
     _hb_frames = 0
 
+    zones_by_camera = load_zones()
+    _zones_last = time.time()
+    # Phút đang gom số liệu quan sát; sang phút mới -> gửi hết mọi luồng rồi đếm lại.
+    _obs_minute = minute_iso(time.time())
+    if zones_by_camera:
+        print(f"🔷 Vùng làm việc: {', '.join(f'{c} ({len(z)} vùng)' for c, z in zones_by_camera.items())}")
+
     while True:
+        # Vùng vừa vẽ trên web có hiệu lực sau tối đa 60s, không cần khởi động lại engine.
+        if time.time() - _zones_last >= ZONE_REFRESH_INTERVAL:
+            zones_by_camera = load_zones()
+            _zones_last = time.time()
+
+        # Hết một phút đồng hồ -> chốt số người quan sát được của mọi luồng và gửi 1 lô.
+        _minute_now = minute_iso(time.time())
+        if _minute_now != _obs_minute:
+            rows = [{"cameraId": cam_id, "minute": _obs_minute,
+                     "persons": st.get("obs_persons", 0),
+                     "personSeconds": round(st.get("obs_seconds", 0.0), 1)}
+                    for st in streams for cam_id in st["cams"]]
+            for st in streams:
+                st["obs_persons"], st["obs_seconds"] = 0, 0.0
+            _obs_minute = _minute_now
+            if rows:
+                threading.Thread(target=post_observations, args=(rows,), daemon=True).start()
+
         for st in streams:
             cap = st["cap"]
 
@@ -428,6 +575,15 @@ def run_inference():
                     cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
                 continue
 
+            # Đệm khung cho clip bằng chứng (setdefault: mọi luồng đều có, kể cả luồng
+            # tạo ở nhánh dự phòng camera 0). Thu nhỏ một nửa trước khi đệm: clip là
+            # BỐI CẢNH, ảnh snapshot mới là bằng chứng cần nét — 20 khung 1080p nguyên
+            # cỡ tốn ~124MB mỗi luồng, nhân số luồng thì hết RAM. Phần đuôi clip phải
+            # dùng ĐÚNG khung đã thu nhỏ này, không thì cv2.VideoWriter (kích thước lấy
+            # từ khung đầu) bỏ hết khung sau.
+            clip_frame = cv2.resize(frame, None, fx=0.5, fy=0.5)
+            st.setdefault("ring", FrameRing()).push(clip_frame)
+
             # Phân tích ĐÚNG video của luồng này -> khung khớp người trong ô đó
             vi_tri_video = None
             if not st["is_live"]:
@@ -435,9 +591,27 @@ def run_inference():
                 if _p and _p > 0:
                     vi_tri_video = _p / 1000.0
 
-            detections = st["tracker"].process_frame(frame)
+            # Ảnh nền cho trình vẽ vùng — mỗi camera 30s một tấm, ghi ở thread phụ.
+            _now_preview = time.time()
+            for cam_id in st["cams"]:
+                if _now_preview - _preview_last.get(cam_id, 0) >= PREVIEW_INTERVAL:
+                    _preview_last[cam_id] = _now_preview
+                    write_preview(cam_id, frame)
+
+            detections = st["tracker"].process_frame(
+                frame, zones=zones_for_stream(st["cams"], zones_by_camera))
 
             violations = [d for d in detections if d.get('isViolation')]
+
+            # "Người × giây" cho tỉ lệ tuân thủ: số người CỦA KHUNG NÀY (đã lọc vùng làm
+            # việc) nhân khoảng thời gian từ khung trước của chính luồng này. Chặn dt ở 1s
+            # để một lần khựng dài (nạp model, RTSP reconnect) không thổi phồng mẫu số.
+            _obs_now = time.time()
+            _obs_dt = min(_obs_now - st.get("obs_last", _obs_now), 1.0)
+            st["obs_last"] = _obs_now
+            _obs_persons = getattr(st["tracker"], "last_person_count", 0)
+            st["obs_seconds"] = st.get("obs_seconds", 0.0) + _obs_persons * _obs_dt
+            st["obs_persons"] = max(st.get("obs_persons", 0), _obs_persons)
 
             # Gửi toạ độ detections sang bridge cho CÁC camera dùng video này
             for cam_id in st["cams"]:
@@ -471,15 +645,32 @@ def run_inference():
                         continue
                     if not os.path.exists(SNAPSHOT_DIR):
                         os.makedirs(SNAPSHOT_DIR)
+                    # trackId trong tên tệp: hai người cùng vi phạm ở CÙNG một giây trên
+                    # cùng camera (chuyện thường) trước đây cho ra cùng một tên -> hai
+                    # cv2.VideoWriter mở đè lên một file, clip hỏng và cả hai Violation
+                    # cùng trỏ vào đó. Tiền tố/đuôi giữ nguyên nên clear_snapshots() và
+                    # isEvidenceFile() bên agent vẫn khớp.
+                    tid = key[1]
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    filename = f"violation_{cam_id}_{timestamp}.jpg"
+                    filename = f"violation_{cam_id}_{timestamp}_{tid}.jpg"
                     annotated = _draw_violation_box(frame.copy(), d["bbox"], d["label"])
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
                     d['snapshotUrl'] = f"/snapshots/{filename}"
+                    # Clip = 20 khung đã đệm + 12 khung kế tiếp; ghi phần đuôi ở các vòng
+                    # lặp sau nên không chặn frame loop.
+                    clip_name = f"clip_{cam_id}_{timestamp}_{tid}.mp4"
+                    pending = start_clip(f"{SNAPSHOT_DIR}/{clip_name}", st["ring"].snapshot())
+                    if pending:
+                        st.setdefault("pending_clips", []).append(pending)
+                        d['clipUrl'] = f"/snapshots/{clip_name}"
                     violation_count[key] = violation_count.get(key, 0) + 1
                     d['occurrenceCount'] = violation_count[key]
                     report_violation(cam_id, d)
                     last_reported[key] = now
+
+            # Phần đuôi của các clip đang mở: mỗi vòng thêm 1 khung, đủ 12 khung thì tự đóng.
+            if st.get("pending_clips"):
+                st["pending_clips"] = [p for p in st["pending_clips"] if not p.feed(clip_frame)]
 
         _hb_frames += 1
         if time.time() - _hb_last >= 5.0:

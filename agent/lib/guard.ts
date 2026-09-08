@@ -3,6 +3,9 @@ import { isPaused } from './settings';
 
 export type Blocked = { blocked: true; reason: string };
 
+// Trần số lần dùng công cụ. Đếm TRONG BỘ NHỚ CỦA MỘT WORKER (xem rateLimit bên dưới):
+// chạy N worker thì trần thực tế theo hệ thống là N lần con số này. Các trần tính theo
+// phiên (escalate/followup/remember) không bị ảnh hưởng vì một phiên chỉ chạy ở một worker.
 export const LIMITS = {
   engineRestartPerHour: 3,
   cameraStatusPerCamera5m: 1,
@@ -23,7 +26,8 @@ let claudeOffReason: string | null = null;
 export function latchClaudeOff(reason: string): void { claudeOffReason = reason; }
 export function claudeLatchedOff(): string | null { return claudeOffReason; }
 
-// ponytail: bộ đếm trong bộ nhớ tiến trình — đủ cho một worker; restart worker là reset.
+// ponytail: bộ đếm trong bộ nhớ tiến trình — PER-WORKER, không chia sẻ giữa các worker;
+// restart worker là reset. Muốn trần đúng theo hệ thống thì phải đếm trong DB (chưa cần).
 const hits = new Map<string, number[]>();
 
 export function rateLimit(key: string, max: number, windowMs: number, now = Date.now()): boolean {

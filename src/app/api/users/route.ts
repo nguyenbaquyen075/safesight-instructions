@@ -6,6 +6,7 @@ import { Prisma } from '@prisma/client';
 import { prisma } from '@/lib/prisma';
 import { createUserSchema, toUserDTO } from '@/lib/user-shape';
 import { ORG_WIDE_ROLES, requireSession } from '@/lib/auth/site-access';
+import { assignableRoles } from '@/lib/auth/permissions';
 import { logAudit } from '@/lib/audit-log';
 
 const BCRYPT_ROUNDS = 10;
@@ -51,6 +52,11 @@ export async function POST(request: NextRequest) {
   const parsed = createUserSchema.safeParse(await request.json().catch(() => ({})));
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
+  }
+
+  // ORG_ADMIN tự nâng quyền bằng cách tạo một tài khoản SUPER_ADMIN rồi đăng nhập vào đó.
+  if (!assignableRoles(gate.session.user.role).includes(parsed.data.role)) {
+    return NextResponse.json({ error: 'Chỉ SUPER_ADMIN mới cấp được vai trò SUPER_ADMIN' }, { status: 403 });
   }
 
   const orgId = await resolveOrgId(gate.session.user.id);

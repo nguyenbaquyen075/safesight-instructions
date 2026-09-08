@@ -2,10 +2,12 @@
 // SPDX-License-Identifier: MIT
 
 
+import { useSession } from 'next-auth/react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { X, Shield, Mail, MapPin, CheckCircle2, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { UserRole, SiteStatus } from '@/types/enums';
+import { SiteStatus } from '@/types/enums';
+import { assignableRoles } from '@/lib/auth/permissions';
 import type { User } from '@/types/models';
 import { useSites } from '@/hooks/use-sites';
 import { useState } from 'react';
@@ -19,6 +21,9 @@ interface UserEditDialogProps {
 
 export function UserEditDialog({ user, isOpen, onClose, onSave }: UserEditDialogProps) {
   const { data: sites } = useSites();
+  const { data: session } = useSession();
+  // ORG_ADMIN không được cấp SUPER_ADMIN — API chặn, danh sách ở đây khớp theo.
+  const roles = assignableRoles(session?.user?.role);
   const [formData, setFormData] = useState<Partial<User>>(user || {});
 
   if (!user && isOpen) return null;
@@ -60,7 +65,7 @@ export function UserEditDialog({ user, isOpen, onClose, onSave }: UserEditDialog
             <div className="space-y-2">
               <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-muted)]">System Role</label>
               <div className="grid grid-cols-2 gap-2">
-                {Object.values(UserRole).map((role) => (
+                {roles.map((role) => (
                   <button
                     key={role}
                     type="button"

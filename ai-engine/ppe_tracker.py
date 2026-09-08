@@ -5,6 +5,7 @@ import numpy as np
 import torch
 from ultralytics import YOLO
 from collections import defaultdict
+from zones import filter_persons_in_zones
 import time
 import os
 import json
@@ -193,6 +194,7 @@ class PPEViolationTracker:
         self.min_height_ratio = min_height_ratio
         self.required_ppe = [p.lower() for p in required_ppe]
         self.imgsz = imgsz  # kích thước xử lý nhỏ hơn -> model chạy nhanh -> khung cập nhật dày hơn
+        self.last_person_count = 0  # số người của khung gần nhất (sau khi lọc vùng làm việc)
 
         # Đọc TÊN LỚP trực tiếp từ model → tự khớp mọi model (4 lớp cũ hoặc 11 lớp mới:
         # Person, helmet, vest, gloves, boots, goggles + biến thể no_*)
@@ -282,12 +284,15 @@ class PPEViolationTracker:
             "height": f"{((box[3]-box[1])/frame.shape[0])*100}%",
         }
 
-    def process_frame(self, frame: np.ndarray) -> list:
+    def process_frame(self, frame: np.ndarray, zones: list | None = None) -> list:
         """Process frame -> detections cho dashboard.
 
         2 tầng khung:
           1) Khung TỪNG BỘ PHẬN model thấy (mũ/áo/găng/giày...) — xanh, hoặc đỏ nếu là no_*.
           2) Khung TỪNG NGƯỜI — xét đủ/thiếu PPE bắt buộc: thiếu -> ĐỎ + VI PHẠM.
+
+        zones: danh sách đa giác (toạ độ tỉ lệ 0–1 theo khung) = vùng làm việc của
+        camera. None/rỗng -> xét cả khung như trước.
         """
         final_detections = []
 
@@ -301,6 +306,9 @@ class PPEViolationTracker:
                                    imgsz=self.imgsz, tracker=TRACKER_CFG,
                                    augment=True, iou=0.5, verbose=False)[0]
         if results.boxes is None:
+            # Không có box nào -> khung này KHÔNG có người. Không đặt lại thì số người
+            # của khung trước cứ tiếp tục cộng vào "người × giây" (mẫu số tuân thủ).
+            self.last_person_count = 0
             return final_detections
 
         boxes = results.boxes.xyxy.cpu().tolist()
@@ -339,6 +347,20 @@ class PPEViolationTracker:
 
             status = "VIOLATION" if low.startswith('no_') else "SAFE"
             print(f"[DETECT] {cls_name:10} | Conf: {conf:.2f} | Status: {status}")
+
+        # VÙNG LÀM VIỆC: người có ĐIỂM CHÂN ngoài mọi vùng MONITORING -> loại ngay
+        # tại đây, trước khi xét PPE, nên họ không sinh vi phạm và cũng không được
+        # tính là người quan sát. Logic nhận diện phía dưới giữ nguyên.
+        if zones:
+            _truoc = len(persons)
+            persons = filter_persons_in_zones(persons, zones, frame.shape[1], frame.shape[0])
+            if len(persons) < _truoc:
+                print(f"[ZONE] bỏ qua {_truoc - len(persons)} người ngoài vùng làm việc")
+
+        # Số người ĐANG XÉT của khung vừa rồi (đã lọc vùng). yolo_inference.py cộng dồn
+        # thành "người × giây" mỗi phút -> mẫu số của tỉ lệ tuân thủ. Để ở thuộc tính
+        # thay vì đổi kiểu trả về, giữ nguyên chữ ký process_frame cho mọi nơi gọi.
+        self.last_person_count = len(persons)
 
         # Thay khung GĂNG/GIÀY bằng kết quả model phụ (nếu có). Chỉ đụng đúng
         # những lớp trong parts_classes — người/mũ/áo giữ nguyên của model chính.

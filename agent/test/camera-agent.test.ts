@@ -54,3 +54,18 @@ test('rememberCamera persists notes and hasActivitySince sees new violations', a
   assert.equal(await hasActivitySince(CAM, t0), true);
   assert.equal(await hasActivitySince(CAM, null), true);
 });
+
+// Nhiều worker cùng ghi trí nhớ một camera: lần ghi thua phải đọc lại rồi thêm vào bản
+// mới, không được đè mất ghi chú của lần ghi thắng.
+test('rememberCamera keeps both notes when two workers write at the same time', async () => {
+  await getCameraAgent(CAM); // tạo sẵn dòng để hai lời gọi chỉ tranh nhau ở bước ghi memory
+  const results = await Promise.all([
+    rememberCamera(CAM, 'worker A: ngược sáng 16-17h', 'sess-a'),
+    rememberCamera(CAM, 'worker B: cẩu tháp che góc trái', 'sess-b'),
+  ]);
+  const stored = parseMemory((await getCameraAgent(CAM)).memory);
+  assert.equal(stored.length, 2, 'ghi chú bị đè mất');
+  assert.deepEqual(stored.map(n => n.sessionId).sort(), ['sess-a', 'sess-b']);
+  // Lần ghi thua đã đọc lại nên trả về CẢ HAI ghi chú; lần thắng chỉ thấy ghi chú của nó.
+  assert.deepEqual(results.map(r => r.length).sort(), [1, 2]);
+});

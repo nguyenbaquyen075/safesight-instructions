@@ -49,6 +49,7 @@ const violationInputSchema = z.object({
     })
   ),
   snapshotUrl: z.string(),
+  clipUrl: z.string().optional(),
   zoneId: z.string().optional(),
   occurrenceCount: z.number().int().min(1).optional(),
 });
@@ -71,7 +72,7 @@ export async function POST(request: NextRequest) {
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   }
-  const { cameraId, type, severity, confidence, bboxData, snapshotUrl, zoneId, occurrenceCount } = parsed.data;
+  const { cameraId, type, severity, confidence, bboxData, snapshotUrl, clipUrl, zoneId, occurrenceCount } = parsed.data;
 
   const camera = await prisma.camera.findUnique({ where: { id: cameraId } });
   if (!camera) {
@@ -88,6 +89,8 @@ export async function POST(request: NextRequest) {
       confidence,
       bboxData: JSON.stringify(bboxData),
       snapshotUrl,
+      // Clip bằng chứng là tuỳ chọn: engine gửi kèm khi ghi được, thiếu thì vi phạm vẫn hợp lệ với ảnh.
+      clipUrl,
       ...(occurrenceCount !== undefined && { occurrenceCount }),
     },
   });

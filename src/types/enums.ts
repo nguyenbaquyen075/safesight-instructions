@@ -51,6 +51,7 @@ export enum AlertChannel {
   PA_SYSTEM = 'pa_system',
   WEBHOOK = 'webhook',
   TELEGRAM = 'telegram',
+  ZALO = 'zalo',
 }
 
 export enum AlertStatus {

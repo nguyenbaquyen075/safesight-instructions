@@ -8,9 +8,11 @@ import { useSession } from 'next-auth/react';
 import { ShieldAlert } from 'lucide-react';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
+import { SidebarProvider, useSidebar } from '@/components/layout/sidebar-context';
 import { Toaster } from '@/components/ui/Toaster';
 import { canAccessPath } from '@/lib/auth/permissions';
 import { UserRole } from '@/types/enums';
+import { cn } from '@/lib/utils';
 
 export default function DashboardLayout({
   children,
@@ -36,6 +38,7 @@ export default function DashboardLayout({
     if (pathname.startsWith('/alerts')) return { title: 'Trung tâm Thông báo', subtitle: 'Xem và xác nhận thông báo' };
     if (pathname.startsWith('/violations')) return { title: 'Nhật ký Vi phạm', subtitle: 'Kiểm tra và giải quyết vi phạm an toàn' };
     if (pathname.startsWith('/analytics')) return { title: 'Phân tích An toàn', subtitle: 'Xu hướng tuân thủ và báo cáo' };
+    if (pathname.startsWith('/reports')) return { title: 'Báo cáo Vi phạm', subtitle: 'Tổng hợp theo camera, xuất CSV/PDF và báo cáo tuần của agent' };
     if (pathname.startsWith('/agent')) return { title: 'Agent giám sát', subtitle: 'Trực vận hành và cán bộ an toàn tự động' };
     if (pathname.startsWith('/users')) return { title: 'Quản lý Người dùng', subtitle: 'Phân quyền và kiểm soát truy cập' };
     if (pathname.startsWith('/settings')) return { title: 'Cài đặt', subtitle: 'Cấu hình cá nhân và hệ thống' };
@@ -46,9 +49,36 @@ export default function DashboardLayout({
   const { title, subtitle } = getHeaderInfo();
 
   return (
+    <SidebarProvider>
+      <DashboardShell title={title} subtitle={subtitle} allowed={allowed}>
+        {children}
+      </DashboardShell>
+    </SidebarProvider>
+  );
+}
+
+function DashboardShell({
+  title,
+  subtitle,
+  allowed,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  allowed: boolean;
+  children: React.ReactNode;
+}) {
+  const { collapsed } = useSidebar();
+
+  return (
     <div className="flex min-h-screen bg-[var(--background)]">
       <Sidebar />
-      <div className="flex-1 ml-[260px] flex flex-col transition-all duration-300">
+      <div
+        className={cn(
+          'flex-1 flex flex-col transition-all duration-300 ml-0 print:ml-0',
+          collapsed ? 'md:ml-[68px]' : 'md:ml-[260px]'
+        )}
+      >
         <Header title={title} subtitle={subtitle} />
         <main className="flex-1 p-6 overflow-y-auto">
           {allowed ? children : (

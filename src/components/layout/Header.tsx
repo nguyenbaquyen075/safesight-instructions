@@ -5,8 +5,9 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import * as DropdownMenu from '@radix-ui/react-dropdown-menu';
-import { Bell, Search, User, UserCircle, Settings } from 'lucide-react';
+import { Bell, Menu, Search, User, UserCircle, Settings } from 'lucide-react';
 import { toast } from '@/lib/toast';
+import { useSidebar } from './sidebar-context';
 
 interface HeaderProps {
   title: string;
@@ -15,14 +16,25 @@ interface HeaderProps {
 
 export function Header({ title, subtitle }: HeaderProps) {
   const router = useRouter();
+  const { open, setOpen } = useSidebar();
   return (
-    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-6 border-b bg-[var(--background)]/80 backdrop-blur-md border-[var(--border)]">
-      {/* Left: Title */}
-      <div>
-        <h1 className="text-lg font-semibold text-[var(--text-primary)]">{title}</h1>
-        {subtitle && (
-          <p className="text-xs text-[var(--text-muted)]">{subtitle}</p>
-        )}
+    <header className="sticky top-0 z-30 flex items-center justify-between h-16 px-4 md:px-6 border-b bg-[var(--background)]/80 backdrop-blur-md border-[var(--border)]">
+      {/* Left: Hamburger (mobile) + Title */}
+      <div className="flex items-center gap-3 min-w-0">
+        <button
+          onClick={() => setOpen(!open)}
+          className="md:hidden flex-shrink-0 p-2 -ml-2 rounded-lg hover:bg-[var(--surface)] transition-colors"
+          aria-label="Mở menu"
+          aria-expanded={open}
+        >
+          <Menu className="w-5 h-5 text-[var(--text-secondary)]" />
+        </button>
+        <div className="min-w-0">
+          <h1 className="text-lg font-semibold text-[var(--text-primary)] truncate">{title}</h1>
+          {subtitle && (
+            <p className="text-xs text-[var(--text-muted)] truncate">{subtitle}</p>
+          )}
+        </div>
       </div>
 
       {/* Right: Actions */}

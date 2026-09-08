@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { toast } from '@/lib/toast';
 import { useDashboardKPIs, useComplianceTrend, useViolationBreakdown } from '@/hooks/use-dashboard';
 import { useViolations } from '@/hooks/use-violations';
+import { useCameras } from '@/hooks/use-cameras';
 import { useMounted } from '@/hooks/use-mounted';
 import {
   ComplianceChart
@@ -24,6 +25,10 @@ import {
 import {
   ViolationDonut
 } from '@/components/dashboard/ViolationDonut';
+import { TimeHeatmap } from '@/components/analytics/TimeHeatmap';
+import { PositionHeatmap } from '@/components/analytics/PositionHeatmap';
+
+const HEATMAP_RANGE_OPTIONS = [7, 30, 90] as const;
 
 export default function AnalyticsPage() {
   const mounted = useMounted();
@@ -33,11 +38,16 @@ export default function AnalyticsPage() {
   const { data: trend } = useComplianceTrend();
   const { data: breakdown } = useViolationBreakdown();
   const { data: violations = [] } = useViolations();
+  const { data: cameras = [] } = useCameras();
+  const [heatmapRangeDays, setHeatmapRangeDays] = React.useState<typeof HEATMAP_RANGE_OPTIONS[number]>(30);
 
   const todayKey = new Date().toDateString();
   const camerasWithViolationToday = new Set(
     violations.filter(v => new Date(v.detectedAt).toDateString() === todayKey).map(v => v.cameraId)
   ).size;
+
+  const heatmapRangeStart = new Date().getTime() - heatmapRangeDays * 24 * 60 * 60 * 1000;
+  const heatmapViolations = violations.filter(v => new Date(v.detectedAt).getTime() >= heatmapRangeStart);
 
   if (!mounted) return null;
 
@@ -147,6 +157,45 @@ export default function AnalyticsPage() {
                 );
               })}
            </div>
+        </div>
+      </div>
+
+      {/* Bản đồ nhiệt vi phạm (F7) */}
+      <div className="flex items-center justify-between gap-4 flex-wrap">
+        <h2 className="text-xl font-black text-[var(--text-primary)]">Bản đồ nhiệt vi phạm</h2>
+        <div className="flex items-center gap-2">
+          {HEATMAP_RANGE_OPTIONS.map(days => (
+            <button
+              key={days}
+              onClick={() => setHeatmapRangeDays(days)}
+              className={cn(
+                'px-4 py-2 rounded-xl text-xs font-bold transition-all',
+                heatmapRangeDays === days
+                  ? 'bg-[var(--primary)] text-white'
+                  : 'bg-[var(--surface)] border border-[var(--border)] text-[var(--text-muted)] hover:bg-[var(--surface-hover)]'
+              )}
+            >
+              {days} ngày
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-8">
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[2.5rem] p-10">
+          <div className="mb-8">
+            <h3 className="text-xl font-black text-[var(--text-primary)]">Theo giờ và thứ trong tuần</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Ô càng đậm, khung giờ đó càng nhiều vi phạm trong khoảng đã chọn.</p>
+          </div>
+          <TimeHeatmap violations={heatmapViolations} />
+        </div>
+
+        <div className="bg-[var(--surface)] border border-[var(--border)] rounded-[2.5rem] p-10">
+          <div className="mb-8">
+            <h3 className="text-xl font-black text-[var(--text-primary)]">Theo vị trí trên camera</h3>
+            <p className="text-xs text-[var(--text-muted)] mt-1">Chọn camera để xem vi phạm tập trung ở đâu trên khung hình.</p>
+          </div>
+          <PositionHeatmap cameras={cameras} violations={heatmapViolations} />
         </div>
       </div>
     </div>

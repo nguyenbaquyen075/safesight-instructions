@@ -12,6 +12,11 @@ services:
     build:
       context: .
       target: dashboard
+      # Bản SQLite là mặc định. Dựng bản PostgreSQL: đặt PRISMA_SCHEMA và BUILD_DATABASE_URL
+      # trong .env (xem .env.docker.example) rồi `docker compose build dashboard`.
+      args:
+        PRISMA_SCHEMA: ${PRISMA_SCHEMA:-prisma/schema.prisma}
+        BUILD_DATABASE_URL: ${BUILD_DATABASE_URL:-file:./data/dev.db}
     # Container chạy ĐÚNG uid:gid của anh trên host (mặc định 1000:1000, export UID GID hoặc
     # đặt trong .env nếu khác) — bắt buộc vì ./data, ./public/snapshots là bind mount mà host-side
     # AI engine/agent (chạy bằng uid của anh) cũng cần ghi được, không phải uid "app" trong image.
@@ -20,7 +25,9 @@ services:
       - "3000:3000"
     env_file: .env
     environment:
-      DATABASE_URL: file:./data/dev.db
+      # Mặc định SQLite trong bind mount ./data. Chuyển sang Postgres: đặt DATABASE_URL trong .env
+      # (postgresql://...@postgres:5432/safesight) và chạy compose với `--profile pg`.
+      DATABASE_URL: ${DATABASE_URL:-file:./data/dev.db}
       NEXT_PUBLIC_YOLO_SERVER_URL: ${NEXT_PUBLIC_YOLO_SERVER_URL:-http://localhost:4001}
       YOLO_BRIDGE_URL: http://bridge:4001
     volumes:
@@ -29,6 +36,27 @@ services:
       - ./public/videos:/app/public/videos:ro
     depends_on:
       - bridge
+    restart: unless-stopped
+
+  # PostgreSQL tuỳ chọn — chỉ chạy khi bật profile: `docker compose --profile pg up -d`.
+  # Không khai depends_on ở dashboard vì mặc định (SQLite) không được kéo service này lên.
+  postgres:
+    image: postgres:16-alpine
+    profiles: ["pg"]
+    # Chỉ mở cổng ra 127.0.0.1: AI engine và agent chạy NGOÀI container vẫn cần nối vào DB.
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-safesight}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-}
+      POSTGRES_DB: ${POSTGRES_DB:-safesight}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-safesight} -d ${POSTGRES_DB:-safesight}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   bridge:
@@ -40,3 +68,6 @@ services:
       - "4001:4001"
     env_file: .env
     restart: unless-stopped
+
+volumes:
+  pgdata:

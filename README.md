@@ -96,6 +96,16 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # đầu lưu token nếu thiếu, sinh bằng
                       # `node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"`)
                       #
+                      # WEBHOOK_SECRET (bắt buộc nếu dùng kênh cảnh báo webhook — ký body JSON
+                      # bằng HMAC-SHA256, gửi ở header X-SafeSight-Signature; thiếu thì kênh
+                      # webhook bỏ qua chứ không gửi bản chưa ký, sinh bằng
+                      # `openssl rand -base64 32`)
+                      #
+                      # PUBLIC_BASE_URL (tuỳ chọn — URL công khai của dashboard; có thì cảnh báo
+                      # Zalo OA gửi kèm ảnh snapshot và webhook nhận snapshotUrl tuyệt đối, không
+                      # có thì Zalo chỉ gửi chữ. Access token Zalo OA lưu trong DB qua trang
+                      # /settings, mã hoá bằng chính TELEGRAM_ENCRYPT_KEY)
+                      #
                       # ROBOFLOW_API_KEY (tuỳ chọn — chỉ cần nếu dùng Roboflow Workflow để
                       # đối chiếu kết quả trên ảnh tĩnh, xem mục "Đối chiếu bằng Roboflow
                       # Workflow" bên dưới; lấy ở app.roboflow.com/settings/api)
@@ -167,6 +177,14 @@ này và `./public/snapshots` là bind mount dùng chung với AI engine/agent c
 agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`, trỏ `NEXT_PUBLIC_YOLO_SERVER_URL`
 và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` của bridge, không
 chỉ `POST /api/violations`. Tag image: `latest` (main), `0.6.0` / `0.6` (release), `main`, mã commit ngắn.
+
+**PostgreSQL (tuỳ chọn).** Ngăn xếp mặc định chạy SQLite. Cần nhiều worker agent hoặc nhiều bản dashboard
+thì bật profile `pg`: `docker compose --profile pg up -d` khởi thêm service `postgres:16-alpine` (volume
+`pgdata`, chỉ mở `127.0.0.1:5432`). Vì Prisma 7 nhúng query compiler theo provider ngay lúc `prisma generate`,
+image dashboard phải được **dựng lại** với `PRISMA_SCHEMA=prisma/postgres/schema.prisma`. Toàn bộ các bước
+(tạo bảng → chép dữ liệu bằng `npm run db:pg:migrate-data` → đổi client) nằm ở
+[wiki/03 — Chuyển sang PostgreSQL](wiki/03-cai-dat-va-van-hanh.md#chuyển-sang-postgresql). Phần này chưa
+được nghiệm thu trên PostgreSQL thật.
 
 Nâng cấp từ bản dùng named volume `safesight-data` (trước khi đổi sang bind mount): chép dữ liệu cũ
 sang `./data` rồi mới chạy lại — `docker run --rm -v <project>_safesight-data:/from -v "$PWD/data":/to alpine cp -a /from/. /to/`

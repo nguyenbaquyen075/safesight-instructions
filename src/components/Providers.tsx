@@ -4,7 +4,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { SessionProvider } from 'next-auth/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function Providers({ children }: { children: React.ReactNode }) {
   const [queryClient] = useState(
@@ -19,6 +19,15 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         },
       })
   );
+
+  // Đăng ký service worker chỉ ở production — tránh cache gây khó chịu khi dev.
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'production' && 'serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // Bỏ qua: PWA offline là tiện ích thêm, không chặn ứng dụng chạy.
+      });
+    }
+  }, []);
 
   return (
     <SessionProvider>

@@ -19,8 +19,10 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 
 | File | Vai trò |
 |---|---|
-| `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB |
+| `yolo_inference.py` | Chạy vòng lặp đọc từng luồng, gọi tracker, gửi detection + ghi Violation vào DB, gửi số người quan sát được mỗi phút |
 | `ppe_tracker.py` | Logic phân tích 1 frame + xác định vi phạm (`PPEViolationTracker`) |
+| `zones.py` | Hình học vùng nhận diện thuần Python (point-in-polygon, điểm chân) — không import torch/cv2 nên test được bằng `python3 -m unittest ai-engine/test_zones.py` |
+| `clips.py` | Clip bằng chứng: `FrameRing` (đệm 20 khung gần nhất), `ClipWriter` (bọc `cv2.VideoWriter`), `PendingClip`/`start_clip` — chỉ `ClipWriter` cần cv2 nên test được bằng `python3 -m unittest ai-engine/test_clips.py` |
 | `yolo_bridge.js` | Bridge Node.js: nhận HTTP → broadcast Socket.IO |
 | `src/hooks/useYolo.ts` | Hook WebSocket phía frontend |
 | `ppe_multiclass.pt` | Model YOLOv8 ĐANG DÙNG — 11 lớp: Person + helmet/vest/gloves/boots/goggles + no_helmet/no_boots/no_gloves/no_goggle (KHÔNG có `no_vest`, xem ghi chú bên dưới) |
@@ -30,7 +32,97 @@ useYolo.ts ── cập nhật state realtime ── UI cảnh báo (CameraCard 
 | `src/app/api/roboflow/route.ts` | Route gọi Roboflow phía server — giữ API key khỏi lộ ra trình duyệt, bắt buộc đăng nhập |
 | `src/app/(dashboard)/roboflow/page.tsx` | Trang `/roboflow`: kéo thả ảnh → xem khung detection của model cloud |
 | `public/videos/` | Video đầu vào mẫu |
-| `public/snapshots/` | Ảnh chụp vi phạm (tự sinh, tự xoá khi tắt dự án) |
+| `public/snapshots/` | Ảnh chụp vi phạm `violation_*.jpg` + clip bằng chứng `clip_*.mp4` (tự sinh, tự xoá khi tắt dự án) + ảnh xem trước `preview_<cameraId>.jpg` (KHÔNG bị xoá) |
+
+## Vùng nhận diện (Zone/ROI) theo camera
+
+Người ở NGOÀI vùng làm việc (khách đi ngang, nhà dân cạnh công trường) không cần bị
+soi PPE. Mỗi camera khai được tối đa 10 vùng đa giác; ai có **điểm chân** (giữa cạnh
+dưới khung người) nằm ngoài **mọi** vùng thì bị loại TRƯỚC khi xét PPE — không sinh
+vi phạm và không tính là người quan sát. Camera không khai vùng nào = xét cả khung.
+
+```
+Zone (isActive, type=MONITORING, polygonData = [{x,y}] tỉ lệ 0–1)
+   │  yolo_inference.load_zones() — đọc DB chỉ-đọc lúc khởi động và mỗi 60s
+   ▼
+ppe_tracker.process_frame(frame, zones=[...])
+   │  zones.filter_persons_in_zones() — ray casting, bỏ người ngoài vùng
+   ▼
+phần còn lại của pipeline giữ nguyên (PPE, vi phạm, snapshot)
+```
+
+- Vẽ vùng ở **Cài đặt > Giám sát > sửa camera > "Vùng nhận diện"** (`ZoneEditor.tsx`),
+  lưu qua `PUT /api/cameras/[id]/zones`. Sửa xong AI áp dụng trong tối đa 60 giây,
+  không cần khởi động lại engine.
+- Nền của trình vẽ là `public/snapshots/preview_<cameraId>.jpg` — engine ghi lại mỗi
+  **30 giây** cho từng camera (JPEG rộng 640px, dùng lại đúng khung vừa đọc, nén/ghi ở
+  thread phụ nên không làm chậm vòng lặp). Chưa chạy engine thì chưa có ảnh và trình
+  vẽ hiện trạng thái rỗng.
+- Một luồng video phục vụ nhiều camera demo: chỉ cần MỘT camera trong nhóm chưa khai
+  vùng là cả luồng xét toàn khung (`zones_for_stream`), vì detections được gửi chung.
+- `type` `RESTRICTED`/`WARNING` của bảng `Zone` chưa dùng — engine chỉ đọc `MONITORING`.
+
+## Clip bằng chứng cho mỗi vi phạm
+
+Một tấm ảnh đứng yên không cho biết người đó vừa tháo mũ ra hay đang đội vào. Vì vậy
+mỗi vi phạm ĐÃ CHỐT còn kèm một clip ngắn khoảng **8 giây**:
+
+```
+mỗi khung đọc được  ->  ring.push(resize(frame, 0.5))  (FrameRing giữ 20 khung gần nhất)
+   ▼
+chốt vi phạm  ->  cv2.imwrite(violation_<cam>_<ts>_<trackId>.jpg)   ảnh bằng chứng như cũ
+              ->  start_clip(clip_<cam>_<ts>_<trackId>.mp4, ring.snapshot())
+                     ghi ngay 20 khung TRƯỚC, trả PendingClip(remaining=12)
+   ▼
+mỗi vòng lặp sau  ->  pending.feed(frame): ghi 1 khung, đếm ngược; đủ 12 thì tự đóng
+```
+
+- mp4v, 4 fps, kích thước lấy từ khung đầu tiên → 32 khung ≈ 8 giây.
+- Vòng lặp KHÔNG bị chặn: mỗi vòng chỉ ghi thêm một khung cho mỗi clip đang mở.
+- Tên clip dùng đúng khoá của ảnh (`<cameraId>_<timestamp>_<trackId>`) nên nhìn tên là
+  ghép được cặp ảnh–clip của cùng một vi phạm. **Phải có `trackId`**: hai người cùng vi
+  phạm trong CÙNG một giây trên cùng camera sẽ trùng tên nếu chỉ có `<cam>_<ts>`, hai
+  `cv2.VideoWriter` mở đè lên một file → clip hỏng và cả hai vi phạm cùng trỏ vào đó.
+  Tiền tố `violation_`/`clip_` và đuôi `.jpg`/`.mp4` giữ nguyên nên `clear_snapshots()`
+  và `isEvidenceFile()` (agent) vẫn nhận đúng tệp bằng chứng.
+- `report_violation()` gửi kèm `clipUrl` (chỉ khi ghi được — API nhận trường tuỳ chọn,
+  không nhận `null`), lưu vào `Violation.clipUrl`.
+- `clear_snapshots()` xoá cả `violation_*.jpg` lẫn `clip_*.mp4` khi engine khởi động/tắt.
+- Trí nhớ: khung được **thu nhỏ một nửa** trước khi `push` (`cv2.resize(frame, None,
+  fx=0.5, fy=0.5)`), nên 20 khung 1080p còn ~31MB mỗi luồng thay vì ~124MB. Phần đuôi
+  clip (`pending.feed`) phải dùng ĐÚNG khung đã thu nhỏ đó — kích thước video lấy từ
+  khung đầu, khác cỡ là `VideoWriter` bỏ khung. Clip là bối cảnh, ảnh snapshot mới là
+  bằng chứng cần nét (vẫn ghi nguyên cỡ).
+
+## Đếm người quan sát được (mẫu số của tỉ lệ tuân thủ)
+
+Chỉ đếm vi phạm thì không biết "nhiều" là bao nhiêu: 5 vi phạm ở công trường 200 người
+khác hẳn 5 vi phạm ở tổ 3 người. Engine vì vậy đếm luôn **số người nó thực sự nhìn thấy**
+và gửi về dashboard làm mẫu số.
+
+```
+process_frame() lọc vùng xong  ->  tracker.last_person_count (số người của khung này)
+   │  mỗi khung: person_seconds += số_người × dt   (dt = giờ thật từ khung trước, chặn ≤ 1s)
+   ▼
+hết một phút đồng hồ (UTC)  ->  gom MỌI luồng thành 1 mảng
+   ▼
+POST /api/observations  ->  upsert ObservationStat(cameraId, minute, persons, personSeconds)
+```
+
+- `last_person_count` là số người **sau khi lọc vùng làm việc**, nên người ngoài vùng
+  không làm phồng mẫu số. Để ở thuộc tính của tracker thay vì đổi kiểu trả về của
+  `process_frame` → không nơi gọi nào phải sửa.
+- `dt` bị chặn ở **1 giây/khung**: một lần khựng dài (nạp model, RTSP reconnect) không
+  biến thành hàng chục phút-người ảo.
+- POST chạy **1 lần/phút cho toàn bộ luồng**, timeout 2s, và ở **thread phụ** (giống
+  `write_preview`): một mình nó khựng là khựng MỌI camera cùng lúc, nên không để nó nằm
+  trên vòng lặp nhận diện. Lỗi thì bỏ qua phút đó và chỉ in cảnh báo một lần cho mỗi HTTP
+  status. Upsert theo `(cameraId, minute)` nên gửi trùng cũng không nhân đôi.
+- Một luồng video phục vụ nhiều camera demo → mỗi camera trong nhóm nhận cùng con số
+  (detections vốn tính một lần rồi gửi chung).
+- Dashboard đọc lại qua `GET /api/stats/compliance`: `tỉ lệ = 1 − vi_phạm / phút_người`.
+  Ngày chưa có dòng `ObservationStat` nào thì API trả `null` và giao diện hiện nhãn
+  **"ước tính"** (rơi về cách tính cũ theo số vi phạm) thay vì bịa ra 100%.
 
 ## Các lớp phát hiện (model `ppe_multiclass.pt` hiện tại)
 

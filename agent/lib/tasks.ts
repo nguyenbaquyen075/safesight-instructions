@@ -5,13 +5,13 @@ import { cameraIdOf } from './camera-agent';
 export type Lane = 'direct' | 'research';
 
 export const DIRECT_KINDS = ['health.sweep', 'health.probe', 'snapshot.cleanup'] as const;
-export const RESEARCH_KINDS = ['ask', 'violation.review', 'ops.escalate', 'shift.report', 'camera.digest', 'followup'] as const;
+export const RESEARCH_KINDS = ['ask', 'violation.review', 'ops.escalate', 'shift.report', 'weekly.report', 'camera.digest', 'followup'] as const;
 export const KINDS = [...DIRECT_KINDS, ...RESEARCH_KINDS] as const;
 export type TaskKind = (typeof KINDS)[number];
 
 export const PRIORITY = {
   'health.sweep': 900, 'health.probe': 800, 'ask': 500, 'violation.review': 300,
-  'ops.escalate': 250, 'shift.report': 200, 'snapshot.cleanup': 100, 'camera.digest': 50, 'followup': 0,
+  'ops.escalate': 250, 'shift.report': 200, 'weekly.report': 150, 'snapshot.cleanup': 100, 'camera.digest': 50, 'followup': 0,
 } as const satisfies Record<TaskKind, number>;
 
 export const MAX_ATTEMPTS = 3;
@@ -81,8 +81,10 @@ export async function ensureTask(input: {
   return { id: created.id, created: true };
 }
 
-// ponytail: SQLite không có FOR UPDATE SKIP LOCKED — thiết kế cho MỘT worker.
-// Nhiều worker/Postgres thì thay bằng UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED) như CRM lib/tasks.ts.
+// Nhiều worker vẫn ĐÚNG: lease bằng updateMany có điều kiện `leasedUntil` cũ, chỉ worker nào
+// đổi được (count === 1) mới nhận task, worker thua bỏ qua. Không cần FOR UPDATE SKIP LOCKED.
+// ponytail: chọn xong mới lease từng dòng nên đông worker sẽ có lượt quét phí; nếu số worker
+// lên tới hàng chục thì đổi sang UPDATE ... FROM (SELECT ... FOR UPDATE SKIP LOCKED) (Postgres).
 // opts.onePerCamera: mỗi lượt chỉ nhận MỘT task cho mỗi camera — subagent của một camera không
 // chạy hai phiên song song với chính nó; task thứ hai của camera đó chờ lượt sau.
 export async function claimDue(limit: number, lane: Lane, now = new Date(), opts: { onePerCamera?: boolean } = {}): Promise<LeasedTask[]> {

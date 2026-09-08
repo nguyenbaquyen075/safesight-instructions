@@ -37,7 +37,9 @@ npm run db:seed
 | `NEXTAUTH_SECRET` | ✅ | NextAuth v5 |
 | `NEXT_PUBLIC_YOLO_SERVER_URL` | ✅ | `http://localhost:4001` — thiếu thì UI không nối bridge |
 | `AI_ENGINE_SECRET` | ✅ | `POST /api/violations` từ chối request thiếu header `X-AI-Engine-Secret` khớp giá trị này (`openssl rand -base64 24`) |
-| `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram trong DB (32 byte base64) |
+| `TELEGRAM_ENCRYPT_KEY` | ✅ | Mã hoá bot token Telegram **và** access token Zalo OA trong DB (32 byte base64) |
+| `WEBHOOK_SECRET` | bắt buộc nếu dùng kênh webhook | Ký body JSON (HMAC-SHA256) gửi ở header `X-SafeSight-Signature`; thiếu thì kênh webhook bỏ qua, không gửi bản chưa ký |
+| `PUBLIC_BASE_URL` | tuỳ chọn | URL công khai của dashboard; có thì Zalo gửi kèm ảnh snapshot và webhook nhận `snapshotUrl` tuyệt đối, không có thì Zalo chỉ gửi chữ |
 | `ROBOFLOW_API_KEY` | tuỳ chọn | Chỉ cần cho trang `/roboflow` và script đối chiếu ảnh tĩnh |
 | `NEXT_API_URL` | tuỳ chọn | AI engine gọi Next.js ở đâu (mặc định `http://localhost:3000`) |
 | `AGENT_BRIDGE_SECRET` | bắt buộc để poke/ask agent | Next gọi `POST http://127.0.0.1:4002/internal/*`; thiếu ở Next thì không gọi (task vẫn nằm hàng đợi), thiếu ở agent thì route trả 401 |
@@ -123,6 +125,57 @@ mkdir -p data
 docker run --rm -v <tên-volume-ở-trên>:/from -v "$PWD/data":/to alpine cp -a /from/. /to/
 ```
 
+## Chuyển sang PostgreSQL
+
+SQLite đủ cho dev và cho một máy chủ nhỏ, nhưng chỉ cho **một tiến trình ghi tại một thời điểm**. Nhiều worker agent, nhiều bản dashboard sau load balancer thì phải dùng PostgreSQL.
+
+Prisma 7 nhúng query compiler theo provider **lúc `prisma generate`**, nên một bản Prisma Client chỉ nói được một loại DB. Vì vậy thứ tự các bước dưới đây quan trọng: **chép dữ liệu xong rồi mới đổi client**.
+
+```bash
+# 0. Bật Postgres (compose profile "pg"); .env cần POSTGRES_PASSWORD và DATABASE_URL
+docker compose --profile pg up -d postgres
+
+# 1. Tạo bảng bên Postgres (không đụng tới client đang có)
+POSTGRES_URL='postgresql://safesight:<mat_khau>@127.0.0.1:5432/safesight'
+DATABASE_URL="$POSTGRES_URL" npm run db:pg:push
+
+# 2. Chép dữ liệu SQLite -> Postgres (script vẫn dùng client SQLite hiện tại, nên phải chạy TRƯỚC bước 3)
+SQLITE_URL=file:./data/dev.db POSTGRES_URL="$POSTGRES_URL" npm run db:pg:migrate-data
+
+# 3. Đổi Prisma Client sang bản Postgres (quay lại dev SQLite: chạy `npx prisma generate`)
+npm run db:pg:generate
+```
+
+`scripts/sqlite-to-postgres.mjs` chép **16 bảng theo đúng thứ tự khoá ngoại** (`Organization` → `Site` → `Camera` → `Zone` → `Violation` → `ObservationStat` → `User` → `AlertRule` → `Alert` → `AuditLog` → `TelegramSettings` → `ZaloSettings` → `AgentTask` → `AgentEvent` → `AgentSettings` → `CameraAgent`), từng lô 500 dòng, mọi `INSERT` đều `ON CONFLICT DO NOTHING` nên chạy lại không nhân đôi dữ liệu.
+
+Với Docker, `.env` cần thêm (xem `.env.docker.example`):
+
+```bash
+DATABASE_URL=postgresql://safesight:<mat_khau>@postgres:5432/safesight
+POSTGRES_PASSWORD=<mat_khau>
+PRISMA_SCHEMA=prisma/postgres/schema.prisma       # build arg: sinh client bản Postgres
+BUILD_DATABASE_URL=postgresql://build/build       # URL giả, chỉ để `next build` chọn đúng adapter
+```
+
+rồi **dựng lại image** (`docker compose build dashboard`) vì client Postgres phải được sinh trong image, và chạy `docker compose --profile pg up -d`. Service `postgres` (image `postgres:16-alpine`, volume `pgdata`) chỉ mở cổng ra `127.0.0.1:5432` để AI engine và agent chạy ngoài container vẫn nối được. Không bật profile thì toàn bộ ngăn xếp chạy SQLite y như trước.
+
+### ⚠️ AI engine VẪN CẦN một `DATABASE_URL` dạng `file:` (SQLite)
+
+Chỉ **dashboard, seed và agent** chọn adapter theo lược đồ của `DATABASE_URL`. `ai-engine/yolo_inference.py` đọc THẲNG file SQLite (`_open_db_readonly`) vì nó khởi động trước khi Next.js sẵn sàng, và **chưa có bản đọc PostgreSQL**. Đưa cho engine một `DATABASE_URL=postgresql://…` thì nó in một dòng cảnh báo lúc khởi động rồi chạy tiếp ở chế độ suy giảm:
+
+- **Vùng nhận diện (Zone/ROI) tắt** — engine xét cả khung hình, dù trên web vẫn vẽ và lưu được vùng.
+- **Camera thật (webcam/RTSP/`video:`) không được mở** — chỉ còn các camera demo trong `src/data/camera-videos.json`.
+- **Camera demo đã xoá trên web vẫn chạy lại** (mất bộ lọc theo bảng `Camera`).
+- Kéo theo: mẫu số "người × giây" của tỉ lệ tuân thủ đếm cả người ngoài vùng làm việc, nên số tuân thủ trên `/reports` và KPI bảng điều khiển **sai**, không phải chỉ thiếu.
+
+Vì vậy khi bật profile `pg`: cho dashboard/agent dùng URL Postgres, còn **tiến trình engine phải chạy với `DATABASE_URL=file:./data/dev.db`** (đúng file SQLite mà web đang dùng) — nghĩa là chỉ nên bật Postgres khi đã chấp nhận engine đứng ngoài, hoặc chờ bản đọc PostgreSQL cho engine (xem `docs/github/issues/postgres-multi-worker.md`, mục tồn đọng).
+
+Chưa nghiệm thu trên PostgreSQL thật: máy phát triển hiện không có Postgres, nên phần này mới chỉ được kiểm bằng đọc lại mã và test SQLite.
+
+## Nhiều worker agent
+
+Có thể chạy nhiều tiến trình `agent/main.ts` (mỗi tiến trình một `AGENT_PORT` khác nhau). Điều kiện: DB phải là PostgreSQL — xem mục "Nhiều worker" trong [09 — Agent](09-agent.md#nhiều-worker).
+
 ## Lưu ý Prisma 7.10 với trợ lý AI
 
 Từ Prisma CLI 7.10, `prisma db push --accept-data-loss` (nằm trong `npm run test:agent`, chạy trên file tạm `agent-test.db`) từ chối chạy khi phát hiện được gọi bởi Claude Code và yêu cầu người vận hành đồng ý rõ ràng; phiên AI phải đặt biến `PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION` đúng nội dung câu đồng ý. Chạy tay trong terminal hoặc trên CI không bị ảnh hưởng.
@@ -135,6 +188,9 @@ Từ Prisma CLI 7.10, `prisma db push --accept-data-loss` (nằm trong `npm run 
 | `npm run dev:web` / `dev:bridge` / `dev:yolo` / `dev:agent` | Chạy riêng từng tiến trình |
 | `npm run test:agent` | Test agent (`node --test agent/test/*.test.ts`) trên SQLite tạm |
 | `npm run db:seed` | Seed org/site/camera (`prisma/seed.mjs`) |
+| `npm run db:pg:push` | Tạo bảng trên PostgreSQL (`prisma/postgres/schema.prisma`) |
+| `npm run db:pg:migrate-data` | Chép dữ liệu SQLite → PostgreSQL (`SQLITE_URL`, `POSTGRES_URL`) |
+| `npm run db:pg:generate` | Sinh Prisma Client bản PostgreSQL (**thay** client SQLite đang có) |
 | `npm run build` / `npm run start` | Build và chạy bản production |
 | `npm run lint` | ESLint |
 
