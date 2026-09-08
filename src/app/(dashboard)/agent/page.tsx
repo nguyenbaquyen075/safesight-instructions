@@ -1,20 +1,88 @@
 // SPDX-License-Identifier: MIT
 'use client';
 import { useState } from 'react';
-import { Bot, Activity, ListTodo, Settings2, Cctv } from 'lucide-react';
+import { Bot, Activity, ListTodo, Settings2, Cctv, Target } from 'lucide-react';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { AgentTimeline } from '@/components/agent/AgentTimeline';
 import { AskAgentBox } from '@/components/agent/AskAgentBox';
 import { CameraAgentCard } from '@/components/agent/CameraAgentCard';
-import { useAgentEvents, useAgentSettings, useAgentTasks, useCameraAgents, useSaveAgentSettings } from '@/hooks/use-agent';
+import { useAgentAccuracy, useAgentEvents, useAgentSettings, useAgentTasks, useCameraAgents, useSaveAgentSettings } from '@/hooks/use-agent';
 import { toast } from '@/lib/toast';
-import { cn } from '@/lib/utils';
+import { cn, getViolationTypeLabel } from '@/lib/utils';
+import type { ViolationType } from '@/types/enums';
 
 const FILTERS = [['', 'Tất cả'], ['verdict', 'Phán quyết'], ['action', 'Hành động'], ['health', 'Sức khoẻ'], ['error', 'Lỗi']] as const;
 // Gợi ý sẵn; admin vẫn gõ được tên model bất kỳ (proxy tương thích OpenAI dùng tên riêng).
 const MODELS = ['claude-opus-5', 'claude-sonnet-5'];
 // Mã thứ khớp nextWeekly trong agent/lib/recurring.ts; nhãn tiếng Việt cho người dùng.
 const WEEKDAY_OPTIONS = [['MON', 'Thứ 2'], ['TUE', 'Thứ 3'], ['WED', 'Thứ 4'], ['THU', 'Thứ 5'], ['FRI', 'Thứ 6'], ['SAT', 'Thứ 7'], ['SUN', 'Chủ nhật']] as const;
+
+const ACCURACY_WINDOWS = [7, 30] as const;
+// Chưa ai chấm thì không có tỉ lệ để hiện — "0 %" sẽ đọc thành "agent chưa sai lần nào".
+const wrongRateLabel = (row: { withFeedback: number; wrong: number }) =>
+  row.withFeedback === 0 ? '—' : `${Math.round((row.wrong / row.withFeedback) * 100)}%`;
+
+// Độ chính xác của agent theo phản hồi của người: bảng theo camera và theo loại vi phạm.
+function AgentAccuracyCard() {
+  const [days, setDays] = useState<number>(7);
+  const { data, isLoading, isError } = useAgentAccuracy(days);
+  const totals = data?.totals;
+
+  return (
+    <SettingCard>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <h3 className="font-black flex items-center gap-2"><Target className="w-4 h-4" /> Độ chính xác của agent</h3>
+        <div className="flex gap-1">
+          {ACCURACY_WINDOWS.map(d => (
+            <button key={d} type="button" onClick={() => setDays(d)} className={cn('px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]', days === d ? 'bg-[var(--primary)] text-white' : 'text-[var(--text-muted)] hover:text-[var(--text-primary)]')}>{d} ngày</button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? <div className="h-40 rounded-xl bg-[var(--surface-elevated)] animate-pulse" /> : isError ? <p className="text-sm text-[var(--danger)]">Không tải được độ chính xác.</p> : !totals || totals.reviewed === 0 ? (
+        <p className="text-sm text-[var(--text-muted)]">Agent chưa phán quyết vi phạm nào trong {days} ngày qua.</p>
+      ) : (
+        <div className="space-y-5">
+          <div className="grid grid-cols-3 gap-3 text-center">
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Đã phán quyết</p><p className="text-2xl font-black mt-1">{totals.reviewed}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Có phản hồi</p><p className="text-2xl font-black mt-1">{totals.withFeedback}</p></div>
+            <div><p className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">Tỉ lệ sai</p><p className="text-2xl font-black mt-1 text-[var(--danger)]">{wrongRateLabel(totals)}</p></div>
+          </div>
+          {totals.withFeedback === 0 && <p className="text-xs text-[var(--text-muted)]">Chưa ai đánh giá phán quyết nào. Mở một vi phạm, tab Agent, chọn Đúng hoặc Sai.</p>}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {([['Theo camera', data.byCamera.map(r => ({ key: r.cameraId, label: r.name, ...r }))], ['Theo loại vi phạm', data.byType.map(r => ({ key: r.type, label: getViolationTypeLabel(r.type as ViolationType), ...r }))]] as const).map(([title, rows]) => (
+              <div key={title} className="space-y-2">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)]">{title}</h4>
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[320px] text-sm">
+                    <thead>
+                      <tr className="text-[10px] font-black uppercase tracking-widest text-[var(--text-muted)] border-b border-[var(--border)]">
+                        <th className="text-left py-2 pr-4">{title === 'Theo camera' ? 'Camera' : 'Loại'}</th>
+                        <th className="text-right py-2 pr-4">Đã review</th>
+                        <th className="text-right py-2 pr-4">Phản hồi</th>
+                        <th className="text-right py-2">Tỉ lệ sai</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map(r => (
+                        <tr key={r.key} className="data-row border-b border-[var(--border-subtle)]">
+                          <td className="py-2 pr-4 font-medium text-[var(--text-primary)] break-words">{r.label}</td>
+                          <td className="py-2 pr-4 text-right">{r.reviewed}</td>
+                          <td className="py-2 pr-4 text-right">{r.withFeedback}</td>
+                          <td className="py-2 text-right font-bold text-[var(--danger)]">{wrongRateLabel(r)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </SettingCard>
+  );
+}
 
 export default function AgentPage() {
   const [type, setType] = useState<string>('');
@@ -85,6 +153,8 @@ export default function AgentPage() {
           </SettingCard>
         </div>
       </div>
+
+      <AgentAccuracyCard />
 
       <div>
         <div className="flex items-center gap-2 mb-4">

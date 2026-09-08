@@ -13,7 +13,7 @@ import type {
   SiteStatus,
   ViolationStatus,
 } from './enums';
-import type { AgentReview } from './agent';
+import type { AgentReview, ReviewFeedback } from './agent';
 
 export interface Organization {
   id: string;
@@ -101,6 +101,7 @@ export interface Violation {
   clipUrl?: string;
   status: ViolationStatus;
   agentReview?: AgentReview | null;
+  reviewFeedback?: ReviewFeedback | null;
   detectedAt: string;
   createdAt: string;
 }

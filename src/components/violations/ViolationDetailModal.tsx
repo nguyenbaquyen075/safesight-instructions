@@ -302,7 +302,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
 
               {tab === 'agent' && (
                 <div className="space-y-4">
-                  <AgentReviewCard review={violation.agentReview ?? null} />
+                  <AgentReviewCard review={violation.agentReview ?? null} violationId={violation.id} feedback={violation.reviewFeedback ?? null} />
                   <SubjectAgentPanel subjectType="violation" subjectId={violation.id} />
                 </div>
               )}

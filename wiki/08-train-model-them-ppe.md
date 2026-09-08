@@ -74,6 +74,43 @@ yolo detect train \
 - Xem `mAP`, precision/recall sau train.
 - Chạy thử trên video thật, chỉnh `confidence`, thu thập thêm ảnh cho lớp bắt kém, train lại.
 
+## Xuất phản hồi agent làm dataset
+
+Từ v0.11, mỗi phán quyết của agent đều được người xác nhận đúng/sai ngay trong tab **Agent**
+của modal vi phạm (lưu ở `Violation.reviewFeedback`). Đây là **nhãn thật do người công trường
+gán trên chính ảnh của mình** — nguồn dữ liệu tốt nhất để train lại, không phải đi tìm dataset công khai.
+
+**Cách lấy:** trang `/reports` → chọn công trường + khoảng ngày → nút **"Xuất phản hồi agent (CSV)"**
+(gọi `GET /api/reports/agent-feedback?siteId&from&to`, file UTF-8 có BOM, mở thẳng bằng Excel).
+
+Các cột trong file:
+
+| Cột | Ý nghĩa |
+|---|---|
+| `violationId` | Id vi phạm — khoá để đối chiếu ngược với DB |
+| `cameraId` | Camera phát hiện — lọc theo camera hay bị oan |
+| `type` | Loại vi phạm (`hard_hat`, `safety_gloves`, ...) = lớp cần tăng nhãn |
+| `detectedAt` | Thời điểm phát hiện (ISO) — dùng để chia train/val theo thời gian |
+| `snapshotUrl` | Đường dẫn ảnh chốt trong `public/` — **ảnh để gán nhãn lại** |
+| `clipUrl` | Clip bằng chứng ~8s nếu engine có ghi (rỗng nếu không) |
+| `agentVerdict` | Phán quyết agent: `violation` / `false_positive` / `undecided` |
+| `band` | Mức chắc chắn của agent: `VERIFIED` / `PROBABLE` / `POSSIBLE` |
+| `humanCorrect` | `true` = agent đúng, `false` = người bảo agent SAI |
+| `note` | Ghi chú của người ("người có mũ, bị cột che") — lý do sai |
+
+**Nạp vào `training/`:**
+1. Lọc các dòng `humanCorrect = false`: đó là những ảnh model/agent đang đọc sai — nhóm theo `type`
+   để biết lớp nào yếu (thường vẫn là `safety_gloves` / `safety_footwear`).
+2. Copy các ảnh theo `snapshotUrl` (nằm trong `public/snapshots/`) sang thư mục ảnh thô của dataset.
+3. Gán nhãn lại bằng Roboflow/CVAT theo đúng bộ lớp ở [Bước 1](#bước-1--xác-định-danh-sách-lớp-class),
+   xuất định dạng YOLO.
+4. Trộn vào dataset hiện có bằng `training/build_dataset.py` rồi train theo
+   [Bước 4](#bước-4--train-dùng-ultralytics-yolov8).
+5. Nghiệm thu bằng `ai-engine/eval_ppe_decision.py` như mọi lần train lại.
+
+Thẻ **"Độ chính xác của agent"** ở trang `/agent` (7/30 ngày, `GET /api/stats/agent-accuracy`)
+cho biết nên xuất khoảng nào: camera hoặc loại vi phạm có tỉ lệ sai cao chính là chỗ thiếu dữ liệu.
+
 ## Giảm báo nhầm (không cần train lại — làm ngay được)
 - **Nâng `confidence`** trong `yolo_inference.py` (đã nâng 0.5→0.6).
 - **Dùng video sát thực tế** (đã đổi sang `viphamlaodong.mp4`).

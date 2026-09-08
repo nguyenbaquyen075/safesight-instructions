@@ -131,7 +131,7 @@ export default function ReportsPage() {
           <InputGroup label="Đến ngày">
             <input type="date" value={to} min={from} onChange={e => setTo(e.target.value)} className="w-full rounded-xl bg-[var(--background-secondary)] border border-[var(--border)] px-3 py-2 text-sm" />
           </InputGroup>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => exportCsv(rows, from, to)}
@@ -147,6 +147,16 @@ export default function ReportsPage() {
             >
               <Printer className="w-4 h-4" /> In / PDF
             </button>
+            {/* Bộ dữ liệu retrain do server dựng (kèm cả cột của agent), nên là link tải thẳng
+                route CSV thay vì dựng lại ở trình duyệt như nút "Xuất CSV" ở trên. */}
+            <a
+              href={`/api/reports/agent-feedback?${new URLSearchParams({ ...(siteId ? { siteId } : {}), from, to }).toString()}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="basis-full inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--border)] px-3 py-2 text-sm font-bold text-[var(--text-secondary)] transition-colors hover:text-[var(--text-primary)] hover:bg-[var(--surface-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+            >
+              <Download className="w-4 h-4" /> Xuất phản hồi agent (CSV)
+            </a>
           </div>
         </div>
       </SettingCard>

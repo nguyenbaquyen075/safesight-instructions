@@ -227,7 +227,7 @@ cùng hàng đợi.
 | Tool | Loại | Input | Trả về |
 |---|---|---|---|
 | `read_violation` | đọc | `violationId` | ảnh snapshot, bbox, type, severity, confidence, occurrenceCount, status, `agentReview` cũ, **cameraId, siteId**, `actions[]` (`assigneeName`, `dueAt`, `status`, `overdue`) — việc khắc phục đã giao cho người |
-| `read_camera_history` | đọc | `cameraId, hours (24/168)` | vi phạm (id, type, status, detectedAt), tỉ lệ `false_positive`, giờ cao điểm, sức khoẻ gần nhất, **siteId** |
+| `read_camera_history` | đọc | `cameraId, hours (24/168)` | vi phạm (id, type, status, detectedAt), tỉ lệ `false_positive`, giờ cao điểm, sức khoẻ gần nhất, **siteId**, `agentFeedback: { total, wrong, wrongRate }` — phản hồi của người về phán quyết agent trong **7 ngày** của camera đó (khung cố định, không theo `hours`); `wrongRate = wrong / max(total, 1)` làm tròn 2 chữ số |
 | `read_site_context` | đọc | `siteId` | site, camera (id, name, status), AlertRule bật, số người nhận Telegram |
 | `search_violations` | đọc | `cameraId?/siteId?/type?/status?/from?/to?/limit` | danh sách id + tóm tắt; không fuzzy |
 | `read_agent_activity` | đọc | `hours` | task đã xong/đang chờ, phán quyết gần đây, sweep gần nhất, `openActions`/`overdueActions` (số việc khắc phục còn mở / quá hạn) |
@@ -280,6 +280,8 @@ Skill hiện có:
 - `evidence` — từng `ObservationKind`, khi nào dùng, vì sao không có confidence.
 - `ppe-review` — mũ chỉ tính khi ở vùng đầu; găng/giày là lớp yếu (oan 6–9%) nên cần
   bằng chứng primary mới kết luận; model không có lớp `no_vest`; người nền; ngược sáng.
+  Thêm: `agentFeedback.wrongRate` ≥ 0.3 với ít nhất 3 phản hồi nghĩa là người hay lật
+  phán quyết ở camera này → chọn PROBABLE thay vì VERIFIED.
 - `escalation` — lần 1 là nhắc nhở, từ lần 2 là vi phạm; không spam; caption ngắn có
   camera, món thiếu, lần thứ mấy.
 - `data-boundaries` — không suy đoán danh tính người, không mô tả đặc điểm cá nhân ngoài

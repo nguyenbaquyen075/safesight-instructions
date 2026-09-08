@@ -20,6 +20,9 @@ export interface AgentReview {
   score: number; observations: string[]; note: string; rationale: string; sessionId: string; reviewedAt: string;
 }
 
+// Người xác nhận phán quyết trên của agent đúng hay sai (cột Violation.reviewFeedback).
+export interface ReviewFeedback { correct: boolean; note?: string; userId: string; at: string }
+
 export const OBSERVATION_LABELS: Record<string, string> = {
   'snapshot.no-person': 'khung đỏ không có người',
   'snapshot.ppe-visible': 'món bị báo thiếu nhìn thấy rõ',

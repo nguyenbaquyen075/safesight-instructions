@@ -149,3 +149,24 @@ export function useUpdateCorrectiveAction() {
     },
   });
 }
+
+// Người chấm phán quyết của agent đúng/sai (G3). Làm mới ['violations'] để danh sách và
+// modal cùng thấy phản hồi mới, và ['agent-accuracy'] để thẻ độ chính xác ở /agent cập nhật.
+export function useSubmitReviewFeedback() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...body }: { id: string; correct: boolean; note?: string }) => {
+      const res = await fetch(`/api/violations/${id}/feedback`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (!res.ok) throw new Error('Không gửi được đánh giá phán quyết');
+      return res.json() as Promise<Violation>;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['violations'] });
+      queryClient.invalidateQueries({ queryKey: ['agent-accuracy'] });
+    },
+  });
+}
