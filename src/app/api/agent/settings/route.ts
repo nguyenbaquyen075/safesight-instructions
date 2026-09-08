@@ -4,6 +4,7 @@ import { z } from 'zod';
 import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { ORG_WIDE_ROLES } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 import type { AgentSettingsView } from '@/types/agent';
 
 // id cố định 'agent-settings', khớp AGENT_SETTINGS_ID trong agent/lib/settings.ts (một dòng duy nhất, dùng chung giữa web và worker).
@@ -35,5 +36,8 @@ export async function PATCH(request: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: parsed.error.flatten() }, { status: 400 });
   const current = await getOrCreate();
   const updated = await prisma.agentSettings.update({ where: { id: current.id }, data: parsed.data });
+
+  await logAudit({ session, action: 'agent-settings.update', resource: 'agent-settings', details: JSON.stringify(parsed.data), request });
+
   return NextResponse.json(toView(updated));
 }

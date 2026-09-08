@@ -6,6 +6,7 @@ import { auth } from '@/auth';
 import { prisma } from '@/lib/prisma';
 import { toUserDTO } from '@/lib/user-shape';
 import { ORG_WIDE_ROLES } from '@/lib/auth/site-access';
+import { logAudit } from '@/lib/audit-log';
 import { UserRole } from '@/types/enums';
 
 async function loadSiteNameMap() {
@@ -59,6 +60,8 @@ export async function PATCH(
     },
   });
 
+  await logAudit({ session, action: 'user.update', resource: 'user', resourceId: id, details: JSON.stringify(parsed.data), request });
+
   return NextResponse.json(toUserDTO(user, await loadSiteNameMap()));
 }
 
@@ -77,5 +80,6 @@ export async function DELETE(
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 
   await prisma.user.delete({ where: { id } });
+  await logAudit({ session, action: 'user.delete', resource: 'user', resourceId: id, details: existing.email, request });
   return NextResponse.json({ success: true });
 }

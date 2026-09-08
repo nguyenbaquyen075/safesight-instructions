@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- Tạo người dùng (`POST /api/users`, dialog "Thêm người dùng" trên `/users`), đổi mật khẩu tự phục vụ (`PATCH /api/users/me/password`, trang `/profile` vào từ menu avatar Header), và nhật ký thao tác (`src/lib/audit-log.ts` ghi vào người dùng/camera/quy tắc cảnh báo/Telegram/cài đặt agent, đọc qua `GET /api/audit-log` và tab "Nhật ký" trong `/settings`). Quên mật khẩu (cần email) chưa làm, để backlog.
+
 ### Thay đổi
 - 5 skill của agent (`agent/skills/*/SKILL.md`) viết lại hoàn toàn bằng tiếng Anh theo chuẩn writing-skills (frontmatter "Use when…", Overview, Quick reference, Common mistakes); kiểm bằng kịch bản review vi phạm không skill → có skill (quan sát đúng kind chuẩn, không bịa `kind` cho `schedule_followup`, leo thang đúng luật).
 

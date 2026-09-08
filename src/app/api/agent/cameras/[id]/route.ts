@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { ORG_WIDE_ROLES, requireSession } from '@/lib/auth/site-access';
 import { parseMemory } from '@/lib/camera-agent-shape';
+import { logAudit } from '@/lib/audit-log';
 
 const updateSchema = z.object({
   isEnabled: z.boolean().optional(),
@@ -40,6 +41,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       data: JSON.stringify({ action: 'camera-agent.settings', changes: parsed.data, userId: gate.session.user.id }),
     },
   });
+
+  await logAudit({ session: gate.session, action: 'camera-agent.settings', resource: 'camera-agent', resourceId: id, details: JSON.stringify(parsed.data), request });
 
   return NextResponse.json({ isEnabled: row.isEnabled, digestEveryMin: row.digestEveryMin, dailyTokenCap: row.dailyTokenCap, memory: parseMemory(row.memory) });
 }
