@@ -77,6 +77,10 @@ Màn hình hiển thị, không có trường nhập. Thành phần: 4 thẻ KPI
 
 Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut theo loại vi phạm, bảng top camera vi phạm. Bộ lọc thời gian: dropdown fix cứng 7 / 30 / 90 ngày, mặc định 7.
 
+Bên dưới các biểu đồ hiện có (v0.9): hai khối **bản đồ nhiệt vi phạm**, dùng chung nút lọc 7/30/90 ngày (mặc định 30) — riêng cho hai khối này, không ảnh hưởng các khối phía trên.
+- **Theo giờ và thứ trong tuần**: lưới 7×24 (thứ × giờ), ô càng đậm càng nhiều vi phạm rơi vào khung giờ đó; hover xem số liệu (tooltip).
+- **Theo vị trí trên camera**: dropdown chọn camera, vẽ chấm mờ tại tâm bbox từng vi phạm chồng lên ảnh xem trước `preview_<cameraId>.jpg`; ảnh lỗi/chưa có thì hiện nền xám + thông báo, chấm vẫn vẽ bình thường.
+
 ## SCR-10 Agent (`/agent`)
 
 | STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |

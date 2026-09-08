@@ -47,6 +47,7 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-VOICE-02 | Camera | Cảnh báo giọng nói | Nhận và phát audio tại loa | S | Workflow | Trang `/site-speaker` theo camera | v0.6 |
 | F-AN-01 | Violation | Phân tích | Xem xu hướng tuân thủ | M | Advanced | Recharts | v0.6 |
 | F-AN-02 | Violation | Phân tích | Xem phân bố vi phạm theo loại | S | Advanced | Donut | v0.6 |
+| F-AN-03 | Violation | Phân tích | Xem bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí | M | Advanced | Lưới 7×24 tô theo `--danger`; canvas chấm mờ trên ảnh xem trước camera | v0.9 |
 | F-RPT-01 | Violation | Báo cáo | Xuất báo cáo CSV / PDF | M | Other | Trang `/reports`: lọc công trường/camera/khoảng ngày, bảng tổng hợp theo camera, Xuất CSV, In / PDF | v0.9 |
 | F-AGENT-01 | AgentTask | Agent | Quét sức khoẻ hệ thống định kỳ | M | Advanced | 60s; 6 loại phát hiện; tự khắc phục trong giới hạn | v0.6 |
 | F-AGENT-02 | Violation | Agent | Review vi phạm bằng bằng chứng | L | Advanced | Claude Tool Runner; band VERIFIED / PROBABLE / POSSIBLE | v0.6 |
