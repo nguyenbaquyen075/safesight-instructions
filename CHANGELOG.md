@@ -15,6 +15,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - `CONTRIBUTING.md`, logo `wiki/assets/safesight-logo.svg`, script `scripts/github-repo-metadata.sh` đặt description/topics cho repo.
 
 - Bộ tài liệu BA `docs/ba/` (15 sản phẩm phân tích nghiệp vụ + SRS, URD, BRD, HDSD, biên bản họp).
+- Test agent lấp khoảng trống: `agent/test/usage.test.ts` (`dailyTokensUsed`), `escalate.test.ts` (`makeEscalate`), `agent-bridge.test.ts` (`enqueueAgentTask` gộp/không gộp task), `violation-status.test.ts` (bất biến status viết HOA khi PATCH).
 
 ### Thay đổi
 - `next.config.ts` bật `output: "standalone"` để đóng gói Docker.
