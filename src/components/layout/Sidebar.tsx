@@ -83,7 +83,7 @@ export function Sidebar() {
         className={cn(
           'fixed inset-y-0 left-0 z-50 h-screen flex flex-col border-r transition-all duration-300',
           'bg-[var(--background-secondary)] border-[var(--border)]',
-          collapsed ? 'w-[260px] md:w-[68px]' : 'w-[260px]',
+          collapsed ? (open ? 'w-[260px]' : 'w-[260px] md:w-[68px]') : 'w-[260px]',
           open ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
         )}
       >
@@ -93,7 +93,7 @@ export function Sidebar() {
             <div className="flex-shrink-0 w-9 h-9 rounded-lg gradient-primary flex items-center justify-center">
               <Shield className="w-5 h-5 text-white" />
             </div>
-            {!collapsed && (
+            {(!collapsed || open) && (
               <div className="flex flex-col">
                 <span className="text-sm font-bold text-[var(--text-primary)] tracking-tight">
                   SafeSight AI
@@ -134,7 +134,7 @@ export function Sidebar() {
                     isActive ? 'text-[var(--primary)]' : ''
                   )}
                 />
-                {!collapsed && (
+                {(!collapsed || open) && (
                   <>
                     <span className="flex-1">{item.label}</span>
                     {!!currentBadge && (
@@ -144,7 +144,7 @@ export function Sidebar() {
                     )}
                   </>
                 )}
-                {collapsed && !!currentBadge && (
+                {collapsed && !open && !!currentBadge && (
                   <span className="absolute left-12 top-0.5 w-2 h-2 rounded-full bg-[var(--danger)]" />
                 )}
               </Link>
@@ -162,7 +162,7 @@ export function Sidebar() {
             )}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>Đăng xuất</span>}
+            {(!collapsed || open) && <span>Đăng xuất</span>}
           </button>
 
           <button
