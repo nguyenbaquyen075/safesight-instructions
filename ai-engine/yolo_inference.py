@@ -30,12 +30,27 @@ SNAPSHOT_DIR = "public/snapshots"
 # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
 HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
 
+# Đã kêu về DATABASE_URL PostgreSQL rồi -> chỉ kêu MỘT lần lúc khởi động, vì
+# load_zones() còn gọi lại mỗi 60s (đừng biến log thành bãi rác).
+_pg_warned = False
+
+
 def _open_db_readonly():
     """Mở file SQLite của Next.js (prisma/dev.db) chỉ để ĐỌC. Đọc THẲNG file thay vì
     gọi API /api/cameras vì tiến trình này khởi động TRƯỚC khi Next.js kịp sẵn sàng
     (xem dev-all.sh) — gọi HTTP lúc đó sẽ lỗi. Trả None nếu chưa có DB (chưa chạy
-    `npm run db:seed` / db chưa được tạo)."""
+    `npm run db:seed` / db chưa được tạo).
+
+    CHƯA hỗ trợ PostgreSQL: dashboard/agent chọn adapter theo lược đồ DATABASE_URL,
+    còn engine vẫn đọc thẳng file SQLite. Gặp URL Postgres thì báo TO rồi trả None —
+    trước đây im lặng nên vùng nhận diện và camera thật tắt mà không ai biết."""
+    global _pg_warned
     db_url = os.environ.get("DATABASE_URL", "")
+    if db_url.startswith(("postgres://", "postgresql://")):
+        if not _pg_warned:
+            _pg_warned = True
+            print("❌ AI engine CHƯA đọc được PostgreSQL — cần DATABASE_URL dạng `file:...` (SQLite). Vùng nhận diện (Zone) và camera thật sẽ KHÔNG hoạt động, chỉ còn video demo.")
+        return None
     db_path = db_url[len("file:"):] if db_url.startswith("file:") else db_url
     db_path = db_path[2:] if db_path.startswith("./") else db_path
     if not db_path or not os.path.exists(db_path):
@@ -184,9 +199,10 @@ def minute_iso(ts):
 def post_observations(rows):
     """Gửi số người quan sát được của phút vừa xong (POST /api/observations).
 
-    Mỗi phút MỘT lần cho toàn bộ luồng, nên timeout 2s vẫn không ảnh hưởng fps đáng
-    kể; lỗi mạng thì bỏ qua phút đó (mẫu số thiếu 1 phút, không sao) và chỉ in cảnh
-    báo 1 lần cho mỗi HTTP status như POST sang bridge.
+    Gọi ở THREAD PHỤ (như write_preview): timeout 2s tuy mỗi phút mới tốn một lần
+    nhưng nó khựng MỌI luồng cùng lúc — dashboard treo (không phải từ chối) là mất
+    2s hình của tất cả camera. Lỗi mạng thì bỏ qua phút đó (mẫu số thiếu 1 phút,
+    không sao) và chỉ in cảnh báo 1 lần cho mỗi HTTP status như POST sang bridge.
     """
     try:
         resp = session.post(OBSERVATIONS_API_URL, json={"observations": rows},
@@ -532,7 +548,7 @@ def run_inference():
                 st["obs_persons"], st["obs_seconds"] = 0, 0.0
             _obs_minute = _minute_now
             if rows:
-                post_observations(rows)
+                threading.Thread(target=post_observations, args=(rows,), daemon=True).start()
 
         for st in streams:
             cap = st["cap"]
@@ -560,8 +576,13 @@ def run_inference():
                 continue
 
             # Đệm khung cho clip bằng chứng (setdefault: mọi luồng đều có, kể cả luồng
-            # tạo ở nhánh dự phòng camera 0).
-            st.setdefault("ring", FrameRing()).push(frame)
+            # tạo ở nhánh dự phòng camera 0). Thu nhỏ một nửa trước khi đệm: clip là
+            # BỐI CẢNH, ảnh snapshot mới là bằng chứng cần nét — 20 khung 1080p nguyên
+            # cỡ tốn ~124MB mỗi luồng, nhân số luồng thì hết RAM. Phần đuôi clip phải
+            # dùng ĐÚNG khung đã thu nhỏ này, không thì cv2.VideoWriter (kích thước lấy
+            # từ khung đầu) bỏ hết khung sau.
+            clip_frame = cv2.resize(frame, None, fx=0.5, fy=0.5)
+            st.setdefault("ring", FrameRing()).push(clip_frame)
 
             # Phân tích ĐÚNG video của luồng này -> khung khớp người trong ô đó
             vi_tri_video = None
@@ -624,14 +645,20 @@ def run_inference():
                         continue
                     if not os.path.exists(SNAPSHOT_DIR):
                         os.makedirs(SNAPSHOT_DIR)
+                    # trackId trong tên tệp: hai người cùng vi phạm ở CÙNG một giây trên
+                    # cùng camera (chuyện thường) trước đây cho ra cùng một tên -> hai
+                    # cv2.VideoWriter mở đè lên một file, clip hỏng và cả hai Violation
+                    # cùng trỏ vào đó. Tiền tố/đuôi giữ nguyên nên clear_snapshots() và
+                    # isEvidenceFile() bên agent vẫn khớp.
+                    tid = key[1]
                     timestamp = time.strftime("%Y%m%d-%H%M%S")
-                    filename = f"violation_{cam_id}_{timestamp}.jpg"
+                    filename = f"violation_{cam_id}_{timestamp}_{tid}.jpg"
                     annotated = _draw_violation_box(frame.copy(), d["bbox"], d["label"])
                     cv2.imwrite(f"{SNAPSHOT_DIR}/{filename}", annotated)
                     d['snapshotUrl'] = f"/snapshots/{filename}"
                     # Clip = 20 khung đã đệm + 12 khung kế tiếp; ghi phần đuôi ở các vòng
                     # lặp sau nên không chặn frame loop.
-                    clip_name = f"clip_{cam_id}_{timestamp}.mp4"
+                    clip_name = f"clip_{cam_id}_{timestamp}_{tid}.mp4"
                     pending = start_clip(f"{SNAPSHOT_DIR}/{clip_name}", st["ring"].snapshot())
                     if pending:
                         st.setdefault("pending_clips", []).append(pending)
@@ -643,7 +670,7 @@ def run_inference():
 
             # Phần đuôi của các clip đang mở: mỗi vòng thêm 1 khung, đủ 12 khung thì tự đóng.
             if st.get("pending_clips"):
-                st["pending_clips"] = [p for p in st["pending_clips"] if not p.feed(frame)]
+                st["pending_clips"] = [p for p in st["pending_clips"] if not p.feed(clip_frame)]
 
         _hb_frames += 1
         if time.time() - _hb_last >= 5.0:

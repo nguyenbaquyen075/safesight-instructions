@@ -159,6 +159,17 @@ BUILD_DATABASE_URL=postgresql://build/build       # URL giả, chỉ để `next
 
 rồi **dựng lại image** (`docker compose build dashboard`) vì client Postgres phải được sinh trong image, và chạy `docker compose --profile pg up -d`. Service `postgres` (image `postgres:16-alpine`, volume `pgdata`) chỉ mở cổng ra `127.0.0.1:5432` để AI engine và agent chạy ngoài container vẫn nối được. Không bật profile thì toàn bộ ngăn xếp chạy SQLite y như trước.
 
+### ⚠️ AI engine VẪN CẦN một `DATABASE_URL` dạng `file:` (SQLite)
+
+Chỉ **dashboard, seed và agent** chọn adapter theo lược đồ của `DATABASE_URL`. `ai-engine/yolo_inference.py` đọc THẲNG file SQLite (`_open_db_readonly`) vì nó khởi động trước khi Next.js sẵn sàng, và **chưa có bản đọc PostgreSQL**. Đưa cho engine một `DATABASE_URL=postgresql://…` thì nó in một dòng cảnh báo lúc khởi động rồi chạy tiếp ở chế độ suy giảm:
+
+- **Vùng nhận diện (Zone/ROI) tắt** — engine xét cả khung hình, dù trên web vẫn vẽ và lưu được vùng.
+- **Camera thật (webcam/RTSP/`video:`) không được mở** — chỉ còn các camera demo trong `src/data/camera-videos.json`.
+- **Camera demo đã xoá trên web vẫn chạy lại** (mất bộ lọc theo bảng `Camera`).
+- Kéo theo: mẫu số "người × giây" của tỉ lệ tuân thủ đếm cả người ngoài vùng làm việc, nên số tuân thủ trên `/reports` và KPI bảng điều khiển **sai**, không phải chỉ thiếu.
+
+Vì vậy khi bật profile `pg`: cho dashboard/agent dùng URL Postgres, còn **tiến trình engine phải chạy với `DATABASE_URL=file:./data/dev.db`** (đúng file SQLite mà web đang dùng) — nghĩa là chỉ nên bật Postgres khi đã chấp nhận engine đứng ngoài, hoặc chờ bản đọc PostgreSQL cho engine (xem `docs/github/issues/postgres-multi-worker.md`, mục tồn đọng).
+
 Chưa nghiệm thu trên PostgreSQL thật: máy phát triển hiện không có Postgres, nên phần này mới chỉ được kiểm bằng đọc lại mã và test SQLite.
 
 ## Nhiều worker agent

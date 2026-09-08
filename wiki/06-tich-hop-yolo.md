@@ -68,10 +68,10 @@ Một tấm ảnh đứng yên không cho biết người đó vừa tháo mũ r
 mỗi vi phạm ĐÃ CHỐT còn kèm một clip ngắn khoảng **8 giây**:
 
 ```
-mỗi khung đọc được  ->  st["ring"].push(frame)      (FrameRing giữ 20 khung gần nhất)
+mỗi khung đọc được  ->  ring.push(resize(frame, 0.5))  (FrameRing giữ 20 khung gần nhất)
    ▼
-chốt vi phạm  ->  cv2.imwrite(violation_<cam>_<ts>.jpg)   ảnh bằng chứng như cũ
-              ->  start_clip(clip_<cam>_<ts>.mp4, ring.snapshot())
+chốt vi phạm  ->  cv2.imwrite(violation_<cam>_<ts>_<trackId>.jpg)   ảnh bằng chứng như cũ
+              ->  start_clip(clip_<cam>_<ts>_<trackId>.mp4, ring.snapshot())
                      ghi ngay 20 khung TRƯỚC, trả PendingClip(remaining=12)
    ▼
 mỗi vòng lặp sau  ->  pending.feed(frame): ghi 1 khung, đếm ngược; đủ 12 thì tự đóng
@@ -79,13 +79,20 @@ mỗi vòng lặp sau  ->  pending.feed(frame): ghi 1 khung, đếm ngược; đ
 
 - mp4v, 4 fps, kích thước lấy từ khung đầu tiên → 32 khung ≈ 8 giây.
 - Vòng lặp KHÔNG bị chặn: mỗi vòng chỉ ghi thêm một khung cho mỗi clip đang mở.
-- Tên clip dùng đúng khoá của ảnh (`<cameraId>_<timestamp>`) nên nhìn tên là ghép được
-  cặp ảnh–clip của cùng một vi phạm.
+- Tên clip dùng đúng khoá của ảnh (`<cameraId>_<timestamp>_<trackId>`) nên nhìn tên là
+  ghép được cặp ảnh–clip của cùng một vi phạm. **Phải có `trackId`**: hai người cùng vi
+  phạm trong CÙNG một giây trên cùng camera sẽ trùng tên nếu chỉ có `<cam>_<ts>`, hai
+  `cv2.VideoWriter` mở đè lên một file → clip hỏng và cả hai vi phạm cùng trỏ vào đó.
+  Tiền tố `violation_`/`clip_` và đuôi `.jpg`/`.mp4` giữ nguyên nên `clear_snapshots()`
+  và `isEvidenceFile()` (agent) vẫn nhận đúng tệp bằng chứng.
 - `report_violation()` gửi kèm `clipUrl` (chỉ khi ghi được — API nhận trường tuỳ chọn,
   không nhận `null`), lưu vào `Violation.clipUrl`.
 - `clear_snapshots()` xoá cả `violation_*.jpg` lẫn `clip_*.mp4` khi engine khởi động/tắt.
-- Trí nhớ: 20 khung 720p ≈ 55MB cho mỗi luồng. Chạy nhiều luồng độ phân giải cao thì
-  thu nhỏ khung trước khi `push` (xem ghi chú `ponytail:` trong `clips.py`).
+- Trí nhớ: khung được **thu nhỏ một nửa** trước khi `push` (`cv2.resize(frame, None,
+  fx=0.5, fy=0.5)`), nên 20 khung 1080p còn ~31MB mỗi luồng thay vì ~124MB. Phần đuôi
+  clip (`pending.feed`) phải dùng ĐÚNG khung đã thu nhỏ đó — kích thước video lấy từ
+  khung đầu, khác cỡ là `VideoWriter` bỏ khung. Clip là bối cảnh, ảnh snapshot mới là
+  bằng chứng cần nét (vẫn ghi nguyên cỡ).
 
 ## Đếm người quan sát được (mẫu số của tỉ lệ tuân thủ)
 
@@ -107,9 +114,10 @@ POST /api/observations  ->  upsert ObservationStat(cameraId, minute, persons, pe
   `process_frame` → không nơi gọi nào phải sửa.
 - `dt` bị chặn ở **1 giây/khung**: một lần khựng dài (nạp model, RTSP reconnect) không
   biến thành hàng chục phút-người ảo.
-- POST chạy **1 lần/phút cho toàn bộ luồng**, timeout 2s, lỗi thì bỏ qua phút đó và chỉ
-  in cảnh báo một lần cho mỗi HTTP status — vòng lặp nhận diện không bao giờ bị chặn lâu.
-  Upsert theo `(cameraId, minute)` nên gửi trùng cũng không nhân đôi.
+- POST chạy **1 lần/phút cho toàn bộ luồng**, timeout 2s, và ở **thread phụ** (giống
+  `write_preview`): một mình nó khựng là khựng MỌI camera cùng lúc, nên không để nó nằm
+  trên vòng lặp nhận diện. Lỗi thì bỏ qua phút đó và chỉ in cảnh báo một lần cho mỗi HTTP
+  status. Upsert theo `(cameraId, minute)` nên gửi trùng cũng không nhân đôi.
 - Một luồng video phục vụ nhiều camera demo → mỗi camera trong nhóm nhận cùng con số
   (detections vốn tính một lần rồi gửi chung).
 - Dashboard đọc lại qua `GET /api/stats/compliance`: `tỉ lệ = 1 − vi_phạm / phút_người`.

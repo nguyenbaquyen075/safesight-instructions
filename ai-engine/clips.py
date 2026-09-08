@@ -20,9 +20,10 @@ FRAMES_AFTER = 12
 class FrameRing:
     """Giữ N khung gần nhất của một luồng để làm phần đầu của clip.
 
-    ponytail: giữ nguyên khung gốc -> 20 khung 720p ≈ 55MB mỗi luồng. Nếu chạy
-    nhiều luồng độ phân giải cao thì thu nhỏ khung trước khi push (clip bằng
-    chứng không cần nét bằng ảnh snapshot).
+    Người gọi (yolo_inference.py) đẩy vào khung ĐÃ THU NHỎ một nửa: 20 khung 1080p
+    nguyên cỡ ≈ 124MB mỗi luồng, nhân số luồng thì hết RAM, mà clip chỉ cần đủ thấy
+    bối cảnh (ảnh snapshot mới là bằng chứng cần nét). Ring không tự thu nhỏ để khỏi
+    phụ thuộc cv2 — nhờ vậy test chạy bằng python hệ thống.
     """
 
     def __init__(self, maxlen=FRAMES_BEFORE):

@@ -48,3 +48,14 @@ SQLite chỉ cho **một tiến trình ghi tại một thời điểm**. Hệ qu
       schema, chọn adapter), `wiki/09` (mục "Nhiều worker"), README (Docker),
       `.env.docker.example`, `docs/ba/14` NFR-20, `CHANGELOG.md`.
 - [ ] PR ghi rõ: **chưa nghiệm thu trên PostgreSQL thật**, cần môi trường có Postgres.
+- [ ] PR ghi rõ: **AI engine chưa đọc được PostgreSQL** — `_open_db_readonly()` in cảnh báo
+      rồi trả `None`, nên với URL Postgres engine mất vùng nhận diện, camera thật và bộ lọc
+      camera đã xoá; tài liệu (`wiki/03`) phải nói rõ engine vẫn cần `DATABASE_URL` `file:`.
+
+## Tồn đọng (làm sau)
+- **Bản đọc PostgreSQL cho AI engine.** Hôm nay `ai-engine/yolo_inference.py` đọc thẳng file
+  SQLite; ba hàm `load_zones()`, `load_real_camera_overrides()`, `load_video_camera_map()` là
+  toàn bộ bề mặt cần chuyển. Việc còn lại: thêm một reader `psycopg` (hoặc gọi API Next.js với
+  `X-AI-Engine-Secret` + retry, tránh thêm dependency Python) đứng sau đúng ba hàm đó, giữ
+  nguyên kiểu trả về. Chưa làm ở đây vì thêm `psycopg` là dependency mới cho một đường chạy
+  chưa nghiệm thu được (máy phát triển không có Postgres).

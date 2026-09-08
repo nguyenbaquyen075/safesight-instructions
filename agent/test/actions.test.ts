@@ -38,6 +38,10 @@ test('pickCleanup selects a closed violation snapshot that is only 2 days old', 
 test('isEvidenceFile accepts violation snapshots and violation clips, nothing else', () => {
   assert.ok(isEvidenceFile('violation_cam-001_20260908-101500.jpg'));
   assert.ok(isEvidenceFile('clip_cam-001_20260908-101500.mp4'));
+  // yolo_inference.py nay thêm trackId vào tên (hai người vi phạm cùng một giây trên
+  // cùng camera trước đây trùng tên) — tiền tố/đuôi giữ nguyên nên vẫn là bằng chứng.
+  assert.ok(isEvidenceFile('violation_cam-001_20260908-101500_7.jpg'));
+  assert.ok(isEvidenceFile('clip_cam-001_20260908-101500_7.mp4'));
   assert.ok(!isEvidenceFile('preview_cam-001.jpg'));
   assert.ok(!isEvidenceFile('.heartbeat.json'));
   assert.ok(!isEvidenceFile('clip_cam-001.txt'));

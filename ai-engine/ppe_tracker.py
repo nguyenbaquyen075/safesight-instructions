@@ -306,6 +306,9 @@ class PPEViolationTracker:
                                    imgsz=self.imgsz, tracker=TRACKER_CFG,
                                    augment=True, iou=0.5, verbose=False)[0]
         if results.boxes is None:
+            # Không có box nào -> khung này KHÔNG có người. Không đặt lại thì số người
+            # của khung trước cứ tiếp tục cộng vào "người × giây" (mẫu số tuân thủ).
+            self.last_person_count = 0
             return final_detections
 
         boxes = results.boxes.xyxy.cpu().tolist()
