@@ -4,6 +4,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-09-08
+
 ### Thêm
 - README mới theo chuẩn dự án mã nguồn mở: logo, badge, mục tính năng, tài liệu, đóng góp.
 - `Dockerfile` hai target (`dashboard`, `bridge`), `docker-compose.yml`, `.env.docker.example`; workflow Docker build và đẩy image lên GHCR.
@@ -119,7 +121,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ### Thêm
 - Khởi tạo dự án: Next.js dashboard, Prisma, AI engine YOLOv8 và YOLO Bridge Socket.IO.
 
-[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/nguyenbaquyen075/safesight-instructions/compare/v0.3.0...v0.4.0
