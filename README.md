@@ -109,6 +109,17 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       #
 # ANTHROPIC_API_KEY (tuỳ chọn — mở lane nghiên cứu của agent: review vi
                       # phạm bằng ảnh, báo cáo ca, hỏi đáp; thiếu thì chỉ chạy trực vận hành)
+                      #
+                      # LLM_PROVIDER (tuỳ chọn — `anthropic` mặc định; đặt `openai` nếu key là
+                      # proxy tương thích OpenAI `/chat/completions`)
+                      # LLM_BASE_URL (tuỳ chọn — URL gốc của endpoint, mặc định lấy
+                      # ANTHROPIC_BASE_URL)
+                      # LLM_API_KEY (tuỳ chọn — key của endpoint trên, mặc định lấy
+                      # ANTHROPIC_API_KEY)
+                      # LLM_MODEL_DEFAULT (tuỳ chọn — tên model ghi vào cài đặt agent lần đầu)
+                      # LLM_IMAGE_INPUT (tuỳ chọn — `true` để gửi ảnh snapshot sang endpoint
+                      # openai; mặc định bỏ ảnh vì nhiều proxy không nhận)
+                      # Xem wiki/09-agent.md mục "Nhà cung cấp LLM".
 
 # 4. Khởi tạo DB + seed dữ liệu Camera/Site tối thiểu (bắt buộc, nếu không
 #    Violation write sẽ lỗi 404 vì cameraId chưa tồn tại)

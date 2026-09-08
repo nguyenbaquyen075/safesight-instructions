@@ -208,10 +208,45 @@ npm run test:agent   # node --test agent/test/*.test.ts trên SQLite tạm
 
 | Biến | Bắt buộc | Ghi chú |
 |---|---|---|
-| `ANTHROPIC_API_KEY` | tuỳ chọn | Thiếu thì chỉ chạy lane trực tiếp (trực vận hành); lane nghiên cứu tắt |
+| `ANTHROPIC_API_KEY` / `LLM_API_KEY` | tuỳ chọn | Thiếu thì chỉ chạy lane trực tiếp (trực vận hành); lane nghiên cứu tắt |
 | `AGENT_BRIDGE_SECRET` | bắt buộc để poke/ask | Next gọi `POST http://127.0.0.1:4002/internal/*`; thiếu ở Next thì không gọi (task vẫn nằm hàng đợi), thiếu ở agent thì route trả 401 |
 | `AGENT_PORT` | tuỳ chọn | Mặc định `4002` |
 | `SNAPSHOT_MAX_MB` | tuỳ chọn | Mặc định `2048` — ngưỡng `disk.pressure` cho `public/snapshots` |
+
+### Nhà cung cấp LLM
+
+Lane nghiên cứu chạy được trên hai loại endpoint. Mặc định là Anthropic Messages API
+(`@anthropic-ai/sdk`, tool runner). Nếu key của bạn là proxy **tương thích OpenAI**
+(`POST /chat/completions`), đặt `LLM_PROVIDER=openai` để agent dùng
+`agent/lib/llm/openai.ts` — vòng lặp gọi tool viết bằng `fetch`, không thêm thư viện.
+
+| Biến | Mặc định | Ghi chú |
+|---|---|---|
+| `LLM_PROVIDER` | `anthropic` | `openai` chuyển sang endpoint `/chat/completions` |
+| `LLM_BASE_URL` | `ANTHROPIC_BASE_URL`, rồi `https://api.openai.com/v1` | URL gốc, agent tự nối `/chat/completions` |
+| `LLM_API_KEY` | `ANTHROPIC_API_KEY` | Gửi ở header `Authorization: Bearer` khi dùng chế độ openai |
+| `LLM_MODEL_DEFAULT` | — | Tên model ghi vào `AgentSettings.model` lúc tạo dòng cài đặt đầu tiên; đổi sau trên trang `/agent` |
+| `LLM_IMAGE_INPUT` | `false` | Cho phép gửi ảnh snapshot sang endpoint openai |
+
+Ví dụ `.env.local`:
+
+```bash
+LLM_PROVIDER=openai
+LLM_BASE_URL=https://proxy-cua-ban/v1
+LLM_API_KEY=sk-...
+LLM_MODEL_DEFAULT=ten-model-cua-proxy
+```
+
+**Lưu ý về ảnh:** nhiều proxy tương thích OpenAI không nhận `image_url`. Mặc định agent
+**bỏ** block ảnh trong kết quả tool (chỉ giữ phần văn bản), nên `read_violation` vẫn trả
+bbox và dữ kiện nhưng model không *nhìn* được snapshot — phán quyết sẽ dựa trên số liệu.
+Đặt `LLM_IMAGE_INPUT=true` nếu proxy hỗ trợ ảnh; ảnh được gửi thành một tin nhắn
+`user` riêng dạng data URL ngay sau kết quả tool.
+
+Chế độ openai không gửi các field riêng của Anthropic (`thinking`, `output_config`), nên
+`reviewEffort` trên trang `/agent` không có tác dụng ở chế độ này. Lỗi HTTP được quy đổi
+giống lỗi SDK: 401/403 tắt chốt lane nghiên cứu tới lần khởi động sau, 429 và 5xx chờ 60s,
+400 là lỗi chết.
 
 `npm run dev` (`dev-all.sh`) tự chạy agent là tiến trình thứ 4, sau bridge và trước Next.
 Lúc khởi động in 4 dòng `[agent] on/off <capability> (<nguồn>)` rồi `✅ Agent HTTP nội bộ:
@@ -222,6 +257,7 @@ http://127.0.0.1:4002`.
 | Triệu chứng | Nguyên nhân | Cách kiểm tra |
 |---|---|---|
 | Task nghiên cứu xong ngay với outcome nhắc "không có ANTHROPIC_API_KEY" | Thiếu key, lane nghiên cứu tắt (đúng thiết kế, không phải lỗi) | Thêm `ANTHROPIC_API_KEY` vào `.env.local` rồi khởi động lại agent |
+| Mọi phiên nghiên cứu lỗi `Cannot read properties of undefined (reading 'filter')` | Endpoint là proxy tương thích OpenAI nhưng agent vẫn chạy đường Anthropic Messages | Đặt `LLM_PROVIDER=openai` (xem "Nhà cung cấp LLM") rồi khởi động lại agent |
 | Panel/API trả `401` khi poke agent | `AGENT_BRIDGE_SECRET` ở Next và ở agent lệch nhau | So `.env.local` của cả hai tiến trình (cùng biến, cùng giá trị) |
 | Task nằm mãi ở trạng thái "chờ" | Agent không chạy hoặc đã treo | `curl 127.0.0.1:4002/health`; nếu không phản hồi, khởi động lại `npm run dev:agent` |
 
