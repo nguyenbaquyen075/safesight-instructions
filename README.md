@@ -372,7 +372,7 @@ Lịch sử thay đổi theo từng phiên bản ở [`CHANGELOG.md`](./CHANGELO
 
 ## 🤝 Đóng góp
 
-Pull Request và Issue đều được hoan nghênh. Đọc [`CONTRIBUTING.md`](./CONTRIBUTING.md) (quy trình, kiểm tra trước khi gửi) và [`AGENTS.md`](./AGENTS.md) (quy ước code, commit, tài liệu). Danh sách thành viên: [`CONTRIBUTORS.md`](./CONTRIBUTORS.md).
+Pull Request và Issue đều được hoan nghênh. Đọc [`CONTRIBUTING.md`](./CONTRIBUTING.md) (quy trình, kiểm tra trước khi gửi) và [`AGENTS.md`](./AGENTS.md) (quy ước code, commit, tài liệu). Danh sách thành viên: [`CONTRIBUTORS.md`](./CONTRIBUTORS.md). Mọi người tham gia tuân theo [Quy tắc ứng xử](./CODE_OF_CONDUCT.md).
 
 ## 📜 Giấy phép
 

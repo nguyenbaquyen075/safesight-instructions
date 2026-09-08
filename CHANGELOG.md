@@ -9,6 +9,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 - Agent trưởng điều phối subagent camera: hai tool mới cho phiên toàn hệ thống — `list_camera_agents` (trạng thái, hạn mức, 3 ghi chú mới nhất, vi phạm mở của từng camera) và `dispatch_to_camera` (giao việc cụ thể → task kind mới `camera.instruction`, ưu tiên 60, chạy dưới subagent camera đó với chỉ dẫn làm "Lý do", không bị cổng "không có hoạt động mới" chặn; chỉ dẫn được ghi vào trí nhớ camera). Preamble nhắc vai trò agent trưởng; đếm chung hạn mức với `schedule_followup`.
 
+- `CODE_OF_CONDUCT.md` (Contributor Covenant 2.1 tiếng Việt, thêm mục riêng về hình ảnh người lao động và secret vận hành), liên kết từ README và CONTRIBUTING.
+
 ### Thay đổi
 - Ô hỏi đáp trên `/agent` và tab Agent trong modal camera/vi phạm/công trường chuyển sang dạng bong bóng chat (cùng `useAskSession` và `ChatThread` với widget); phần thuần `toChatItems`/`eventSummary` tách ra `src/lib/chat-shape.ts` có test. Toast dời lên `bottom-24` để không đè nút chat.
 

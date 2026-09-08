@@ -1,5 +1,7 @@
 # Đóng góp cho SafeSight
 
+Khi tham gia, bạn đồng ý tuân theo [Quy tắc ứng xử](./CODE_OF_CONDUCT.md) của dự án.
+
 Cảm ơn anh/chị đã quan tâm. Quy trình ngắn gọn:
 
 1. **Mở issue** mô tả lỗi hoặc đề xuất trước khi làm thay đổi lớn.
