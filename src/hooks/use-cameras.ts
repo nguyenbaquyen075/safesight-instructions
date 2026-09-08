@@ -72,7 +72,7 @@ export function useUpdateCamera() {
   });
 }
 
-/** Vùng nhận diện (Zone MONITORING) của 1 camera — nền cho trình vẽ trong CameraEditDialog. */
+/** Vùng của 1 camera (mọi loại: làm việc + vùng cấm) — nền cho trình vẽ trong CameraEditDialog. */
 export function useCameraZones(id: string | undefined) {
   return useQuery<ZoneDTO[]>({
     queryKey: ['cameras', id, 'zones'],
