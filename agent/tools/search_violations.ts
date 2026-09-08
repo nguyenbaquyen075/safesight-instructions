@@ -16,7 +16,7 @@ export const searchSchema = z.object({
 export async function searchViolations(f: z.infer<typeof searchSchema>) {
   const rows = await prisma.violation.findMany({
     where: {
-      cameraId: f.cameraId, siteId: f.siteId, type: f.type, status: f.status ? f.status.toUpperCase() : undefined,
+      cameraId: f.cameraId, siteId: f.siteId, type: f.type, status: f.status ? { in: [f.status.toUpperCase(), f.status.toLowerCase()] } : undefined, // row cũ có thể ghi chữ thường
       detectedAt: { gte: f.from ? new Date(f.from) : undefined, lte: f.to ? new Date(f.to) : undefined },
     },
     orderBy: { detectedAt: 'desc' }, take: f.limit, include: { camera: { select: { name: true } } },

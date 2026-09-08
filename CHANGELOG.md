@@ -6,6 +6,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ### Sửa
 - Tài khoản dev cứng `admin@safesight.ai` chỉ còn hoạt động ngoài production (hoặc khi `ALLOW_DEV_LOGIN=true`).
+- API vi phạm trả thêm `occurrenceCount`; JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách; bỏ độ trễ giả 800ms ở `GET /api/violations`; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
 
 ### Thêm
 - README mới theo chuẩn dự án mã nguồn mở: logo, badge, mục tính năng, tài liệu, đóng góp.

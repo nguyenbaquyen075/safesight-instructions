@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { assertSiteAccess } from '@/lib/auth/site-access';
+import { toViolationDTO } from '@/lib/violation-shape';
 
 export async function GET(
   request: NextRequest,
@@ -19,24 +20,7 @@ export async function GET(
     return NextResponse.json({ error: 'Violation not found' }, { status: 404 });
   }
 
-  return NextResponse.json({
-    id: violation.id,
-    cameraId: violation.cameraId,
-    cameraName: violation.camera.name,
-    siteId: violation.siteId,
-    siteName: violation.site.name,
-    zoneId: violation.zoneId ?? undefined,
-    type: violation.type,
-    severity: violation.severity,
-    confidence: violation.confidence,
-    bboxData: JSON.parse(violation.bboxData),
-    snapshotUrl: violation.snapshotUrl,
-    clipUrl: violation.clipUrl ?? undefined,
-    status: violation.status.toLowerCase(),
-    agentReview: violation.agentReview ? JSON.parse(violation.agentReview) : null,
-    detectedAt: violation.detectedAt.toISOString(),
-    createdAt: violation.createdAt.toISOString(),
-  });
+  return NextResponse.json(toViolationDTO(violation));
 }
 
 const updateSchema = z.object({

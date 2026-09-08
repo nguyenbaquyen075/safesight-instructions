@@ -5,6 +5,7 @@ import { prisma } from '../lib/db';
 import { emit } from '../lib/audit';
 import { loadSnapshotBase64 } from '../lib/snapshot';
 import { safeRun } from '../lib/tool-context';
+import { parseJsonOr } from '@/lib/violation-shape';
 import type { ToolContext } from '../lib/tool-context';
 
 export async function violationFacts(id: string) {
@@ -14,8 +15,8 @@ export async function violationFacts(id: string) {
     violationId: v.id, cameraId: v.cameraId, cameraName: v.camera.name, siteId: v.siteId, siteName: v.site.name,
     type: v.type, severity: v.severity, confidence: v.confidence, occurrenceCount: v.occurrenceCount,
     status: v.status.toLowerCase(), detectedAt: v.detectedAt.toISOString(),
-    bbox: JSON.parse(v.bboxData), snapshotUrl: v.snapshotUrl,
-    agentReview: v.agentReview ? JSON.parse(v.agentReview) : null,
+    bbox: parseJsonOr(v.bboxData, []), snapshotUrl: v.snapshotUrl,
+    agentReview: parseJsonOr(v.agentReview, null),
   };
 }
 

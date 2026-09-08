@@ -95,6 +95,7 @@ export interface Violation {
   type: ViolationType;
   severity: Severity;
   confidence: number;
+  occurrenceCount?: number; // lần thứ mấy của cùng một người (AI engine tăng khi báo lại); dữ liệu mock không có
   bboxData: BoundingBox[];
   snapshotUrl: string;
   clipUrl?: string;

@@ -25,7 +25,7 @@ AgentTask (hàng đợi)   ·   AgentEvent (audit + chat)   ·   AgentSettings (
 | `Site` | Công trường | toạ độ `lat`/`lng`, các số đếm camera/tuân thủ/cảnh báo |
 | `Camera` | Camera giám sát | `rtspUrl` lưu nguồn theo quy ước `webcam:0` / `rtsp://...` / `video:ten.mp4`; `status` khác `ONLINE` thì AI bỏ qua |
 | `Zone` | Vùng nhận diện trong khung hình | `polygonData` JSON string; chưa dùng trong pipeline AI |
-| `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
+| `Violation` | Vi phạm AI đã chốt | `type`, `severity`, `confidence`, `bboxData` (JSON), `snapshotUrl`, `occurrenceCount` (lần thứ mấy của cùng một người, reset khi rời khung; GET `/api/violations` và `/api/violations/[id]` trả về trường này), `agentReview` (JSON `{ verdict, band, observations[], note, sessionId, reviewedAt }`, agent ghi sau khi review) |
 | `Alert` | Cảnh báo sinh từ vi phạm | `channel`, `recipient`, `errorMessage` (null = gửi thành công, dùng tính cooldown) |
 | `AlertRule` | Quy tắc cảnh báo | `violationTypes`/`channels`/`recipients` JSON array, `threshold`, `cooldownSec` |
 | `User` | Người dùng | `role`, `assignedSites` JSON array, `passwordHash` (Credentials login) |
