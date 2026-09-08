@@ -10,9 +10,17 @@ import { makeRecordVerdict } from '../tools/record_verdict';
 import { makeEscalate } from '../tools/escalate';
 import { makeScheduleFollowup } from '../tools/schedule_followup';
 import { makeWriteNote } from '../tools/write_note';
+import { makeRememberCamera } from '../tools/remember_camera';
+
+// Phiên thuộc một camera thì có thêm remember_camera ở CUỐI bộ tool: thứ tự các tool trước đó
+// không đổi nên prompt cache vẫn dùng lại được giữa các phiên cùng kind cùng loại chủ thể.
+export function toolsFor(kind: string, ctx: ToolContext) {
+  const tools = toolsForKind(kind, ctx);
+  return ctx.cameraId ? [...tools, makeRememberCamera(ctx)] : tools;
+}
 
 // Bộ tool CỐ ĐỊNH theo kind (thứ tự ổn định) để prompt cache không vỡ giữa các phiên cùng kind.
-export function toolsFor(kind: string, ctx: ToolContext) {
+function toolsForKind(kind: string, ctx: ToolContext) {
   const reads = [makeReadViolation(ctx), makeReadCameraHistory(ctx), makeReadSiteContext(ctx), makeSearchViolations(ctx), makeReadSystemHealth(ctx)];
   switch (kind) {
     case 'violation.review': return [...reads, makeRecordVerdict(ctx), makeEscalate(ctx), makeScheduleFollowup(ctx), makeWriteNote(ctx)];

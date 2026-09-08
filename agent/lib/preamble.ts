@@ -2,6 +2,7 @@
 import { prisma } from './db';
 import { capabilitiesMarkdown } from './capabilities';
 import type { LeasedTask } from './tasks';
+import type { CameraMemoryNote } from './camera-agent';
 
 async function neighbours(task: LeasedTask): Promise<string> {
   if (task.subjectType === 'violation' && task.subjectId) {
@@ -29,13 +30,23 @@ const OPENING: Record<string, string> = {
   'ask': 'Đây là HỘI THOẠI với người dùng đang mở dashboard. Trả lời câu hỏi, ngắn, có id khi cần. Không đưa kế hoạch làm việc.',
 };
 
-export async function preambleFor(task: LeasedTask, opts: { userMessage?: string; sessionId?: string } = {}): Promise<string> {
+export async function preambleFor(task: LeasedTask, opts: { userMessage?: string; sessionId?: string; cameraId?: string | null; memory?: CameraMemoryNote[] } = {}): Promise<string> {
   const parts = [
     `## Phiên ${task.kind}`, OPENING[task.kind] ?? OPENING['followup'],
     `Lý do: ${task.reason}`, `Ngân sách: ${task.budget} tool call.`,
     '', '## Bản ghi được mở', await neighbours(task),
     '', await capabilitiesMarkdown(),
   ];
+  // Phiên của một camera chạy dưới subagent riêng của camera đó: nhắc vai trò và nạp lại trí nhớ đã học.
+  if (opts.cameraId) {
+    const notes = opts.memory ?? [];
+    parts.push(
+      '', `## Bạn là subagent phụ trách camera ${opts.cameraId}`,
+      'Bạn chỉ chịu trách nhiệm cho camera này. Điều gì BỀN học được về nó (góc máy, giờ ngược sáng, khu vực hay báo oan, việc cần theo dõi) thì ghi bằng remember_camera để phiên sau dùng lại.',
+      '', '## Trí nhớ camera',
+      ...(notes.length ? notes.map((n, i) => `- #${i} [${n.at.slice(0, 10)}] ${n.text}`) : ['(chưa có ghi chú)']),
+    );
+  }
   // Thread hỏi đáp: nhắc lại tối đa 10 lượt trước đó (không tính câu hỏi hiện tại) để phiên mới có ngữ cảnh.
   // Hợp đồng: câu hỏi hiện tại đã được ghi thành message.user TRƯỚC khi phiên chạy (route /api/agent/ask), nên phần tử cuối là câu hỏi hiện tại và bị bỏ.
   if (task.kind === 'ask' && opts.sessionId) {

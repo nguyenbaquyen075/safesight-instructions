@@ -4,11 +4,13 @@ import { emit } from './audit';
 
 export interface ToolContext {
   sessionId: string; taskId: string | null; taskKind: string; budget: number;
-  spent: { calls: number; escalations: number; followups: number; verdicts: Set<string> };
+  // Camera mà phiên này phụ trách (null = phiên toàn hệ thống): quyết định có tool remember_camera hay không.
+  cameraId: string | null;
+  spent: { calls: number; escalations: number; followups: number; remembers: number; verdicts: Set<string> };
 }
 
-export function newToolContext(task: LeasedTask, sessionId: string): ToolContext {
-  return { sessionId, taskId: task.id, taskKind: task.kind, budget: task.budget, spent: { calls: 0, escalations: 0, followups: 0, verdicts: new Set() } };
+export function newToolContext(task: LeasedTask, sessionId: string, cameraId: string | null = null): ToolContext {
+  return { sessionId, taskId: task.id, taskKind: task.kind, budget: task.budget, cameraId, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() } };
 }
 
 // Bọc thân tool: mọi lỗi bất ngờ (Prisma, đĩa, mạng) thành kết quả JSON {error} + event 'error',

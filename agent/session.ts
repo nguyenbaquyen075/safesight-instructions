@@ -10,6 +10,7 @@ import { preambleFor } from './lib/preamble';
 import { toolsFor } from './lib/toolsets';
 import { newToolContext } from './lib/tool-context';
 import { dailyTokensUsed } from './lib/usage';
+import { addCameraTokens, cameraIdOf, getCameraAgent, parseMemory, type CameraMemoryNote } from './lib/camera-agent';
 import { openAiClient } from './lib/llm/openai';
 import type { LeasedTask } from './lib/tasks';
 
@@ -87,12 +88,27 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
     throw new SessionError(reason, retryAfterMs, false, true);
   }
 
+  // Trần toàn cục thắng trước; sau đó mới tới subagent của camera (tắt riêng / trần token riêng).
+  const cameraId = await cameraIdOf(task);
+  let memory: CameraMemoryNote[] = [];
+  if (cameraId) {
+    const cameraAgent = await getCameraAgent(cameraId);
+    if (!cameraAgent.isEnabled) return skipped(`subagent camera ${cameraId} đang tắt`);
+    if (cameraAgent.tokensUsedToday >= cameraAgent.dailyTokenCap) {
+      const reason = 'camera đã chạm trần token trong ngày';
+      const retryAfterMs = msUntilMidnight();
+      await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.ended', data: { stop: 'skipped', reason, retryAfterMs } });
+      throw new SessionError(reason, retryAfterMs, false, true);
+    }
+    memory = parseMemory(cameraAgent.memory);
+  }
+
   await prisma.agentTask.updateMany({ where: { id: task.id, finishedAt: null }, data: { sessionId } });
-  const ctx = newToolContext(task, sessionId);
+  const ctx = newToolContext(task, sessionId, cameraId);
   const effort = task.kind === 'shift.report' ? 'high' : settings.reviewEffort;
   const client = opts.client ?? (env.llmProvider === 'openai' ? openAiClient() : anthropicClient());
-  const messages = [{ role: 'user', content: await preambleFor(task, { userMessage: opts.userMessage, sessionId }) }];
-  await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget } });
+  const messages = [{ role: 'user', content: await preambleFor(task, { userMessage: opts.userMessage, sessionId, cameraId, memory }) }];
+  await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget, cameraId } });
 
   const usage = { input_tokens: 0, output_tokens: 0, cache_read_input_tokens: 0 };
   let finalText = ''; let stop: string | null = null;
@@ -109,6 +125,9 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
     await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'error', data: { message: mapped.message, fatal: mapped.fatal } });
     await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.ended', data: { usage, stop: 'error' } });
     throw mapped;
+  } finally {
+    // Token đã tiêu là đã tiêu: cộng cả khi phiên lỗi giữa chừng, nếu không camera có thể chạy vượt trần.
+    if (cameraId) await addCameraTokens(cameraId, usage.input_tokens + usage.output_tokens);
   }
   if (stop === 'refusal') finalText = 'Claude từ chối lượt này (stop_reason=refusal); không có phán quyết.';
   if (stop === 'max_tokens') finalText = finalText ? `${finalText}\n(kết luận bị cắt vì max_tokens)` : '(kết luận bị cắt vì max_tokens)';

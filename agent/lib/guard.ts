@@ -8,6 +8,7 @@ export const LIMITS = {
   cameraStatusPerCamera5m: 1,
   escalatePerSession: 2,
   followupPerSession: 3,
+  rememberPerSession: 3,
 } as const;
 
 export async function checkPaused(): Promise<Blocked | null> {

@@ -144,7 +144,7 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
   chỉ ghi event và `snapshot.cleanup` không xoá file nào. `write_note` **vẫn chạy**: nó chỉ
   ghi nhận vào nhật ký agent, không đụng tới dữ liệu vận hành.
 - **Tần suất:** `escalate` theo AlertRule cooldown; `record_verdict` 1 lần/vi phạm/phiên;
-  `schedule_followup` tối đa 3/phiên; sweep: đổi trạng thái camera 1/5 phút/camera,
+  `schedule_followup` tối đa 3/phiên; `remember_camera` tối đa 3/phiên; sweep: đổi trạng thái camera 1/5 phút/camera,
   SIGTERM engine 3/giờ.
 - **Không bao giờ:** không có tool xoá bản ghi, sửa User/role/AlertRule/TelegramSettings,
   đổi `rtspUrl`, sửa ngưỡng nhận diện, đọc/ghi file ngoài `public/snapshots`, gọi mạng ngoài
@@ -155,6 +155,31 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
   retryAfterMs }` — nếu không thì panel hỏi-đáp (`AskAgentBox`) poll theo `sessionId` sẽ
   không bao giờ thấy điểm dừng và treo "Agent đang trả lời…" mãi.
 - Bị chặn → tool trả kết quả có lý do (không `is_error`) để model viết lại thay vì thử lại.
+
+## Subagent theo camera
+
+Mỗi camera có một **subagent** riêng — một dòng `CameraAgent` (`id` = `Camera.id`, tạo lười
+khi camera đó có task đầu tiên) chứ không phải một tiến trình riêng: vẫn cùng worker `agent/`,
+cùng hàng đợi.
+
+- **Định tuyến** (`agent/lib/camera-agent.ts`, `cameraIdOf`): task `subjectType = camera` →
+  chính nó; `violation` → `Violation.cameraId`; còn lại → `null` (phiên toàn hệ thống, chạy
+  như cũ).
+- **Bật/tắt riêng:** `CameraAgent.isEnabled = false` → `runSession` trả về
+  `subagent camera <id> đang tắt` và phát `session.ended { stop: 'skipped' }`, không gọi LLM.
+  Kill switch toàn cục vẫn thắng trước.
+- **Trần token riêng:** `dailyTokenCap` mặc định 300 000/ngày, đếm theo ngày **địa phương**
+  (`usageDay`, sang ngày mới thì `tokensUsedToday` reset). Chạm trần → `SessionError` hoãn
+  qua nửa đêm kèm `refundAttempt` (không tiêu lần thử của task) và phát `session.ended
+  { stop: 'skipped', reason, retryAfterMs }` trước khi ném, đúng như trần toàn cục. Thứ tự
+  kiểm: kill switch → trần toàn cục → subagent tắt → trần camera.
+- **Trí nhớ:** `CameraAgent.memory` là JSON `[{ at, text, sessionId }]`, tối đa 20 ghi chú,
+  mỗi ghi chú ≤ 300 ký tự (ghi chú thứ 21 đẩy ghi chú cũ nhất ra). Đầu mỗi phiên của camera,
+  preamble thêm `## Bạn là subagent phụ trách camera <id>` và `## Trí nhớ camera` liệt kê
+  ghi chú cũ → mới, mỗi dòng `- #<chỉ số> [YYYY-MM-DD] nội dung` (chỉ số dùng cho
+  `replaceIndex`).
+- **Cộng token:** cuối phiên (kể cả khi phiên lỗi giữa chừng) `input + output` được cộng vào
+  `tokensUsedToday` của camera; `session.started.data` ghi thêm `cameraId`.
 
 ## Tool (`agent/tools/*.ts`, mỗi file một tool)
 
@@ -170,11 +195,13 @@ Kiểm tra trong code trước khi tool ghi chạy (`agent/lib/guard.ts`):
 | `escalate` | ghi | `violationId, caption` | `{ sent, blockedReason? }` |
 | `schedule_followup` | ghi | `kind ("followup"\|"camera.digest"), subjectType, subjectId, minutes (5..1440), reason (≥10 ký tự)` | `{ dueAt }` |
 | `write_note` | ghi | `subjectType, subjectId, note` | `{ ok }` |
+| `remember_camera` | ghi | `text (5..300)`, `replaceIndex?` | `{ ok, total }` — chỉ có trong phiên thuộc một camera, tối đa 3 lần/phiên (`LIMITS.rememberPerSession`) |
 
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);
-`ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ.
+`ask` = tất cả. Tool set cố định theo kind để cache prompt không vỡ; phiên thuộc một camera
+được thêm `remember_camera` ở **cuối** danh sách (thứ tự các tool trước đó không đổi).
 
 ## Skill (`agent/skills/*.md`, nạp vào system prompt)
 
