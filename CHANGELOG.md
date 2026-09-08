@@ -5,6 +5,17 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Thêm
+- **Loa công trường tự động**: bridge có `POST /announce` (`{ cameraId, text }`, cùng header
+  `X-AI-Engine-Secret` như `/detections`) phát sự kiện `voice-announce` vào room `camera-<id>`
+  và trả `{ ok, listeners }`. Trang `/site-speaker` đọc câu nhận được bằng `speechSynthesis`
+  (`vi-VN`, rate 0.95), có nút "Thử loa", danh sách 10 thông báo gần nhất và cảnh báo khi
+  trình duyệt không hỗ trợ Web Speech API. Modal vi phạm thêm nút **"Phát loa"** gọi
+  `POST /api/cameras/[id]/announce` (session + `assertSiteAccess`, ghi `AuditLog`
+  `camera.announce`); không truyền `text` thì câu được dựng từ loại vi phạm bằng hàm thuần
+  `announcementFor()` (`src/lib/announce-shape.ts`, tối đa 200 ký tự). Agent có tool mới
+  `announce` cho kind `violation.review`/`followup`/`camera.instruction`/`ask`, chỉ chạy khi
+  đã có phán quyết VERIFIED "vi phạm thật" cho camera đó, tối đa 2 lần/phiên và 60 giây/camera.
+  Biến mới `YOLO_BRIDGE_URL` (tuỳ chọn) cho địa chỉ bridge phía máy chủ.
 - `ai-engine/requirements.txt` ghim phiên bản các gói Python engine dùng trực tiếp (`torch`, `torchvision`, `ultralytics`, `opencv-python`, `numpy`, `requests`) theo `.venv` của operator; README chuyển sang cài bằng `pip install -r ai-engine/requirements.txt`; wiki/03 ghi chú cách chạy `pip-audit` thủ công cho các gói này.
 - **Cảnh báo xâm nhập vùng cấm**: vùng `RESTRICTED` / `WARNING` / `SUSPENDED_LOAD` của bảng `Zone` giờ được AI engine dùng thật — người có điểm chân nằm trong vùng liên tục ≥ 3 giây sinh vi phạm `zone_intrusion` (mức `critical` / `high`) hoặc `suspended_load` (`critical`), kèm `zoneId`, ảnh khoanh đỏ (nhãn không dấu `VUNG CAM` / `TAI TREO` vì `cv2.putText` chỉ có font ASCII; nhãn tiếng Việt nằm trong `bboxData[].label`), và báo lại mỗi 60 giây với `occurrenceCount` tăng dần nếu người đó vẫn đứng trong vùng (`intrusions` / `IntrusionTracker` trong `ai-engine/zones.py`, thuần Python nên test không cần torch).
 - Vùng nguy hiểm được **hợp vào tập giữ người** của luồng video (`zones_for_stream`), nếu không thì người đứng trong vùng cấm bị lọc mất trước khi engine kịp xét xâm nhập. Thay đổi hành vi kèm theo: với camera có khai vùng làm việc, người **chỉ** đứng trong vùng nguy hiểm nay cũng bị xét PPE và được tính vào `ObservationStat` (mẫu số tỉ lệ tuân thủ).

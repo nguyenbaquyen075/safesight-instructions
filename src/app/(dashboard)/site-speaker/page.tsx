@@ -3,7 +3,7 @@
 
 import * as React from 'react';
 import { io, Socket } from 'socket.io-client';
-import { Volume2, Wifi, WifiOff, ChevronDown, MapPin, Building2, Power, ListChecks } from 'lucide-react';
+import { Volume2, Wifi, WifiOff, ChevronDown, MapPin, Building2, Power, ListChecks, AlertTriangle, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { mockCameras } from '@/data/mock-cameras';
 import { CameraStatus } from '@/types/enums';
@@ -13,6 +13,24 @@ const YOLO_SERVER_URL = process.env.NEXT_PUBLIC_YOLO_SERVER_URL || '';
 // WAV câm 1 mẫu — phát 1 lần trong thao tác bấm của người dùng để "mở khoá"
 // quyền tự động phát audio của trình duyệt (cần cho tablet/Safari).
 const SILENT_AUDIO_SRC = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQAAAAA=';
+// Câu mẫu cho nút "Thử loa" — người lắp loa nghe thử mà không cần chờ vi phạm thật.
+const TEST_SENTENCE = 'Đây là thông báo thử loa an toàn công trường.';
+const ANNOUNCEMENT_KEEP = 10;
+
+interface Announcement { at: number; text: string }
+
+// Khả năng đọc của trình duyệt không đổi trong vòng đời trang -> không cần đăng ký lắng nghe.
+const subscribeNever = () => () => {};
+
+// Đọc câu tiếng Việt qua giọng có sẵn của trình duyệt; rate 0.95 cho dễ nghe ngoài công trường.
+function speak(text: string) {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'vi-VN';
+  utterance.rate = 0.95;
+  // Huỷ câu đang đọc dở: một loạt cảnh báo dồn dập không được xếp hàng rồi đọc lại nội dung cũ vài phút sau.
+  window.speechSynthesis.cancel();
+  window.speechSynthesis.speak(utterance);
+}
 
 export default function SiteSpeakerPage() {
   const [cameraId, setCameraId] = React.useState('');
@@ -20,6 +38,10 @@ export default function SiteSpeakerPage() {
   const [lastPlayedAt, setLastPlayedAt] = React.useState<number | null>(null);
   const [playError, setPlayError] = React.useState<string | null>(null);
   const [activated, setActivated] = React.useState(false);
+  const [announcements, setAnnouncements] = React.useState<Announcement[]>([]);
+  // Trình duyệt cũ / WebView không có Web Speech API: báo cho người lắp loa biết máy này không đọc được.
+  // useSyncExternalStore để lần render trên máy chủ (chưa có window) không lệch với lần hydrate.
+  const speechSupported = React.useSyncExternalStore(subscribeNever, () => 'speechSynthesis' in window, () => true);
 
   const onlineCameras = mockCameras.filter((c) => c.status === CameraStatus.ONLINE);
   const selectedCamera = onlineCameras.find((c) => c.id === cameraId);
@@ -57,6 +79,14 @@ export default function SiteSpeakerPage() {
         });
     });
 
+    socket.on('voice-announce', (data: { cameraId: string; text: string }) => {
+      if (data.cameraId !== cameraId || !data.text) return;
+      setAnnouncements((prev) => [{ at: Date.now(), text: data.text }, ...prev].slice(0, ANNOUNCEMENT_KEEP));
+      if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+      speak(data.text);
+      setLastPlayedAt(Date.now());
+    });
+
     return () => {
       socket.disconnect();
     };
@@ -65,6 +95,12 @@ export default function SiteSpeakerPage() {
   const activate = () => {
     new Audio(SILENT_AUDIO_SRC).play().catch(() => {});
     setActivated(true);
+  };
+
+  const testSpeaker = () => {
+    if (!speechSupported) return;
+    speak(TEST_SENTENCE);
+    setAnnouncements((prev) => [{ at: Date.now(), text: TEST_SENTENCE }, ...prev].slice(0, ANNOUNCEMENT_KEEP));
   };
 
   return (
@@ -195,7 +231,40 @@ export default function SiteSpeakerPage() {
               {playError && (
                 <p className="text-xs text-[var(--danger)] mt-1">{playError}</p>
               )}
+              {!speechSupported && (
+                <p className="text-xs text-[var(--warning)] mt-1 flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 shrink-0" /> Trình duyệt này không đọc được thông báo tự động — dùng Chrome hoặc Safari bản mới.
+                </p>
+              )}
             </div>
+          </div>
+
+          <button
+            onClick={testSpeaker}
+            disabled={!speechSupported}
+            className="w-full flex items-center justify-center gap-2 p-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] text-sm font-bold hover:bg-[var(--surface-elevated)] transition-all disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+          >
+            <Megaphone className="w-4 h-4" /> Thử loa
+          </button>
+
+          <div className="bg-[var(--surface)] border border-[var(--border)] rounded-2xl p-6">
+            <h2 className="flex items-center gap-2 text-xs font-black text-[var(--text-muted)] uppercase tracking-widest mb-4">
+              <Megaphone className="w-3.5 h-3.5" /> Thông báo gần đây
+            </h2>
+            {announcements.length === 0 ? (
+              <p className="text-xs text-[var(--text-muted)]">Chưa có thông báo nào phát ở loa này.</p>
+            ) : (
+              <ul className="space-y-2">
+                {announcements.map((a) => (
+                  <li key={a.at} className="flex items-start gap-3 text-sm">
+                    <span className="shrink-0 text-xs font-bold text-[var(--text-muted)] tabular-nums mt-0.5">
+                      {new Date(a.at).toLocaleTimeString()}
+                    </span>
+                    <span className="text-[var(--text-primary)] break-words min-w-0">{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         </div>
       )}

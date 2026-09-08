@@ -44,7 +44,7 @@ test('siteContext lists cameras with their id; searchViolations filters by statu
 });
 
 test('safeRun turns an unexpected error into JSON {error} and logs an error event without throwing', async () => {
-  const ctx = { sessionId: 's-saferun', taskId: null, taskKind: 'ask', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set<string>() } };
+  const ctx = { sessionId: 's-saferun', taskId: null, taskKind: 'ask', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set<string>() } };
   const out = await safeRun(ctx, 'read_violation', async () => { throw new Error('DB rớt'); });
   assert.match(String(out), /DB rớt/);
   const ev = await prisma.agentEvent.findFirst({ where: { sessionId: 's-saferun', type: 'error' } });

@@ -7,7 +7,7 @@ import { LIMITS } from '../lib/guard';
 import { AGENT_SETTINGS_ID } from '../lib/settings';
 import type { ToolContext } from '../lib/tool-context';
 
-const ctx = (): ToolContext => ({ sessionId: 's-esc', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, verdicts: new Set() } });
+const ctx = (): ToolContext => ({ sessionId: 's-esc', taskId: null, taskKind: 'violation.review', budget: 6, cameraId: null, spent: { calls: 0, escalations: 0, followups: 0, remembers: 0, announces: 0, verdicts: new Set() } });
 
 const run = async (input: { violationId?: string; caption: string }, c: ToolContext = ctx()) =>
   JSON.parse((await makeEscalate(c).run(input)) as string);

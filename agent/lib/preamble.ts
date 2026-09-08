@@ -24,7 +24,7 @@ async function neighbours(task: LeasedTask): Promise<string> {
 const ORCHESTRATING_KINDS = new Set(['ask', 'shift.report', 'weekly.report', 'ops.escalate']);
 
 const OPENING: Record<string, string> = {
-  'violation.review': 'Đây là một lượt review tự động có ngân sách: nhìn ảnh, đọc lịch sử nếu cần, record_verdict, leo thang nếu đủ điều kiện, rồi kết luận ngắn.',
+  'violation.review': 'Đây là một lượt review tự động có ngân sách: nhìn ảnh, đọc lịch sử nếu cần, record_verdict, leo thang nếu đủ điều kiện, rồi kết luận ngắn. Vi phạm VERIFIED thật và camera có loa → announce một câu ngắn.',
   'camera.instruction': 'Đây là CHỈ DẪN từ agent trưởng cho subagent camera này. Làm đúng việc được giao (lý do ở dưới): đọc lịch sử/vi phạm liên quan, kết luận bằng write_note, leo thang nếu đủ điều kiện, remember_camera nếu học được điều bền. Không record_verdict.',
   'camera.digest': 'Đây là lượt tổng hợp camera: đọc lịch sử 24h/7 ngày, nhận xét xu hướng (write_note), hẹn xem lại nếu cần. Không record_verdict.',
   'shift.report': 'Viết báo cáo ca cho nhóm quản lý: vi phạm thật / báo oan theo camera, sự cố vận hành đã tự xử lý, việc cần người làm. Gửi bằng escalate (không violationId) rồi trả lời lại nội dung báo cáo.',

@@ -20,7 +20,7 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/` | `(dashboard)/page.tsx` | tất cả | KPI, biểu đồ tuân thủ, dòng thời gian cảnh báo, trạng thái công trường |
 | `/sites` | `(dashboard)/sites/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Quản lý công trường |
 | `/cameras` | `(dashboard)/cameras/page.tsx` | tất cả | Lưới camera live, khung detection từ YOLO, lọc "chỉ vi phạm", nút mic cảnh báo |
-| `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic |
+| `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic; nhận thêm `voice-announce` và đọc bằng `speechSynthesis` (`lang=vi-VN`, rate 0.95), nút "Thử loa", danh sách 10 thông báo gần nhất, cảnh báo khi trình duyệt không có Web Speech API |
 | `/alerts` | `(dashboard)/alerts/page.tsx` | tất cả | Danh sách cảnh báo từ vi phạm thật |
 | `/violations` | `(dashboard)/violations/page.tsx` | tất cả | Bảng vi phạm + modal chi tiết (ảnh snapshot) |
 | `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm, bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí camera (lọc 7/30/90 ngày) |
@@ -51,6 +51,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/violations/[id]` | GET, PATCH, DELETE | Chi tiết / đổi trạng thái / xoá; cả 3 method kiểm `assertSiteAccess` |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma) |
 | `/api/cameras/[id]/zones` | GET, PUT | Vùng của camera, **mọi loại** (`MONITORING`/`RESTRICTED`/`WARNING`/`SUSPENDED_LOAD`); `assertSiteAccess`. GET mở cho mọi vai trò có quyền xem site đó; PUT thêm điều kiện SUPER_ADMIN/ORG_ADMIN (khớp `PAGE_ROLES['/settings']` — lối vào duy nhất trên giao diện) và ghi `AuditLog` `camera.zones.update`. PUT thay TOÀN BỘ danh sách mọi loại (`{ zones: [{ name?, type?, points: [{x,y}] }] }`, `type` mặc định `MONITORING`, tối đa 10 vùng, mỗi vùng 3–20 điểm toạ độ tỉ lệ 0–1); `zones: []` = xoá hết. DTO trả về kèm `type`. AI engine tự đọc lại bảng `Zone` mỗi 60s |
+| `/api/cameras/[id]/announce` | POST | Phát một câu qua loa của camera; cần session + `assertSiteAccess` theo site của camera. Body `{ text?: string ≤ 200, violationId?: string }` — không có `text` thì bắt buộc `violationId` và câu được dựng bằng `announcementFor()` (`src/lib/announce-shape.ts`), vi phạm không thuộc camera này → 404. Gọi `announce()` (`src/lib/announce.ts`) đẩy `POST /announce` sang YOLO Bridge (`YOLO_BRIDGE_URL` hoặc `NEXT_PUBLIC_YOLO_SERVER_URL`, mặc định `http://127.0.0.1:4001`, header `X-AI-Engine-Secret`, timeout 3s) rồi trả `{ ok, listeners?, error?, text }`; ghi `AuditLog` `camera.announce` |
 | `/api/cameras` | GET, POST | Danh sách (cần session, lọc theo phạm vi site) + thêm camera thật (`assertSiteAccess`); POST ghi `AuditLog` |
 | `/api/cameras/[id]` | GET, PATCH, DELETE | Sửa nguồn (`rtspUrl`), trạng thái, xoá; cả 3 method kiểm `assertSiteAccess`. DELETE xoá luôn dòng `CameraAgent` cùng id (không có quan hệ Prisma); PATCH/DELETE ghi `AuditLog` |
 | `/api/observations` | POST | Chỉ cho AI engine (header `X-AI-Engine-Secret`, không session): `{ observations: [{ cameraId, minute (ISO phút), persons, personSeconds }] }` tối đa 200 dòng; upsert `ObservationStat` theo `(cameraId, minute)` trong **một** `$transaction` cho cả lô nên gửi lại cùng một phút không nhân đôi mẫu số; `siteId` suy từ Camera, camera đã xoá thì bỏ qua dòng đó. Trả 201 `{ upserted }` |
@@ -81,7 +82,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | Hook | File | Nguồn |
 |---|---|---|
 | `useViolations`, `useOpenViolationCount` | `use-violations.ts` | `/api/violations`, `/api/violations/count` |
-| `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones` |
+| `useCameras`, `useCreateCamera`, `useUpdateCamera`, `useDeleteCamera`, `useCameraZones`, `useSaveCameraZones`, `useAnnounceCamera` | `use-cameras.ts` | `/api/cameras`, `/api/cameras/[id]/zones`, `/api/cameras/[id]/announce` |
 | `useSites`, `useSite` | `use-sites.ts` | `/api/sites` |
 | `useViolationReport` | `use-reports.ts` | `/api/reports/violations` |
 | `useUsers`, `useUser`, `useCreateUser`, `useUpdateUser`, `useDeleteUser`, `useChangePassword` | `use-users.ts` | `/api/users`, `/api/users/me/password` |

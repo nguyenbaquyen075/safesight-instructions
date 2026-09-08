@@ -24,6 +24,8 @@ export const env = {
   workerId: optional('AGENT_WORKER_ID') ?? `${hostname()}-${process.pid}`,
   bridgeUrl: process.env.YOLO_BRIDGE_URL?.trim() || 'http://127.0.0.1:4001',
   bridgeSecret: optional('AGENT_BRIDGE_SECRET'),
+  // Bí mật dùng chung với YOLO Bridge (POST /announce, /detections) — cùng biến AI engine dùng.
+  aiEngineSecret: optional('AI_ENGINE_SECRET'),
   snapshotMaxMb: Number(process.env.SNAPSHOT_MAX_MB ?? 2048),
   llmProvider,
   llmBaseUrl: optional('LLM_BASE_URL') ?? optional('ANTHROPIC_BASE_URL'),
