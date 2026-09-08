@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { Camera } from '@/types/models';
+import type { ZoneDTO, ZonesPayload } from '@/lib/zone-shape';
 
 export interface CameraInput {
   name: string;
@@ -68,6 +69,36 @@ export function useUpdateCamera() {
       return res.json() as Promise<Camera>;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cameras'] }),
+  });
+}
+
+/** Vùng nhận diện (Zone MONITORING) của 1 camera — nền cho trình vẽ trong CameraEditDialog. */
+export function useCameraZones(id: string | undefined) {
+  return useQuery<ZoneDTO[]>({
+    queryKey: ['cameras', id, 'zones'],
+    queryFn: async () => {
+      const res = await fetch(`/api/cameras/${id}/zones`);
+      if (!res.ok) throw new Error('Failed to fetch zones');
+      return (await res.json()).zones as ZoneDTO[];
+    },
+    enabled: !!id,
+  });
+}
+
+/** PUT thay toàn bộ danh sách vùng của camera (mảng rỗng = xoá hết, AI xét cả khung). */
+export function useSaveCameraZones(id: string | undefined) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (zones: ZonesPayload['zones']) => {
+      const res = await fetch(`/api/cameras/${id}/zones`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ zones }),
+      });
+      if (!res.ok) throw new Error('Failed to save zones');
+      return (await res.json()).zones as ZoneDTO[];
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['cameras', id, 'zones'] }),
   });
 }
 

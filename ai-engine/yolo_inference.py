@@ -12,6 +12,7 @@ import sys
 import atexit
 import threading
 from ppe_tracker import PPEViolationTracker
+from zones import parse_polygon
 from env_local import load_dotenv_local
 
 load_dotenv_local()
@@ -201,6 +202,54 @@ def load_video_camera_map():
         video_to_cams.setdefault(path, []).append(cam_id)
     return video_to_cams
 
+
+# Vùng nhận diện được sửa trên web (Cài đặt > Giám sát) trong lúc engine đang chạy
+# -> đọc lại DB mỗi 60s, khỏi phải khởi động lại engine.
+ZONE_REFRESH_INTERVAL = 60
+
+
+def load_zones():
+    """Đọc VÙNG LÀM VIỆC của từng camera -> {cameraId: [[(x, y), ...], ...]}.
+
+    Chỉ lấy Zone đang bật và type MONITORING (vùng "chỉ xét người trong vùng");
+    RESTRICTED/WARNING dành cho tính năng khác, chưa dùng ở đây. Toạ độ là tỉ lệ
+    0–1 theo khung hình (xem src/lib/zone-shape.ts, cùng quy ước với trình vẽ).
+    Camera không có vùng nào -> không có khoá trong dict -> xét cả khung.
+    """
+    conn = _open_db_readonly()
+    if conn is None:
+        return {}
+    try:
+        rows = conn.execute(
+            "SELECT cameraId, polygonData FROM Zone WHERE isActive = 1 AND type = 'MONITORING'"
+        ).fetchall()
+    except sqlite3.Error as e:
+        print(f"⚠️ Không đọc được vùng nhận diện từ DB: {e}")
+        return {}
+    finally:
+        conn.close()
+
+    zones = {}
+    for cam_id, raw in rows:
+        polygon = parse_polygon(raw)
+        if polygon:
+            zones.setdefault(cam_id, []).append(polygon)
+    return zones
+
+
+def zones_for_stream(cam_ids, zones_by_camera):
+    """Vùng áp cho MỘT luồng video. Một luồng có thể phục vụ nhiều camera demo dùng
+    chung file video: detections tính một lần rồi gửi cho tất cả, nên chỉ cần MỘT
+    camera trong nhóm chưa khai vùng là phải xét cả khung (None), không thì camera
+    đó mất người."""
+    polygons = []
+    for cam_id in cam_ids:
+        cam_zones = zones_by_camera.get(cam_id)
+        if not cam_zones:
+            return None
+        polygons.extend(cam_zones)
+    return polygons or None
+
 class RTSPStream:
     """Đọc luồng RTSP (camera IP thật) trong 1 thread riêng, luôn giữ frame MỚI
     NHẤT (không dồn buffer -> đỡ trễ hình) và tự reconnect khi mạng rớt.
@@ -283,6 +332,35 @@ def clear_snapshots():
         os.remove(HEARTBEAT_PATH)
     except OSError:
         pass
+
+
+PREVIEW_INTERVAL = 30   # giây giữa 2 ảnh xem trước của cùng một camera
+PREVIEW_WIDTH = 640
+_preview_last = {}      # cameraId -> lúc ghi ảnh xem trước gần nhất
+
+
+def write_preview(cam_id, frame):
+    """Ghi public/snapshots/preview_<cameraId>.jpg làm NỀN cho trình vẽ vùng.
+
+    Dùng lại đúng khung vừa đọc (không mở thêm luồng). Thu nhỏ ngay tại đây (rẻ)
+    rồi giao phần nén JPEG + ghi đĩa cho thread phụ để vòng lặp nhận diện không
+    phải đợi ổ đĩa. Ghi ra file tạm rồi os.replace -> trình duyệt không bao giờ
+    đọc phải ảnh viết dở.
+    """
+    h, w = frame.shape[:2]
+    small = (cv2.resize(frame, (PREVIEW_WIDTH, max(1, round(h * PREVIEW_WIDTH / w))))
+             if w > PREVIEW_WIDTH else frame.copy())
+
+    def _save():
+        tmp = os.path.join(SNAPSHOT_DIR, f".preview_{cam_id}.tmp.jpg")
+        try:
+            os.makedirs(SNAPSHOT_DIR, exist_ok=True)
+            if cv2.imwrite(tmp, small, [int(cv2.IMWRITE_JPEG_QUALITY), 80]):
+                os.replace(tmp, os.path.join(SNAPSHOT_DIR, f"preview_{cam_id}.jpg"))
+        except (OSError, cv2.error):
+            pass
+
+    threading.Thread(target=_save, daemon=True).start()
 
 
 def write_heartbeat(streams: int = 0, fps: float = 0.0):
@@ -402,7 +480,17 @@ def run_inference():
     _hb_last = time.time()
     _hb_frames = 0
 
+    zones_by_camera = load_zones()
+    _zones_last = time.time()
+    if zones_by_camera:
+        print(f"🔷 Vùng làm việc: {', '.join(f'{c} ({len(z)} vùng)' for c, z in zones_by_camera.items())}")
+
     while True:
+        # Vùng vừa vẽ trên web có hiệu lực sau tối đa 60s, không cần khởi động lại engine.
+        if time.time() - _zones_last >= ZONE_REFRESH_INTERVAL:
+            zones_by_camera = load_zones()
+            _zones_last = time.time()
+
         for st in streams:
             cap = st["cap"]
 
@@ -435,7 +523,15 @@ def run_inference():
                 if _p and _p > 0:
                     vi_tri_video = _p / 1000.0
 
-            detections = st["tracker"].process_frame(frame)
+            # Ảnh nền cho trình vẽ vùng — mỗi camera 30s một tấm, ghi ở thread phụ.
+            _now_preview = time.time()
+            for cam_id in st["cams"]:
+                if _now_preview - _preview_last.get(cam_id, 0) >= PREVIEW_INTERVAL:
+                    _preview_last[cam_id] = _now_preview
+                    write_preview(cam_id, frame)
+
+            detections = st["tracker"].process_frame(
+                frame, zones=zones_for_stream(st["cams"], zones_by_camera))
 
             violations = [d for d in detections if d.get('isViolation')]
 

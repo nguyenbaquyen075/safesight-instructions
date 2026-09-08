@@ -125,9 +125,15 @@ Màn cập nhật: không sửa email và mật khẩu tại đây (P2: đổi m
 | 2 | Công trình | dropdown (danh mục Site, lọc theo tổ chức) | Có | site đầu tiên | |
 | 3 | Vị trí lắp đặt | free text | Không | trống | Ví dụ "Cổng chính" |
 | 4 | Nguồn video | radio: Webcam / RTSP / Video mẫu | Có | Video mẫu | Webcam → nhập chỉ số (`webcam:0`); RTSP → nhập URL `rtsp://user:pass@host:554/...`; Video mẫu → dropdown từ `/api/videos` kèm nút tải video ≤ 200MB |
-| 5 | Trạng thái | dropdown fix cứng (`CameraStatus`) | — | ONLINE | Khác ONLINE thì AI bỏ qua camera |
+| 5 | Vùng nhận diện | trình vẽ đa giác trên ảnh xem trước | Không | vùng đã lưu của camera | Chỉ hiện khi SỬA camera đã có. Bấm ảnh = thêm điểm, kéo = di chuyển, chuột phải lên điểm = xoá; tối đa 10 vùng, mỗi vùng 3–20 điểm. Nút "Lưu vùng" gọi `PUT /api/cameras/[id]/zones` riêng, không đi cùng nút Lưu của dialog |
+| 6 | Trạng thái | dropdown fix cứng (`CameraStatus`) | — | ONLINE | Khác ONLINE thì AI bỏ qua camera |
 
 Màn cập nhật khác thêm mới: `id` không sửa; đổi nguồn → agent thăm dò lại camera.
+
+Trạng thái của trình vẽ vùng: đang tải danh sách vùng = khối skeleton; chưa có
+`public/snapshots/preview_<id>.jpg` = "Chưa có ảnh xem trước — chạy AI engine trước"
+và nút Lưu bị khoá; vùng chưa đủ 3 điểm không được lưu (có toast nhắc). Lưu danh
+sách rỗng = xoá hết vùng, AI xét lại toàn khung hình.
 
 ## SCR-14 Cài đặt — tab Thông báo: Bot Telegram
 
