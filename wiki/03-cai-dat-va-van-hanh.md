@@ -87,6 +87,7 @@ Truy cập http://localhost:3000. Chưa có `.venv` thì script bỏ qua AI engi
 ```bash
 cp .env.docker.example .env   # secret cho dashboard + bridge
 mkdir -p data public/snapshots   # tạo trước để không bị Docker tạo bằng quyền root
+export UID GID                # uid:gid của anh — dashboard container chạy bằng uid này (xem dưới)
 docker compose up -d          # hoặc: docker compose up -d --build
 ```
 
@@ -101,7 +102,26 @@ engine/agent vào Docker, set `DATABASE_URL=file:./data/dev.db` (khớp thư m�
 Bridge giờ cũng đọc `AI_ENGINE_SECRET` (qua `env_file: .env`) và **bắt buộc** header
 `x-ai-engine-secret` khớp secret đó trên `POST /detections` — trước đây endpoint này không xác thực nên
 publish cổng 4001 ra ngoài là mở cửa cho ai cũng bơm detection giả. Nếu chưa cấu hình secret, bridge vẫn
-chạy (chỉ log cảnh báo) để dev cục bộ không bị chặn.
+chạy (chỉ log cảnh báo) để dev cục bộ không bị chặn. AI engine (`env_local.py`) và `mock_yolo.js` đọc
+secret theo cùng thứ tự `.env.local` rồi `.env` như bridge, để cả ba luôn khớp cấu hình.
+
+`docker-compose.yml` chạy service `dashboard` bằng `user: "${UID:-1000}:${GID:-1000}"` thay vì user
+`app` đóng cứng trong image — ảnh Alpine tạo user `app` với uid riêng của nó, không khớp uid chủ
+`./data`/`./public/snapshots` trên host, nên nếu không override, container không ghi được `dev.db`
+(crash) hoặc ghi bằng uid khác uid của AI engine/agent chạy trên host (host không đọc/ghi lại được).
+`export UID GID` trước khi `docker compose up` (`docker compose` chỉ thay biến có trong
+environment/`.env`, không tự đọc uid hệ thống); có thể ghi cố định `UID=`/`GID=` vào `.env` thay vì
+export mỗi lần. Không override (`user:` mặc định `1000:1000`, hoặc bỏ dòng `user:` để dùng `USER app`
+sẵn trong image) vẫn chạy được vì `/app/data` và `/app/public/snapshots` trong image đã `chmod 777`.
+
+**Nâng cấp từ bản dùng named volume:** nếu deployment cũ dùng volume `safesight-data` (trước khi đổi
+sang bind mount ở trên), chép dữ liệu sang `./data` rồi mới `docker compose up -d`:
+
+```bash
+docker volume ls | grep safesight-data   # tìm đúng tên volume (có tiền tố tên project compose)
+mkdir -p data
+docker run --rm -v <tên-volume-ở-trên>:/from -v "$PWD/data":/to alpine cp -a /from/. /to/
+```
 
 ## Lưu ý Prisma 7.10 với trợ lý AI
 

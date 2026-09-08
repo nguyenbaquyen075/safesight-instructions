@@ -12,6 +12,10 @@ services:
     build:
       context: .
       target: dashboard
+    # Container chạy ĐÚNG uid:gid của anh trên host (mặc định 1000:1000, export UID GID hoặc
+    # đặt trong .env nếu khác) — bắt buộc vì ./data, ./public/snapshots là bind mount mà host-side
+    # AI engine/agent (chạy bằng uid của anh) cũng cần ghi được, không phải uid "app" trong image.
+    user: "${UID:-1000}:${GID:-1000}"
     ports:
       - "3000:3000"
     env_file: .env

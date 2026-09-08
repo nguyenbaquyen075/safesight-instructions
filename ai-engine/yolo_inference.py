@@ -20,6 +20,8 @@ load_dotenv_local()
 BRIDGE_URL = "http://localhost:4001/detections"
 NEXT_API_URL = os.environ.get("NEXT_API_URL", "http://localhost:3000") + "/api/violations"
 AI_ENGINE_SECRET = os.environ.get("AI_ENGINE_SECRET", "")
+# HTTP status của bridge đã cảnh báo rồi — chỉ in 1 lần/status, khỏi spam log mỗi frame.
+_bridge_warned_statuses = set()
 SNAPSHOT_DIR = "public/snapshots"
 # Heartbeat cho agent (agent/lib/capabilities.ts đọc file này): còn sống, bao nhiêu luồng, fps ước lượng.
 HEARTBEAT_PATH = os.path.join(SNAPSHOT_DIR, ".heartbeat.json")
@@ -426,7 +428,7 @@ def run_inference():
             # Gửi toạ độ detections sang bridge cho CÁC camera dùng video này
             for cam_id in st["cams"]:
                 try:
-                    session.post(BRIDGE_URL, json={
+                    resp = session.post(BRIDGE_URL, json={
                         "cameraId": cam_id,
                         "detections": detections,
                         # VỊ TRÍ (giây) trong video mà AI VỪA phân tích. Trình duyệt
@@ -436,6 +438,9 @@ def run_inference():
                         # nhận diện thuộc về cảnh hoàn toàn khác.
                         "videoPos": vi_tri_video,
                     }, headers={"X-AI-Engine-Secret": AI_ENGINE_SECRET}, timeout=0.1)
+                    if not resp.ok and resp.status_code not in _bridge_warned_statuses:
+                        _bridge_warned_statuses.add(resp.status_code)
+                        print(f"⚠️ bridge từ chối detection: HTTP {resp.status_code} — kiểm tra AI_ENGINE_SECRET trong .env.local")
                 except:
                     pass
 

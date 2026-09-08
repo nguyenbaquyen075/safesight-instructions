@@ -21,12 +21,16 @@ RUN npx prisma generate \
 FROM node:24-alpine AS dashboard
 WORKDIR /app
 ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 PORT=3000 DATABASE_URL=file:./data/dev.db
-RUN addgroup -S app && adduser -S app -G app && mkdir -p data && chown app:app data
+RUN addgroup -S app && adduser -S app -G app && mkdir -p data public
 COPY --from=build --chown=app:app /app/.next/standalone ./
 COPY --from=build --chown=app:app /app/.next/static ./.next/static
 COPY --from=build --chown=app:app /app/public ./public
 COPY --from=build --chown=app:app /app/data/dev.db ./seed.db
 COPY --chown=app:app docker-entrypoint.sh ./
+# ./data và ./public/snapshots (bind mount, xem docker-compose.yml) đều phải ghi được bởi bất kỳ
+# uid nào — compose chạy dashboard bằng uid:gid của host, không phải "app". 777 chấp nhận được vì
+# đây là thư mục dữ liệu bind mount ra ngoài host, không phải mã nguồn image.
+RUN mkdir -p public/snapshots && chmod 777 data public/snapshots
 USER app
 VOLUME ["/app/data"]
 EXPOSE 3000

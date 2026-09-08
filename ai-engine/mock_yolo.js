@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 
+const path = require('path');
+// Cùng thứ tự yolo_bridge.js đọc — bridge giờ đòi header X-AI-Engine-Secret nếu có cấu hình.
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env.local') });
+require('dotenv').config({ path: path.resolve(process.cwd(), '.env') });
+
 const BRIDGE_URL = "http://localhost:4001/detections";
+const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
 const CAMERA_IDS = ["cam-001", "cam-002", "cam-003", "cam-004", "cam-005", "cam-006"];
 
 const labels = ["No Helmet", "No Vest", "Person", "Safety Vest", "Hard Hat"];
@@ -37,7 +43,10 @@ async function sendMockDetections() {
     try {
       await fetch(BRIDGE_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(AI_ENGINE_SECRET ? { 'X-AI-Engine-Secret': AI_ENGINE_SECRET } : {})
+        },
         body: JSON.stringify({
           cameraId: camId,
           detections: detections

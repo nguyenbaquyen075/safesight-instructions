@@ -10,7 +10,7 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const PORT = Number(process.env.BRIDGE_PORT ?? 4001);
+const PORT = 4001;
 const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
 if (!AI_ENGINE_SECRET) {
   console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections KHÔNG xác thực (chỉ dùng cho dev).');

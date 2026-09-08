@@ -157,6 +157,7 @@ Hai image được CI build và đẩy lên GitHub Container Registry mỗi khi 
 ```bash
 cp .env.docker.example .env      # điền NEXTAUTH_SECRET, AI_ENGINE_SECRET, TELEGRAM_ENCRYPT_KEY, AGENT_BRIDGE_SECRET
 mkdir -p data public/snapshots   # tạo trước để không bị Docker tạo bằng quyền root
+export UID GID                   # dashboard container chạy bằng uid:gid này để ghi được ./data — xem wiki/03
 docker compose up -d             # kéo image từ GHCR; thêm --build để build tại chỗ
 ```
 
@@ -166,6 +167,10 @@ này và `./public/snapshots` là bind mount dùng chung với AI engine/agent c
 agent vẫn chạy ngoài container bằng `npm run dev:yolo` / `npm run dev:agent`, trỏ `NEXT_PUBLIC_YOLO_SERVER_URL`
 và API về địa chỉ máy chạy Docker. `AI_ENGINE_SECRET` giờ cũng bảo vệ `POST /detections` của bridge, không
 chỉ `POST /api/violations`. Tag image: `latest` (main), `0.6.0` / `0.6` (release), `main`, mã commit ngắn.
+
+Nâng cấp từ bản dùng named volume `safesight-data` (trước khi đổi sang bind mount): chép dữ liệu cũ
+sang `./data` rồi mới chạy lại — `docker run --rm -v <project>_safesight-data:/from -v "$PWD/data":/to alpine cp -a /from/. /to/`
+(`docker volume ls` để tìm đúng tên volume). Chi tiết uid/gid: [wiki/03](wiki/03-cai-dat-va-van-hanh.md).
 
 ## 🤖 Agent giám sát tự động
 

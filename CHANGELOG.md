@@ -32,6 +32,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 - Chạm trần token trong ngày luôn phát `session.ended (stop: skipped)` để panel hỏi-đáp không treo; event `error` gắn đúng `sessionId` của task; vòng lặp agent thoát ngay khi nhận SIGTERM; `PATCH /api/cameras/[id]` đánh thức agent sau khi ghi task; hỏi tiếp vào task `ask` đã hết lượt thử reset `attempts`.
 - JSON hỏng trong `bboxData`/`agentReview` không còn làm 500 danh sách vi phạm; agent so sánh trạng thái không phân biệt hoa/thường với row cũ.
 - Badge Sidebar không còn hiện số "0" rời khi không có vi phạm.
+- Dashboard container không còn crash-loop khi bind mount `./data`/`./public/snapshots`: chạy bằng `user: "${UID:-1000}:${GID:-1000}"` trong `docker-compose.yml` thay vì uid riêng của user `app` trong image; `/app/data`/`/app/public/snapshots` trong image đã `chmod 777` và `docker-entrypoint.sh` báo lỗi rõ nếu vẫn không ghi được thay vì để `set -e` chết im lặng.
+- YOLO engine không còn im lặng bỏ qua khi bridge từ chối detection (401 do `AI_ENGINE_SECRET` lệch): in cảnh báo 1 lần/mã lỗi HTTP thay vì `except: pass`; `env_local.py` đọc thêm `.env` (không chỉ `.env.local`) để engine luôn khớp secret với bridge; `mock_yolo.js` gửi kèm header `X-AI-Engine-Secret` như engine thật.
 
 ### Loại bỏ
 - `SPEC.md` (thay bằng `docs/ba/SRS.md` và bộ BA).
