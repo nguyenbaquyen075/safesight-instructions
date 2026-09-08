@@ -243,3 +243,40 @@ body {
   outline: 2px solid var(--primary);
   outline-offset: 2px;
 }
+
+/* ===== In / xuất PDF (trang Báo cáo) =====
+   Dashboard là nền tối: in nguyên trạng ra giấy trắng sẽ mất chữ. Đổi token sang
+   bảng màu sáng và bỏ khung điều hướng để bản in chỉ còn nội dung báo cáo. */
+@media print {
+  :root {
+    --background: #FFFFFF;
+    --background-secondary: #FFFFFF;
+    --surface: #FFFFFF;
+    --surface-hover: #FFFFFF;
+    --surface-elevated: #F1F5F9;
+    --border: #94A3B8;
+    --border-subtle: #CBD5E1;
+    --text-primary: #0F172A;
+    --text-secondary: #1E293B;
+    --text-muted: #475569;
+    --shadow-sm: none;
+    --shadow-md: none;
+    --shadow-lg: none;
+  }
+
+  aside,
+  header,
+  .no-print {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  /* Một dòng bảng không bị cắt làm đôi giữa hai trang giấy. */
+  tr {
+    break-inside: avoid;
+  }
+}

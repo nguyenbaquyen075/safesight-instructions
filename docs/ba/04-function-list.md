@@ -47,11 +47,12 @@ Phân loại: **Workflow** (trong luồng nghiệp vụ), **Basic** (thêm / tì
 | F-VOICE-02 | Camera | Cảnh báo giọng nói | Nhận và phát audio tại loa | S | Workflow | Trang `/site-speaker` theo camera | v0.6 |
 | F-AN-01 | Violation | Phân tích | Xem xu hướng tuân thủ | M | Advanced | Recharts | v0.6 |
 | F-AN-02 | Violation | Phân tích | Xem phân bố vi phạm theo loại | S | Advanced | Donut | v0.6 |
-| F-RPT-01 | Violation | Báo cáo | Xuất báo cáo CSV / PDF | M | Other | Trang `/reports` chưa có | P2 |
+| F-RPT-01 | Violation | Báo cáo | Xuất báo cáo CSV / PDF | M | Other | Trang `/reports`: lọc công trường/camera/khoảng ngày, bảng tổng hợp theo camera, Xuất CSV, In / PDF | v0.9 |
 | F-AGENT-01 | AgentTask | Agent | Quét sức khoẻ hệ thống định kỳ | M | Advanced | 60s; 6 loại phát hiện; tự khắc phục trong giới hạn | v0.6 |
 | F-AGENT-02 | Violation | Agent | Review vi phạm bằng bằng chứng | L | Advanced | Claude Tool Runner; band VERIFIED / PROBABLE / POSSIBLE | v0.6 |
 | F-AGENT-03 | Alert | Agent | Leo thang Telegram khi VERIFIED thật | S | Workflow | Tôn trọng cooldown | v0.6 |
 | F-AGENT-04 | AgentEvent | Agent | Tổng hợp theo camera / báo cáo ca | M | Other | `camera.digest`, `shift.report` theo giờ cấu hình | v0.6 |
+| F-AGENT-05 | AgentEvent | Agent | Báo cáo tuần tự động | M | Other | `weekly.report` theo `AgentSettings.weeklyReportAt`, gửi Telegram và hiện ở `/reports` | v0.9 |
 | F-AGENT-05 | AgentEvent | Agent | Hỏi đáp về hệ thống / vi phạm / camera / công trường | M | Advanced | Trang `/agent` và tab Agent trong modal | v0.6 |
 | F-AGENT-06 | AgentSettings | Agent | Bật / tắt agent, chọn model, trần token | S | Basic | Kill switch; tắt thì chỉ ghi nhận | v0.6 |
 | F-AGENT-07 | AgentEvent | Agent | Xem dòng thời gian và hàng đợi | S | Basic | Audit mọi tool call, verdict, action | v0.6 |

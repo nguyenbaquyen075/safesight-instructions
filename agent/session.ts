@@ -105,7 +105,7 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
 
   await prisma.agentTask.updateMany({ where: { id: task.id, finishedAt: null }, data: { sessionId } });
   const ctx = newToolContext(task, sessionId, cameraId);
-  const effort = task.kind === 'shift.report' ? 'high' : settings.reviewEffort;
+  const effort = task.kind === 'shift.report' || task.kind === 'weekly.report' ? 'high' : settings.reviewEffort;
   const client = opts.client ?? (env.llmProvider === 'openai' ? openAiClient() : anthropicClient());
   const messages = [{ role: 'user', content: await preambleFor(task, { userMessage: opts.userMessage, sessionId, cameraId, memory }) }];
   await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.started', data: { kind: task.kind, model: settings.model, effort, budget: task.budget, cameraId } });
@@ -139,5 +139,10 @@ export async function runSession(task: LeasedTask, opts: { userMessage?: string;
   if (stop === 'refusal') finalText = 'Claude từ chối lượt này (stop_reason=refusal); không có phán quyết.';
   if (stop === 'max_tokens') finalText = finalText ? `${finalText}\n(kết luận bị cắt vì max_tokens)` : '(kết luận bị cắt vì max_tokens)';
   await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'session.ended', data: { usage, stop, calls: ctx.spent.calls } });
+  // Bản báo cáo tuần được ghi thành event riêng để trang /reports đọc lại được bằng
+  // GET /api/agent/events?type=report, không phải lọc trong đống message.assistant.
+  if (task.kind === 'weekly.report' && finalText) {
+    await emit({ sessionId, taskId: task.id, subjectType: task.subjectType, subjectId: task.subjectId, type: 'report', data: { text: finalText } });
+  }
   return finalText || `phiên kết thúc (${stop ?? 'không rõ'}) không có kết luận`;
 }

@@ -86,6 +86,7 @@ Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut 
 | 3 | Độ kỹ khi review | dropdown fix cứng | — | `medium` | low / medium / high |
 | 4 | Trần token / ngày | number | — | theo cài đặt | Số nguyên ≥ 0, không thập phân; lưu khi rời ô |
 | 5 | Giờ báo cáo ca | time | — | theo cài đặt | HH:mm |
+| 5b | Giờ báo cáo tuần | dropdown thứ + time | — | `MON 08:00` | Thứ 2…Chủ nhật + HH:mm; lưu ngay khi đổi thứ, lưu khi rời ô giờ |
 | 6 | Sweep gần nhất | card chỉ đọc | — | — | Thời điểm, phát hiện, hành động |
 | 7 | Hàng đợi | table chỉ đọc | — | — | kind, đối tượng, lý do, lần thử, hạn |
 | 8 | Dòng thời gian | list chỉ đọc | — | 50 sự kiện mới nhất | Icon theo loại sự kiện, giờ HH:mm:ss |
@@ -207,3 +208,19 @@ Tài khoản dev cứng (`admin@safesight.ai`, không có dòng `User` trong DB)
 | 1 | Bảng nhật ký | table | — | 100 dòng mới nhất | Cột: Thời gian, Người dùng, Hành động, Đối tượng, Chi tiết |
 
 Trạng thái tải: skeleton khi đang tải, thông báo lỗi màu đỏ khi tải hỏng, dòng chữ nhạt khi rỗng.
+
+## SCR-20 Báo cáo (`/reports`)
+
+| STT | Tên trường | Kiểu dữ liệu | Bắt buộc | Giá trị khởi tạo | Mô tả ràng buộc |
+|---|---|---|---|---|---|
+| 1 | Công trường | dropdown động | — | Tất cả công trường | Chỉ các công trường trong phạm vi người dùng; đổi công trường thì xoá lựa chọn camera |
+| 2 | Camera | dropdown động | — | Tất cả camera | Lọc theo công trường đã chọn |
+| 3 | Từ ngày / Đến ngày | date | — | 7 ngày gần nhất | `Từ ngày` ≤ `Đến ngày` (ràng buộc bằng `min`/`max` của input) |
+| 4 | 4 ô số tổng | card chỉ đọc | — | `0` | Tổng vi phạm, vi phạm thật (`RESOLVED`), báo oan (`FALSE_POSITIVE`), còn mở (`OPEN` + `UNDER_REVIEW`) |
+| 5 | Tổng hợp theo camera | table chỉ đọc | — | — | Cột: Camera, Công trường, Tổng, Thật, Báo oan, Còn mở; camera nhiều vi phạm nhất lên đầu |
+| 6 | Chi tiết vi phạm | table chỉ đọc | — | 200 dòng mới nhất | Cột: Thời gian, Camera, Loại, Mức độ, Trạng thái; API trả tối đa 2.000 dòng |
+| 7 | Xuất CSV | button | — | — | Tắt khi không có dòng nào; file UTF-8 có BOM, xuất đủ số dòng API trả về |
+| 8 | In / PDF | button | — | — | `window.print()`; bản in bỏ sidebar/header/bộ lọc và đổi sang nền sáng |
+| 9 | Báo cáo tuần của agent | đoạn văn chỉ đọc | — | `Chưa có báo cáo tuần nào` | Sự kiện `report` mới nhất của agent, hiện theo đoạn (không render markdown thô) |
+
+Trạng thái tải: skeleton khi đang tải, thông báo lỗi màu đỏ khi tải hỏng, dòng chữ nhạt khi khoảng ngày không có vi phạm.

@@ -36,9 +36,10 @@
 | Cấu hình bot Telegram | O | O | X | X | X | X | X |
 | Tạo / sửa / xoá / bật tắt quy tắc cảnh báo | O | O | O* | X | X | X | X |
 | Xem phân tích | O | O | O | O | X | X | X |
+| Xem báo cáo vi phạm, xuất CSV / in PDF | O | O | O | X | X | X | X |
 | Xem trang Agent, hỏi đáp toàn hệ thống | O | O | O | X | X | X | X |
 | Hỏi agent trong modal vi phạm / camera / công trường | O | O | O | O | O | X | X |
-| Bật / tắt agent, chọn model, trần token | O | O | X | X | X | X | X |
+| Bật / tắt agent, chọn model, trần token, giờ báo cáo ca / tuần | O | O | X | X | X | X | X |
 | Bật / tắt và cài đặt subagent camera (nhịp tổng hợp, trần token, xoá trí nhớ) | O | O | X | X | X | X | X |
 | Tổng hợp ngay theo camera | O | O | O* | X | X | X | X |
 | Xem thẻ subagent camera và trí nhớ camera | O | O | O***** | O***** | O***** | X | X |

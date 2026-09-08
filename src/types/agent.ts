@@ -12,6 +12,7 @@ export interface AgentEventView {
 
 export interface AgentSettingsView {
   isEnabled: boolean; model: string; reviewEffort: string; dailyTokenCap: number; shiftReportAt: string;
+  weeklyReportAt: string; // "MON 08:00"
 }
 
 export interface AgentReview {
