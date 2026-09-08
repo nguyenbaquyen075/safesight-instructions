@@ -101,6 +101,20 @@ xanh dương = hành động chính. Không dùng màu khác cho các ý này.
 - **Ô hỏi đáp**: textarea + nút gửi; khi phiên đang chạy hiện "Agent đang trả lời…" và poll 2s; im lặng 90s coi là xong.
 - **Trạng thái rỗng/tải/lỗi** bắt buộc cho mọi khối: "Chưa có gì", skeleton `surface-elevated`, thông báo lỗi `danger-muted`.
 
+## Thẻ subagent camera
+- **Thẻ** (`src/components/agent/CameraAgentCard.tsx`): dựng trên `SettingCard`, dùng `Switch` và `InputGroup`
+  của `components/settings/ui.tsx`; xếp trong lưới `grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4`.
+- **Thanh token hôm nay**: nền `surface-elevated`, cao 6px, bo tròn; phần đã dùng `primary`, chuyển `warning`
+  khi vượt 80% trần (cảnh báo sắp hết hạn mức, đúng nghĩa màu vàng của hệ màu).
+- **Chip trạng thái**: viền `border`, chữ 10px `text-muted` — hiện khi camera không `online`, và chip "mặc định"
+  khi camera chưa có dòng `CameraAgent` (đang xem giá trị khởi tạo).
+- **Ghi chú trí nhớ**: mono 12px, `text-secondary`; tiền tố `#<chỉ số> <ngày>` màu `text-muted` để đối chiếu với
+  `replaceIndex` mà agent dùng khi sửa ghi chú. Thẻ hiện 3 ghi chú mới nhất, panel camera hiện đầy đủ.
+- **Nút**: "Tổng hợp ngay" là nút chính (`primary`, chữ trắng), tắt khi subagent tắt; "Xoá trí nhớ" viền `border`,
+  chữ `text-secondary`, luôn hỏi `confirm()` trước. Cả hai có `focus-visible:ring-2 ring-[var(--primary)]`.
+- **Trạng thái**: tải = 3 skeleton `surface-elevated` cao 288px; lỗi = chữ `danger`; rỗng = "Chưa có camera nào
+  trong phạm vi của bạn."; trí nhớ rỗng = "(chưa có ghi chú)".
+
 ## Responsive
 - Lưới `grid-cols-1 sm:grid-cols-2 lg:grid-cols-4` cho thẻ số; bảng/dòng thời gian cuộn ngang trong container `overflow-x-auto`.
 - Không bao giờ để trang cuộn ngang; văn bản dài `break-words`.

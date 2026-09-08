@@ -25,7 +25,7 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo |
-| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, ô hỏi toàn hệ thống, capabilities |
+| `/agent` | `(dashboard)/agent/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Dòng thời gian `AgentEvent`, hàng đợi task, sweep gần nhất, cài đặt, mục "Subagent theo camera" (lưới `CameraAgentCard`: bật/tắt, nhịp tổng hợp, token hôm nay/trần, digest gần nhất, vi phạm mở, báo oan 24h, 3 ghi chú mới nhất, "Tổng hợp ngay", "Xoá trí nhớ"), ô hỏi toàn hệ thống, capabilities |
 | `/reports`, `/profile` | — | — | ❌ Chưa có |
 
 ## Danh mục API route (`src/app/api/`)
@@ -82,7 +82,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 - **alerts/** — `AlertsTable.tsx`
 - **settings/** — `CameraMonitoringCard.tsx`, `CameraEditDialog.tsx`, `TelegramBotCard.tsx`, `AlertRulesCard.tsx`, `AlertRuleEditDialog.tsx`, `ui.tsx`
 - **sites/** — `SiteDetailModal.tsx` · **users/** — `UserTable.tsx`, `UserEditDialog.tsx`
-- **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`)
+- **agent/** — `AgentTimeline.tsx`, `AgentReviewCard.tsx`, `AskAgentBox.tsx`, `SubjectAgentPanel.tsx`, `BandBadge.tsx`, `CameraAgentCard.tsx` (tab/khối Agent trong modal vi phạm/camera/site + trang `/agent`). `SubjectAgentPanel` với `subjectType="camera"` hiện thêm khối đầu panel: trạng thái subagent (bật/tắt), token hôm nay/trần, digest gần nhất và **toàn bộ** trí nhớ camera — lấy từ `useCameraAgents()` lọc theo `cameraId` (không gọi API này ở modal vi phạm/công trường)
 - **ui/** — shadcn/Radix primitives, `Toaster.tsx` · **Providers.tsx** — React Query + session
 
 ## Dữ liệu mock còn lại

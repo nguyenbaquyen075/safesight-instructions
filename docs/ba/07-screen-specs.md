@@ -91,6 +91,12 @@ Màn hình hiển thị: biểu đồ xu hướng tuân thủ theo ngày, donut 
 | 8 | Dòng thời gian | list chỉ đọc | — | 50 sự kiện mới nhất | Icon theo loại sự kiện, giờ HH:mm:ss |
 | 9 | Câu hỏi toàn hệ thống | free text (textarea) + button | Có khi gửi | trống | Giống SCR-06 mục 7 |
 | 10 | Capabilities | chip chỉ đọc | — | — | Có/không `ANTHROPIC_API_KEY`, `.venv`, model |
+| 11 | Bật subagent camera | switch (trên từng thẻ camera) | — | `true` | Lưu ngay, có toast; tắt → camera đó không chạy phiên nào |
+| 12 | Nhịp tổng hợp (phút) | number | — | `30` | Số nguyên 5–1440; lưu khi rời ô, ngoài khoảng thì bỏ qua |
+| 13 | Token hôm nay | thanh tiến trình chỉ đọc | — | `0 / 300.000` | `đã dùng / trần`; thanh đổi sang màu cảnh báo khi > 80% |
+| 14 | Digest gần nhất · Vi phạm mở · Báo oan 24h | 3 ô số chỉ đọc | — | `chưa có` / `0` / `0%` | Thời điểm digest cuối, số vi phạm `OPEN`, tỉ lệ `FALSE_POSITIVE` trong 24h |
+| 15 | Trí nhớ camera | list chỉ đọc | — | `(chưa có ghi chú)` | 3 ghi chú mới nhất, mono 12px, tiền tố `#<chỉ số> <ngày>`; panel camera hiện đủ 20 |
+| 16 | Tổng hợp ngay / Xoá trí nhớ | 2 button | — | — | "Tổng hợp ngay" tắt khi subagent tắt, toast kèm mã task; "Xoá trí nhớ" hỏi xác nhận rồi xoá toàn bộ |
 
 ## SCR-11 Kiểm thử Roboflow (`/roboflow`)
 
