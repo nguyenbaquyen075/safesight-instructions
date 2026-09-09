@@ -705,7 +705,7 @@ export default function CamerasPage() {
                     onError={(msg) => showNotification('Cảnh báo giọng nói lỗi', msg, 'danger')}
                   />
                   {isDemo && (
-                    <button
+                    <button aria-label={`Mở chi tiết camera ${cam.name}`}
                       onClick={() => setSelectedCamera({ cam, videoUrl: videoUrl! })}
                       className="w-8 h-8 rounded-lg bg-white/10 hover:bg-[var(--primary)] backdrop-blur-md flex items-center justify-center text-white transition-all"
                     >

@@ -210,6 +210,8 @@ Ngưỡng chốt vi phạm (`CONFIRM_CONF=0.6`, `CONFIRM_DELAY=3.0`) và các ng
 
 ## Gán nguồn video cho camera
 
+> **Codec video demo:** file trong `public/videos/` phải là **H.264 (yuv420p)** để trình duyệt phát được. Chrome/Chromium trên Linux không giải mã HEVC/H.265: ô video sẽ đen trong khi AI engine (OpenCV/ffmpeg) vẫn đọc và gửi khung nhận diện. Chuyển mã: `ffmpeg -i in.mov -vf scale=1280:-2 -c:v libx264 -crf 24 -pix_fmt yuv420p -movflags +faststart -an out.mp4`.
+
 - Camera demo: `src/data/camera-videos.json` (`cam-id → tên file trong public/videos/`).
 - Camera thật hoặc đổi video qua giao diện: **Cài đặt > Giám sát** ghi vào `Camera.rtspUrl` theo quy ước `webcam:0`, `rtsp://...`, `video:ten.mp4`. Camera có `status` khác `ONLINE` bị AI bỏ qua.
 

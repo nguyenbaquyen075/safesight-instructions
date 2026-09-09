@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 'use client';
 import { useState } from 'react';
+
+const PAGE = 50;
+const MAX_EVENTS = 500;
 import { Bot, Activity, ListTodo, Settings2, Cctv, Target } from 'lucide-react';
 import { SectionHeader, SettingCard, InputGroup, Switch } from '@/components/settings/ui';
 import { AgentTimeline } from '@/components/agent/AgentTimeline';
@@ -86,7 +89,9 @@ function AgentAccuracyCard() {
 
 export default function AgentPage() {
   const [type, setType] = useState<string>('');
-  const { data: events = [], isLoading, isError } = useAgentEvents({ type: type || undefined, limit: 150 });
+  // Nhật ký tải theo trang: mỗi lần "Tải thêm" lấy thêm PAGE sự kiện (API trần 500), hộp cuộn riêng để trang không dài vô tận.
+  const [limit, setLimit] = useState(PAGE);
+  const { data: events = [], isLoading, isError, isFetching } = useAgentEvents({ type: type || undefined, limit });
   const { data: open = [], isLoading: tasksLoading, isError: tasksError } = useAgentTasks({ status: 'open', limit: 30 });
   const { data: settings, isLoading: settingsLoading, isError: settingsError } = useAgentSettings();
   const save = useSaveAgentSettings();
@@ -116,8 +121,21 @@ export default function AgentPage() {
               ))}
             </div>
           </div>
-          {isLoading ? <div className="h-24 rounded-xl bg-[var(--surface-elevated)] animate-pulse" /> : isError ? <p className="text-sm text-[var(--danger)]">Không tải được nhật ký.</p> : <div className="overflow-x-auto"><AgentTimeline events={events} /></div>}
-        </SettingCard>
+          {isLoading ? <div className="h-24 rounded-xl bg-[var(--surface-elevated)] animate-pulse" /> : isError ? <p className="text-sm text-[var(--danger)]">Không tải được nhật ký.</p> : (
+            <>
+              <div className="max-h-[60vh] overflow-y-auto overflow-x-auto pr-1"><AgentTimeline events={events} /></div>
+              <div className="mt-3 flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-xs text-[var(--text-muted)]">Đang hiện {events.length} sự kiện{events.length >= limit ? ' gần nhất' : ' (đã hết)'}</p>
+                {events.length >= limit && limit < MAX_EVENTS && (
+                  <button type="button" onClick={() => setLimit(l => Math.min(l + PAGE, MAX_EVENTS))} disabled={isFetching}
+                    className="px-3 py-1.5 rounded-lg text-xs font-bold border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--surface-hover)] disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]">
+                    {isFetching ? 'Đang tải…' : `Tải thêm ${PAGE}`}
+                  </button>
+                )}
+              </div>
+            </>
+          )}
+</SettingCard>
 
         <div className="space-y-6">
           <SettingCard>
