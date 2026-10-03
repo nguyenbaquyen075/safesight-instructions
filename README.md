@@ -115,6 +115,9 @@ cp .env .env.local   # rồi chỉnh DATABASE_URL, NEXTAUTH_SECRET, NEXT_PUBLIC_
                       # được gửi kèm header X-AI-Engine-Secret nên bridge và dashboard phải dùng
                       # chung AI_ENGINE_SECRET)
                       #
+                      # AUTO_ANNOUNCE (tuỳ chọn — mặc định bật: vi phạm vừa chốt tự đọc qua loa
+                      # của camera đó, xem /site-speaker; đặt `false` để tắt khẩn)
+                      #
                       # AGENT_BRIDGE_SECRET (bắt buộc để Next đánh thức agent và gửi câu hỏi từ
                       # panel; thiếu thì agent vẫn chạy theo chu kỳ 20s, sinh bằng
                       # `openssl rand -base64 24`)

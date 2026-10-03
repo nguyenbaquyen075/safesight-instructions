@@ -10,7 +10,10 @@ const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
 
-const PORT = 4001;
+const PORT = Number(process.env.BRIDGE_PORT) || 4001;
+// Hai câu loa liên tiếp của cùng một camera phải cách nhau ít nhất chừng này (trừ khi force):
+// engine báo lại mỗi 60s, agent review lại thường vài chục giây sau -> không đọc trùng một câu.
+const ANNOUNCE_COOLDOWN_MS = Number(process.env.ANNOUNCE_COOLDOWN_MS) || 30_000;
 const AI_ENGINE_SECRET = process.env.AI_ENGINE_SECRET?.trim() || '';
 if (!AI_ENGINE_SECRET) {
   console.warn('⚠️  [BRIDGE] AI_ENGINE_SECRET chưa cấu hình — POST /detections và POST /announce KHÔNG xác thực (chỉ dùng cho dev).');
@@ -48,19 +51,30 @@ app.post('/detections', (req, res) => {
 });
 
 // Loa công trường: dashboard/agent đẩy một câu, bridge phát cho thiết bị đang mở
-// /site-speaker của camera đó. Trả về số thiết bị đang nghe để người gọi biết có ai nghe không.
+// /site-speaker của camera đó. Loa nằm trong room riêng `speaker-<id>` (không lẫn với tab chỉ
+// xem camera ở `camera-<id>`), nên `listeners` là số thiết bị loa thật sự đang nghe.
+const lastAnnounceAt = {};   // cameraId -> lần phát gần nhất (cho cooldown)
 app.post('/announce', (req, res) => {
   if (AI_ENGINE_SECRET && req.headers['x-ai-engine-secret'] !== AI_ENGINE_SECRET) {
     return res.sendStatus(401);
   }
-  const { cameraId, text } = req.body || {};
+  const { cameraId, text, force } = req.body || {};
   // Bridge là ranh giới tin cậy cuối trước loa: kiểm kiểu và độ dài ở đây, không tin route/tool phía trên.
   if (typeof cameraId !== 'string' || !cameraId.trim() || typeof text !== 'string' || !text.trim() || text.length > 200) {
     return res.status(400).json({ ok: false, error: 'cameraId và text (1–200 ký tự) là bắt buộc' });
   }
-  const room = `camera-${cameraId}`;
+  const room = `speaker-${cameraId}`;
+  const listeners = io.sockets.adapter.rooms.get(room)?.size ?? 0;
+  // Không có loa nào nghe thì không phát và KHÔNG tính cooldown: lúc có người mở loa, vi phạm kế tiếp phát ngay.
+  if (listeners === 0) return res.json({ ok: true, listeners: 0 });
+  // force (người bấm tay) luôn được phát; tự động/agent phải chờ hết cooldown của camera.
+  const sinceLast = Date.now() - (lastAnnounceAt[cameraId] ?? 0);
+  if (force !== true && sinceLast < ANNOUNCE_COOLDOWN_MS) {
+    return res.status(429).json({ ok: false, throttled: true, error: 'camera này vừa phát loa', retryInMs: ANNOUNCE_COOLDOWN_MS - sinceLast });
+  }
+  lastAnnounceAt[cameraId] = Date.now();
   io.to(room).emit('voice-announce', { cameraId, text, at: new Date().toISOString() });
-  res.json({ ok: true, listeners: io.sockets.adapter.rooms.get(room)?.size ?? 0 });
+  res.json({ ok: true, listeners });
 });
 
 // Sức khoẻ cho agent/direct/health.ts: camera nào còn gửi detection, bao nhiêu client đang xem
@@ -73,6 +87,11 @@ io.on('connection', (socket) => {
 
   socket.on('subscribe-camera', (cameraId) => {
     socket.join(`camera-${cameraId}`);
+  });
+
+  // Thiết bị loa công trường (/site-speaker) — tách khỏi subscribe-camera để đếm đúng số loa.
+  socket.on('subscribe-speaker', (cameraId) => {
+    socket.join(`speaker-${cameraId}`);
   });
 
   socket.on('subscribe-all', () => {

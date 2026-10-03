@@ -5,7 +5,7 @@ import * as React from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Volume2, Wifi, WifiOff, ChevronDown, MapPin, Building2, Power, ListChecks, AlertTriangle, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { mockCameras } from '@/data/mock-cameras';
+import { useCameras } from '@/hooks/use-cameras';
 import { CameraStatus } from '@/types/enums';
 import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard';
 
@@ -43,7 +43,9 @@ export default function SiteSpeakerPage() {
   // useSyncExternalStore để lần render trên máy chủ (chưa có window) không lệch với lần hydrate.
   const speechSupported = React.useSyncExternalStore(subscribeNever, () => 'speechSynthesis' in window, () => true);
 
-  const onlineCameras = mockCameras.filter((c) => c.status === CameraStatus.ONLINE);
+  // Loa gắn theo camera thật trong DB (id = room của bridge); cùng nguồn với thẻ mic ở trên.
+  const { data: cameras, isLoading: camerasLoading, isError: camerasError } = useCameras({ includeDemo: true });
+  const onlineCameras = React.useMemo(() => (cameras ?? []).filter((c) => c.status === CameraStatus.ONLINE), [cameras]);
   const selectedCamera = onlineCameras.find((c) => c.id === cameraId);
 
   React.useEffect(() => {
@@ -57,7 +59,8 @@ export default function SiteSpeakerPage() {
 
     socket.on('connect', () => {
       setIsConnected(true);
-      socket.emit('subscribe-camera', cameraId);
+      socket.emit('subscribe-camera', cameraId); // voice-broadcast (mic -> loa)
+      socket.emit('subscribe-speaker', cameraId); // voice-announce (câu tự động); room riêng để bridge đếm đúng số loa
     });
     socket.on('disconnect', () => setIsConnected(false));
 
@@ -161,7 +164,7 @@ export default function SiteSpeakerPage() {
             onChange={(e) => setCameraId(e.target.value)}
             className="w-full p-4 pr-10 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-[var(--text-primary)] text-sm font-bold appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40 focus:border-[var(--primary)] transition-all"
           >
-            <option value="">— Chọn mic —</option>
+            <option value="">{camerasLoading ? 'Đang tải danh sách mic...' : '— Chọn mic —'}</option>
             {onlineCameras.map((cam) => (
               <option key={cam.id} value={cam.id}>
                 {cam.name} ({cam.siteName})
@@ -170,6 +173,12 @@ export default function SiteSpeakerPage() {
           </select>
           <ChevronDown className="w-4 h-4 text-[var(--text-muted)] absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none" />
         </div>
+        {camerasError && (
+          <p className="text-xs text-[var(--danger)]">Không tải được danh sách camera — tải lại trang hoặc kiểm tra đăng nhập.</p>
+        )}
+        {!camerasLoading && !camerasError && onlineCameras.length === 0 && (
+          <p className="text-xs text-[var(--text-muted)]">Chưa có camera nào đang hoạt động để làm loa.</p>
+        )}
 
         {selectedCamera && (
           <div className="flex items-center gap-4 p-4 rounded-xl bg-[var(--surface-elevated)] border border-[var(--border)]">

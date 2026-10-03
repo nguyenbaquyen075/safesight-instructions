@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { AlertChannel } from '@/types/enums';
 
 /** Các kênh đã nối thật (có sender). Enum còn SMS/Email/… nhưng chưa gửi được. */
-export const SENDABLE_CHANNELS = [AlertChannel.TELEGRAM, AlertChannel.ZALO, AlertChannel.WEBHOOK] as const;
+export const SENDABLE_CHANNELS = [AlertChannel.TELEGRAM, AlertChannel.ZALO, AlertChannel.WEBHOOK, AlertChannel.PA_SYSTEM] as const;
 export type SendableChannel = (typeof SENDABLE_CHANNELS)[number];
 
 export const chatIdSchema = z
@@ -25,10 +25,16 @@ export const webhookUrlSchema = z
     }
   }, 'Webhook phải là URL https hợp lệ');
 
+// Loa công trường: người nhận là id camera đặt loa (cuid hoặc id seed như "cam-001").
+export const speakerIdSchema = z
+  .string()
+  .regex(/^[\w-]{1,64}$/, 'Id camera đặt loa không hợp lệ');
+
 const RECIPIENT_SCHEMAS: Record<SendableChannel, z.ZodType<string>> = {
   [AlertChannel.TELEGRAM]: chatIdSchema,
   [AlertChannel.ZALO]: zaloUserIdSchema,
   [AlertChannel.WEBHOOK]: webhookUrlSchema,
+  [AlertChannel.PA_SYSTEM]: speakerIdSchema,
 };
 
 // AlertRule.recipients là MỘT mảng JSON dùng chung cho mọi kênh, nên mỗi mục
@@ -76,6 +82,7 @@ const CHANNEL_LABELS: Record<SendableChannel, string> = {
   [AlertChannel.TELEGRAM]: 'Telegram',
   [AlertChannel.ZALO]: 'Zalo OA',
   [AlertChannel.WEBHOOK]: 'Webhook',
+  [AlertChannel.PA_SYSTEM]: 'Loa công trường',
 };
 
 export const alertRuleSchema = alertRuleObjectSchema.superRefine((data, ctx) => {

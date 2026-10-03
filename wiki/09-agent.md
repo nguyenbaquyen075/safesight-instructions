@@ -262,6 +262,8 @@ nào để gắn; lịch sử leo thang vận hành nằm ở `AgentEvent` (`act
 announce một câu ngắn". OPENING của `shift.report` và `weekly.report` nhắc thêm phần "việc khắc
 phục còn mở / quá hạn" và chỉ tới `read_agent_activity` (`openActions`, `overdueActions`).
 
+Loa còn có đường **tự động không qua agent**: ngay khi engine chốt vi phạm, `POST /api/violations` gọi `autoAnnounce()` (xem [02](02-kien-truc-he-thong.md)). Hai đường dùng chung cooldown 30s mỗi camera **ở bridge**, nên tool `announce` có thể nhận `blockedReason` "camera này vừa phát loa" nếu loa vừa đọc câu tự động — đó là thiết kế, không phải lỗi, và không tiêu hạn mức `announcePerSession`.
+
 Bộ tool cho từng kind: `violation.review` = tất cả trừ `read_agent_activity`;
 `camera.digest`/`shift.report`/`weekly.report`/`ops.escalate` = đọc + `write_note` + `escalate`
 (`ops.escalate` chỉ `escalate` với caption vận hành, không `record_verdict`);

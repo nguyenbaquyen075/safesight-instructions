@@ -25,7 +25,7 @@ test('senderFor returns a sender for every sendable channel', () => {
   for (const channel of SENDABLE_CHANNELS) {
     assert.ok(senderFor(channel), `missing sender for ${channel}`);
   }
-  assert.deepEqual([...SENDABLE_CHANNELS], [AlertChannel.TELEGRAM, AlertChannel.ZALO, AlertChannel.WEBHOOK]);
+  assert.deepEqual([...SENDABLE_CHANNELS], [AlertChannel.TELEGRAM, AlertChannel.ZALO, AlertChannel.WEBHOOK, AlertChannel.PA_SYSTEM]);
 });
 
 test('senderFor returns undefined for channels that are not wired yet', () => {

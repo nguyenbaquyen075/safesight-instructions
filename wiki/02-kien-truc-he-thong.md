@@ -35,12 +35,12 @@ Cả 4 tiến trình khởi động bằng **một lệnh** `npm run dev` (`dev-
 - Server Express + Socket.IO (port **4001**).
 - Nhận detection từ Python, phát vào room `camera-<id>` và room `all-cameras` (client chỉ xem 1 camera không phải nhận dữ liệu mọi camera).
 - Relay sự kiện `voice-broadcast` (mic trên trang `/cameras` → trang `/site-speaker`).
-- `POST /announce` (`{ cameraId, text }`, header `X-AI-Engine-Secret` như `/detections`) → phát `voice-announce` vào room `camera-<id>`, trả `{ ok, listeners }` (số thiết bị loa đang nghe). Dashboard và agent dùng để cho loa đọc câu nhắc.
+- `POST /announce` (`{ cameraId, text }`, header `X-AI-Engine-Secret` như `/detections`) → phát `voice-announce` vào room **`speaker-<id>`** (thiết bị loa vào bằng `subscribe-speaker`, tách khỏi `camera-<id>` của tab xem camera), trả `{ ok, listeners }` (số thiết bị loa đang nghe; 0 thì không phát và không tính cooldown). Cooldown 30s mỗi camera (`ANNOUNCE_COOLDOWN_MS`): gọi sớm hơn trả 429 `{ throttled: true }`, trừ khi body có `force: true` (nút "Phát loa" bấm tay). Dashboard (tự động và bấm tay) và agent dùng để cho loa đọc câu nhắc.
 
 ### 3. Next.js Dashboard — `src/`
 - Next.js 16 App Router (port **3000**), NextAuth v5 (Credentials), Prisma 7.
 - Nhận realtime qua hook `useYolo` (`src/hooks/useYolo.ts`), vẽ khung trên `CameraCard`.
-- API routes (`src/app/api/`) đọc/ghi DB thật; `POST /api/violations` gọi `notifyViolation()` gửi cảnh báo theo `AlertRule` (fire-and-forget, không chặn vòng lặp AI).
+- API routes (`src/app/api/`) đọc/ghi DB thật; `POST /api/violations` gọi `notifyViolation()` gửi cảnh báo theo `AlertRule` và `autoAnnounce()` cho loa của camera đó đọc câu nhắc (cả hai fire-and-forget, không chặn vòng lặp AI; lần đầu nhắc nhẹ, tái phạm nói mạnh; tắt bằng `AUTO_ANNOUNCE=false`).
 - **Kênh cảnh báo** (`src/lib/alert-channels/`): mỗi kênh là một `AlertSender { send(input) }`, `senderFor(channel)` chọn sender theo `AlertChannel`. Đã nối: `telegram` (`TelegramClient.sendPhoto`), `zalo` (Zalo OA `POST /v3.0/oa/message/cs`), `webhook` (POST JSON kèm header `X-SafeSight-Signature: sha256=<HMAC của body bằng WEBHOOK_SECRET>`). Kênh chưa cấu hình/đang tắt bị bỏ qua im lặng, không ghi `Alert`. `AlertRule.recipients` dùng chung một mảng nên mục của kênh mới mang tiền tố (`zalo:123`, `webhook:https://…`); mục không tiền tố vẫn là chat_id Telegram.
 
 ### 4. Agent — `agent/`

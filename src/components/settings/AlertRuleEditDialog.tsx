@@ -48,6 +48,12 @@ const RECIPIENT_HINTS: Record<SendableChannel, { name: string; label: string; pl
       </>
     ),
   },
+  [AlertChannel.PA_SYSTEM]: {
+    name: 'Loa công trường',
+    label: 'Id camera đặt loa',
+    placeholder: 'VD: id camera trên trang Loa công trường',
+    hint: <>Thiết bị đang mở trang <code>/site-speaker</code> của camera này sẽ đọc câu nhắc.</>,
+  },
 };
 
 interface AlertRuleEditDialogProps {

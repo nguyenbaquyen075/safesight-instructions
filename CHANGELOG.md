@@ -4,7 +4,22 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- **Loa tự phát khi chốt vi phạm**: engine chốt một vi phạm (thiếu liên tục ≥ 3s) → `POST /api/violations`
+  gọi `autoAnnounce()` (`src/lib/auto-announce.ts`) → loa của **chính camera đó** đọc ngay, không chờ
+  agent/LLM và không cần `AlertRule`. Lần đầu (`occurrenceCount ≤ 1`) là nhắc nhẹ ("Khu vực X, vui
+  lòng đội mũ bảo hộ"), tái phạm (≥ 2) nói mạnh ("Cảnh báo, khu vực X, yêu cầu đội mũ bảo hộ ngay").
+  Mặc định bật; `AUTO_ANNOUNCE=false` là công tắc tắt khẩn. Kênh cảnh báo `pa_system` (người nhận
+  `pa_system:<cameraId>`) cho phép đặt loa của camera khác qua `AlertRule`.
+- Bridge: loa nằm trong room riêng `speaker-<id>` (sự kiện `subscribe-speaker`), nên `listeners` của
+  `POST /announce` chỉ đếm thiết bị loa thật chứ không đếm tab chỉ xem camera. Cooldown 30 giây mỗi
+  camera (`ANNOUNCE_COOLDOWN_MS`) chống đọc trùng giữa đường tự động và agent: gọi sớm hơn bị trả 429
+  `{ throttled: true }`; nút "Phát loa" bấm tay gửi `force: true` nên luôn được phát. Không có loa nào
+  nghe thì không phát và không tính cooldown. Biến mới (tuỳ chọn) `BRIDGE_PORT`, `ANNOUNCE_COOLDOWN_MS`.
+
 ### Sửa
+- `/site-speaker` chọn loa từ camera thật trong DB (`useCameras`) thay cho `mockCameras` — camera thật
+  trước đây không chọn được nên không nhận được câu loa nào.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
 - Video demo `210321.mp4` (cam-001/cam-005), `IMG_2744 2.MOV` (cam-007), `IMG_2745 2.MOV` (cam-008) chuyển mã từ HEVC/H.265 4K sang **H.264 720p**: Chrome/Linux không giải mã HEVC nên ô video đen trong khi engine (OpenCV) vẫn đọc được và đẩy khung nhận diện — nhìn như "không có video mà model vẫn bắt". File nhỏ hơn nhiều lần, engine không đổi.

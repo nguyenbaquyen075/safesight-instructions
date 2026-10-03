@@ -20,7 +20,7 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/` | `(dashboard)/page.tsx` | tất cả | KPI, biểu đồ tuân thủ, dòng thời gian cảnh báo, trạng thái công trường |
 | `/sites` | `(dashboard)/sites/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER | Quản lý công trường |
 | `/cameras` | `(dashboard)/cameras/page.tsx` | tất cả | Lưới camera live, khung detection từ YOLO, lọc "chỉ vi phạm", nút mic cảnh báo |
-| `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic; nhận thêm `voice-announce` và đọc bằng `speechSynthesis` (`lang=vi-VN`, rate 0.95), nút "Thử loa", danh sách 10 thông báo gần nhất, cảnh báo khi trình duyệt không có Web Speech API |
+| `/site-speaker` | `(dashboard)/site-speaker/page.tsx` | tất cả | "Loa công trường": chọn camera, phát audio nhận từ mic; danh sách loa lấy từ camera thật (`useCameras`); vào room loa bằng `subscribe-speaker` để nhận `voice-announce` (câu tự động khi chốt vi phạm hoặc bấm tay) và đọc bằng `speechSynthesis` (`lang=vi-VN`, rate 0.95), nút "Thử loa", danh sách 10 thông báo gần nhất, cảnh báo khi trình duyệt không có Web Speech API |
 | `/alerts` | `(dashboard)/alerts/page.tsx` | tất cả | Danh sách cảnh báo từ vi phạm thật |
 | `/violations` | `(dashboard)/violations/page.tsx` | tất cả | Bảng vi phạm + modal chi tiết (ảnh snapshot) |
 | `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm, bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí camera (lọc 7/30/90 ngày) |

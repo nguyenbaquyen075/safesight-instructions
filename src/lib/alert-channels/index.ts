@@ -4,6 +4,7 @@ import type { Camera, Violation } from '@prisma/client';
 import { telegramSender } from './telegram';
 import { zaloSender } from './zalo';
 import { webhookSender } from './webhook';
+import { speakerSender } from './speaker';
 import { AlertChannel } from '@/types/enums';
 import type { SendableChannel } from '@/lib/validation/alert-rule';
 
@@ -33,6 +34,7 @@ const SENDERS: Record<SendableChannel, AlertSender> = {
   [AlertChannel.TELEGRAM]: telegramSender,
   [AlertChannel.ZALO]: zaloSender,
   [AlertChannel.WEBHOOK]: webhookSender,
+  [AlertChannel.PA_SYSTEM]: speakerSender,
 };
 
 export function senderFor(channel: string): AlertSender | undefined {

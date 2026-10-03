@@ -40,7 +40,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     text = announcementFor(violation, camera);
   }
 
-  const result = await announce(id, text);
+  // Người bấm tay luôn được phát, không bị cooldown của bridge chặn.
+  const result = await announce(id, text, { force: true });
   await logAudit({ session: gate.session, action: 'camera.announce', resource: 'camera', resourceId: id, details: text, request });
 
   return NextResponse.json({ ...result, text });
