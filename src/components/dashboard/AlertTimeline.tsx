@@ -72,7 +72,7 @@ export function AlertTimeline({ alerts }: AlertTimelineProps) {
                   {/* Thumbnail — khung hình sống từ video đang giám sát (khớp hiện tại) */}
                   <div className="relative w-16 h-12 rounded-md overflow-hidden bg-[var(--surface-elevated)] flex-shrink-0 border border-[var(--border)]">
                     <video
-                      src="/videos/test1.mp4"
+                      src="/videos/IMG_2744%202.MOV"
                       autoPlay
                       muted
                       loop

@@ -32,7 +32,7 @@ const sites = [
   { id: 'site-002', orgId: 'org-001', name: 'Masteri Centre Point - Block A', address: 'Xa lộ Hà Nội, Long Bình, TP. Thủ Đức', lat: 10.8593, lng: 106.8, status: 'ACTIVE' },
 ];
 
-// Chỉ 6 camera thực sự dùng trong src/data/camera-videos.json (nguồn video cho YOLO)
+// 6 camera roster mẫu (khớp mock-cameras.ts); chỉ camera có video trong src/data/camera-videos.json mới được YOLO phân tích
 const cameras = [
   { id: 'cam-001', siteId: 'site-001', name: 'Cổng chính - Entrance A', rtspUrl: 'rtsp://192.168.1.101:554/stream1', status: 'ONLINE', type: 'dome', location: 'Main Entrance', fps: 15, resolution: '1920x1080' },
   { id: 'cam-002', siteId: 'site-001', name: 'Tầng 15 - Khu vực cốt thép', rtspUrl: 'rtsp://192.168.1.102:554/stream1', status: 'ONLINE', type: 'fixed', location: 'Floor 15 - Rebar Area', fps: 15, resolution: '1920x1080' },

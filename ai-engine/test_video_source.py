@@ -28,9 +28,9 @@ def demo():
 
         # đường dẫn file mp4 -> cv2.VideoCapture(path), giữ nguyên hành vi cũ
         fake_cv2_cap.reset_mock()
-        result = get_video_source("public/videos/test1.mp4")
+        result = get_video_source("public/videos/IMG_2744 2.MOV")
         assert not isinstance(result, RTSPStream)
-        fake_cv2_cap.assert_called_once_with("public/videos/test1.mp4")
+        fake_cv2_cap.assert_called_once_with("public/videos/IMG_2744 2.MOV")
 
     print("OK: get_video_source() rẽ nhánh đúng cho rtsp / webcam / file.")
 
