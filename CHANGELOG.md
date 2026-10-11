@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thêm
+- **Loa tự động trên trang `/cameras`**: nút "Loa tự động" bật/tắt việc đọc to lỗi PPE đang bắt được bằng giọng `vi-VN` của trình duyệt (`speechSynthesis`), theo vòng — mỗi camera đang lỗi đọc đúng 1 lần ("Tại <camera>, thiếu <món>. Yêu cầu khắc phục ngay."), cách nhau 2 giây, nghỉ 10 giây giữa 2 vòng để người ở hiện trường kịp khắc phục; câu trước chưa đọc xong thì chờ. Dùng thẳng detection đang hiện trên lưới (`isViolation` + `missingPpe`) nên không cần bridge hay API mới và chạy độc lập với `/site-speaker`. Bấm bật đọc ngay câu xác nhận (đồng thời mở quyền phát âm của trình duyệt); máy thiếu giọng tiếng Việt thì báo lỗi rõ thay vì đọc sai. Mới: `src/lib/speak.ts`, `src/hooks/useAutoSpeaker.ts`.
+
 ### Sửa
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
