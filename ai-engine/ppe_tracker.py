@@ -88,6 +88,15 @@ class InstanceDetector:
             'missing_ppe': missing_ppe
         }
 
+def _iou_hop(a, b):
+    """IoU của hai khung [x1, y1, x2, y2]."""
+    ix = max(0.0, min(a[2], b[2]) - max(a[0], b[0]))
+    iy = max(0.0, min(a[3], b[3]) - max(a[1], b[1]))
+    i = ix * iy
+    u = (a[2] - a[0]) * (a[3] - a[1]) + (b[2] - b[0]) * (b[3] - b[1]) - i
+    return i / u if u > 0 else 0.0
+
+
 class PPEViolationTracker:
     # Tên hiển thị tiếng Việt cho từng loại PPE
     PPE_VN = {
@@ -146,6 +155,20 @@ class PPEViolationTracker:
     # Găng bão hoà ở 2.0s. Chọn 3.0s chỉ thêm 5 điểm giày mà đổi lấy thêm 1 giây
     # mù khi người ta THÁO đồ ra. Đặt bằng EVIDENCE_WINDOW cho nhất quán.
     HOLD_SECONDS = 2.5
+
+    # Khung GIÀY ôm đúng chiếc giày, neo vào điểm cổ chân (tươi từng khung, còn ô giày của
+    # model phụ chỉ cập nhật mỗi PPE_MOI_N_KHUNG khung). Giày nằm DƯỚI và to hơn ô vuông nhỏ
+    # quanh cổ chân nên khung cũ trượt lên ống chân. Bốn số, đơn vị = chiều dài cẳng chân
+    # (gối -> cổ chân): (dịch dọc theo cẳng, dịch ngang cẳng, rộng, cao). Là TRUNG VỊ đo trên
+    # 259 bàn chân của 3 video mẫu (ô giày ppe_boots.pt so với điểm khớp). Chỉnh ở đây nếu
+    # khung vẫn lệch trên camera thật; chiếc giày nào được model phụ thấy thì độ lệch/cỡ
+    # riêng của nó đè lên số này (xem _chan trong process_frame).
+    CHAN_MAU = (0.107, 0.054, 0.663, 0.646)
+    # Dịch khung XUỐNG thêm (đơn vị = chiều dài cẳng chân), áp cho cả khung mặc định lẫn khung
+    # lấy theo ô giày của model: ô giày của model hay bao cả mắt cá nên cao hơn thân giày, nhìn
+    # trên màn hình khung vẫn "ở cổ chân". 0.15 chọn bằng mắt trên ảnh thật (0.107 + 0.15 ~ 0.25
+    # cổ chân -> thân giày; 0.35 trở lên bắt đầu tụt xuống nền). Bỏ về 0 nếu muốn khớp ô model.
+    CHAN_XUONG = 0.15
     # Ba model PPE ăn 93% thời gian (216+203+195 ms) còn model tư thế chỉ 45 ms.
     # Mà tư thế mới quyết định VỊ TRÍ khung, còn PPE quyết định CÓ/THIẾU — thứ
     # thay đổi rất chậm (không ai tháo găng trong 1/10 giây).
@@ -244,6 +267,7 @@ class PPEViolationTracker:
         self._ppe_last_seen = {}
         # trackId -> {tên món: (hộp theo TỈ LỆ trong khung người, thời điểm, conf)}
         self._part_memory = {}
+        self._chan_lech = {}         # (mã người, khớp cổ chân) -> độ lệch/cỡ riêng của chiếc giày + thời điểm
         # trackId -> lần ĐẦU TIÊN thấy người này (để tính thời gian quan sát)
         self._lan_dau_thay = {}
         self._dem_khung = 0          # đếm khung để biết khi nào chạy lại model PPE
@@ -302,6 +326,8 @@ class PPEViolationTracker:
         # iou=0.5 (mặc định 0.7): TTA đẻ box trùng (4 box cho 2 bàn chân) -> siết NMS
         # bớt 19% box thừa mà KHÔNG mất frame nào.
         self._dem_khung += 1
+        if self._dem_khung % 300 == 0:
+            self._chan_lech = {k: v for k, v in self._chan_lech.items() if time.time() - v[4] <= 10}
         results = self.model.track(frame, persist=True, conf=self.confidence,
                                    imgsz=self.imgsz, tracker=TRACKER_CFG,
                                    augment=True, iou=0.5, verbose=False)[0]
@@ -665,6 +691,78 @@ class PPEViolationTracker:
             _than = _bao_khop([5, 6, 11, 12], 0.15, 0.10) or \
                     [px1 + pw * 0.18, py1 + ph * 0.22, px2 - pw * 0.18, py1 + ph * 0.62]
 
+            _chan_dung = set()   # ô giày model đã gán cho một bàn chân của người này
+
+            def _chan(idx, knee):
+                """Khung ôm chiếc giày tại cổ chân `idx` (gối `knee`); None nếu thiếu khớp.
+
+                Vị trí neo vào cổ chân HIỆN TẠI nên bám theo người từng khung. Hình dạng =
+                CHAN_MAU cộng độ lệch riêng học từ ô giày model phụ vừa thấy gần bàn chân
+                này (đúng hướng mũi giày, đúng cỡ); khung kế tiếp mà model không chạy thì
+                dùng lại độ lệch đó trong HOLD_SECONDS giây."""
+                if not (_kc_ok(idx) and _kc_ok(knee)):
+                    return None
+                ax, ay = _k[idx]
+                kx, ky = _k[knee]
+                d = ((ax - kx) ** 2 + (ay - ky) ** 2) ** 0.5
+                if d < 20 or not (0 <= ax <= frame.shape[1] and 0 <= ay <= frame.shape[0]):
+                    return None
+                ux, uy = (ax - kx) / d, (ay - ky) / d      # dọc cẳng chân, hướng xuống bàn chân
+                vx, vy = -uy, ux                           # ngang cẳng chân
+                mau = self.CHAN_MAU
+                khoa = (p['id'], idx)
+                if p['id'] is not None and not getattr(self, 'parts_models_bo_qua', True):
+                    gan = None   # ô giày TƯƠI (khung này model phụ vừa chạy) gần cổ chân nhất
+                    for it in items:
+                        if it.get('giu') or it['name'] not in ('boots', 'no_boots') or id(it) in _chan_dung:
+                            continue
+                        dx = (it['box'][0] + it['box'][2]) / 2 - ax
+                        dy = (it['box'][1] + it['box'][3]) / 2 - ay
+                        kc = (dx * dx + dy * dy) ** 0.5
+                        if kc < ph * 0.20 and (gan is None or kc < gan[0]):
+                            gan = (kc, it, dx, dy)
+                    if gan:
+                        _chan_dung.add(id(gan[1]))
+                        _, it, dx, dy = gan
+                        self._chan_lech[khoa] = (
+                            (dx * ux + dy * uy) / d - mau[0], (dx * vx + dy * vy) / d - mau[1],
+                            (it['box'][2] - it['box'][0]) / d - mau[2],
+                            (it['box'][3] - it['box'][1]) / d - mau[3], _now)
+                lech = self._chan_lech.get(khoa)
+                da, db, dw, dh = lech[:4] if lech and _now - lech[4] <= self.HOLD_SECONDS else (0, 0, 0, 0)
+                w = min(max(mau[2] + dw, 0.3), 1.1) * d
+                h = min(max(mau[3] + dh, 0.3), 1.1) * d
+                w, h = max(min(w, ph * 0.17), 12), max(min(h, ph * 0.17), 12)
+                xuong = mau[0] + da + self.CHAN_XUONG
+                cx = ax + (xuong * ux + (mau[1] + db) * vx) * d
+                cy = ay + (xuong * uy + (mau[1] + db) * vy) * d
+                return [cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2]
+
+            def _khung_giay():
+                """Khung cho từng bàn chân. Model tư thế đôi khi đặt CẢ HAI cổ chân lên cùng một
+                bàn chân (chân kia bị che / nhoè) -> hai khung chồng nhau trên một chân, chân
+                còn lại không có khung. Hai khung chồng nhau thì chỉ giữ một, và khung chân
+                kia lấy từ ô giày model phụ thấy ở chỗ khác (nếu có), không có thì để trống
+                còn hơn vẽ trùng."""
+                cac = [b for b in (_chan(15, 13) or _tu_khop(15, 13, 0.22),
+                                   _chan(16, 14) or _tu_khop(16, 14, 0.22)) if b]
+                if len(cac) < 2 or _iou_hop(cac[0], cac[1]) <= 0.3:
+                    return cac
+                giu = cac[0]
+                dich = (giu[3] - giu[1]) * (self.CHAN_XUONG / self.CHAN_MAU[3])   # cùng độ dịch xuống như _chan
+                ung = None
+                for it in items:
+                    if it['name'] not in ('boots', 'no_boots') or not self._center_inside(it['box'], p['box']):
+                        continue
+                    if (it['box'][1] + it['box'][3]) / 2 < py1 + ph * 0.5 or _iou_hop(it['box'], giu) >= 0.2:
+                        continue
+                    if ung is None or it['conf'] > ung['conf']:
+                        ung = it
+                if ung is None:
+                    return [giu]
+                b = ung['box']
+                return [giu, [b[0], b[1] + dich, b[2], b[3] + dich]]
+
             # món -> (tên hiển thị, các khung để vẽ)
             _mon_khung = {
                 'helmet': ('MŨ', [head_helmet_box if helmet_on_head else _dau]),
@@ -675,8 +773,7 @@ class PPEViolationTracker:
                 # bàn tay đo theo cẳng tay (khuỷu 7/8 -> cổ tay 9/10)
                 # bàn chân đo theo cẳng chân (gối 13/14 -> cổ chân 15/16)
                 'gloves': ('GĂNG', [b for b in (_tu_khop(9, 7), _tu_khop(10, 8)) if b]),
-                'boots':  ('GIÀY', [b for b in (_tu_khop(15, 13, 0.22),
-                                                _tu_khop(16, 14, 0.22)) if b]),
+                'boots':  ('GIÀY', _khung_giay()),
             }
             for _mon, (_ten, _khung_list) in _mon_khung.items():
                 if _mon not in self.required_ppe:
