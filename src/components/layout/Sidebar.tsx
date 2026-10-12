@@ -20,7 +20,6 @@ import {
   ShieldAlert,
   BarChart3,
   FileText,
-  ScanSearch,
   Users,
   Settings,
   ChevronLeft,
@@ -47,7 +46,6 @@ const navItems: NavItem[] = [
   { label: 'Phân tích', href: '/analytics', icon: BarChart3 },
   { label: 'Báo cáo', href: '/reports', icon: FileText },
   { label: 'Agent', href: '/agent', icon: Bot },
-  { label: 'Kiểm thử Roboflow', href: '/roboflow', icon: ScanSearch },
   { label: 'Người dùng', href: '/users', icon: Users },
   { label: 'Cài đặt', href: '/settings', icon: Settings },
 ];

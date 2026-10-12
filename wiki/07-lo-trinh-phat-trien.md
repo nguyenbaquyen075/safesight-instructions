@@ -10,7 +10,7 @@ Cập nhật 2026-09-08 theo hiện trạng code (thay cho bảng cũ trong `SPE
 - Cảnh báo Telegram theo `AlertRule` (threshold, cooldown), cấu hình qua Settings.
 - Quản lý camera thật (webcam/RTSP) và gắn video mẫu qua giao diện.
 - Cảnh báo bằng giọng nói: mic trên `/cameras` → `/site-speaker`.
-- Trang `/roboflow` đối chiếu model cloud trên ảnh tĩnh.
+- Trang `/roboflow` đối chiếu model cloud trên ảnh tĩnh (đã gỡ khỏi dashboard; script `ai-engine/roboflow_workflow.py` vẫn còn).
 - Agent giám sát tự động (`agent/`, tiến trình thứ 4): trực vận hành (sweep 5 phát hiện + tự khắc phục) + cán bộ an toàn (review vi phạm bằng bằng chứng/band, leo thang Telegram, digest, báo cáo ca) + trợ lý hỏi đáp (trang `/agent`, tab Agent trong modal vi phạm/camera/site). Xem [Agent giám sát tự động](09-agent.md).
 - Subagent theo camera (v0.8.0): `CameraAgent` bật/tắt, trí nhớ, trần token riêng, digest định kỳ; lane nghiên cứu song song; skill chuẩn `SKILL.md`.
 - Lộ trình v0.9.0 (9 tính năng, PR #4–#21): vùng nhận diện Zone/ROI theo camera; kênh cảnh báo Zalo OA và Webhook; tạo người dùng, đổi mật khẩu, nhật ký thao tác; giao diện di động + PWA; trang `/reports` (CSV/in) và báo cáo tuần của agent; tỉ lệ tuân thủ từ số người quan sát được; clip bằng chứng 8s; bản đồ nhiệt vi phạm; chạy trên PostgreSQL và nhiều worker agent.

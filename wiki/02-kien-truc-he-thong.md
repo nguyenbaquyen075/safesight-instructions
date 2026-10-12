@@ -62,7 +62,7 @@ Nguồn video ──▶ ppe_tracker.process_frame() ──(HTTP)──▶ yolo_b
 - **Vì sao tách Bridge?** Python (AI, có thể chạy trên máy GPU) và frontend độc lập; Bridge là điểm nối chuẩn hoá, dễ thay nguồn AI về sau.
 - **Python đọc thẳng SQLite** (`prisma/dev.db`, chế độ chỉ đọc) để biết danh sách camera vì tiến trình AI khởi động trước khi Next.js sẵn sàng.
 - **Bridge chưa có xác thực** (ghi chú `ponytail:` trong file) — chỉ dùng trong localhost/máy demo.
-- Roboflow (`ai-engine/roboflow_workflow.py`, trang `/roboflow`) chỉ dùng cho **ảnh tĩnh** để đối chiếu; pipeline camera luôn chạy model local.
+- Roboflow (`ai-engine/roboflow_workflow.py`) chỉ dùng cho **ảnh tĩnh** để đối chiếu; pipeline camera luôn chạy model local.
 
 ## Cổng mạng (mặc định)
 

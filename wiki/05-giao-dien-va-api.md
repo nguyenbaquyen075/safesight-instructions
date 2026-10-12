@@ -24,7 +24,6 @@ Badge số ở mục "Thông báo" của Sidebar lấy từ DB qua `useOpenViola
 | `/alerts` | `(dashboard)/alerts/page.tsx` | tất cả | Danh sách cảnh báo từ vi phạm thật |
 | `/violations` | `(dashboard)/violations/page.tsx` | tất cả | Bảng vi phạm + modal chi tiết (ảnh snapshot) |
 | `/analytics` | `(dashboard)/analytics/page.tsx` | SUPER_ADMIN, ORG_ADMIN, SITE_MANAGER, SAFETY_OFFICER | Xu hướng tuân thủ + donut vi phạm, bản đồ nhiệt vi phạm theo giờ×thứ và theo vị trí camera (lọc 7/30/90 ngày) |
-| `/roboflow` | `(dashboard)/roboflow/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Kéo thả ảnh, đối chiếu model cloud (tốn credit) |
 | `/users` | `(dashboard)/users/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Quản lý người dùng |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, Zalo OA, quy tắc cảnh báo |
 | `/settings` | `(dashboard)/settings/page.tsx` | SUPER_ADMIN, ORG_ADMIN | Giám sát (camera thật/video mẫu), Telegram bot, quy tắc cảnh báo, tab "Nhật ký" (`AuditLogCard`, đọc `GET /api/audit-log`) |
@@ -72,7 +71,7 @@ Tất cả route đọc/ghi DB thật qua Prisma (`src/lib/prisma.ts`). Middlewa
 | `/api/settings/telegram/test` | POST | Gọi `getMe` kiểm tra token |
 | `/api/settings/zalo` | GET, POST | Lưu access token OA (mã hoá) + bật/tắt; POST ghi `AuditLog` (không log token thô) |
 | `/api/settings/zalo/test` | POST | Gọi `getoa` kiểm tra access token |
-| `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin |
+| `/api/roboflow` | POST | Gọi Roboflow Workflow phía server, giữ API key; chỉ admin (trang `/roboflow` đã gỡ nên hiện không có giao diện gọi tới) |
 | `/api/reports/agent-feedback` | GET | Cần session; `?siteId&from&to` (cùng cách hiểu khoảng ngày với `/api/stats/agent-accuracy`) → CSV `text/csv; charset=utf-8` có BOM + `Content-Disposition: attachment`, cột `violationId,cameraId,type,detectedAt,snapshotUrl,clipUrl,agentVerdict,band,humanCorrect,note`, tối đa `MAX_FEEDBACK_ROWS` = 20.000 dòng mới nhất — chạm trần thì thêm header `X-Truncated: true` và tên file có đuôi `-partial`. Chỉ vi phạm đã có phản hồi của người — bộ dữ liệu retrain, xem [Train model](08-train-model-them-ppe.md) |
 | `/api/reports/violations` | GET | Cần session; `?siteId&cameraId&from&to` (mặc định 7 ngày, biên ngày tính theo UTC như `/api/stats/compliance`, `siteId` ngoài phạm vi → 403) → `{ range, byCamera, rows }`, `rows` tối đa 2.000 dòng mới nhất. Gộp theo camera bằng `buildReportSummary` trong `src/lib/report-shape.ts` |
 | `/api/agent/tasks` | GET | `?status=open\|done&subjectType&subjectId` |

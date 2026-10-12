@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thay đổi
+- **Gỡ trang "Kiểm thử Roboflow"** (`/roboflow`) khỏi dashboard: bỏ mục ở thanh bên, bỏ trang và quyền xem trang (`PAGE_ROLES`). Script `ai-engine/roboflow_workflow.py` và route `POST /api/roboflow` (chỉ admin, tốn 1 credit mỗi lần gọi) vẫn còn nhưng không còn giao diện nào gọi tới.
+
 ### Sửa
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
