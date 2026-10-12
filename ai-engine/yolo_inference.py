@@ -99,6 +99,11 @@ def load_real_camera_overrides():
     except (OSError, json.JSONDecodeError):
         demo_cam_ids = set()
 
+    # Roster camera mẫu (cam-001...cam-012, khớp src/data/mock-cameras.ts) cũng là DEMO dù
+    # chưa có video trong camera-videos.json: rtspUrl của chúng là dữ liệu giả. Camera thật
+    # do người dùng thêm có id dạng cuid nên không trùng mẫu này.
+    demo_cam_ids |= {row[0] for row in rows if re.fullmatch(r"cam-\d{3}", row[0] or "")}
+
     overrides = {}
     for cam_id, rtsp_url, status in rows:
         if cam_id in demo_cam_ids and not (rtsp_url or "").startswith("video:"):

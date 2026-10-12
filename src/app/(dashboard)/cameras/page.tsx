@@ -38,15 +38,16 @@ import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 // "video:ten.mp4"), rồi mới đến video mặc định trong camera-videos.json.
 // Thiếu bước này thì đổi video xong trang vẫn chiếu video cũ — file json là
 // tĩnh, không biết gì về lựa chọn mới.
-function videoForCamera(cameraId: string, source?: string): string {
+function videoForCamera(cameraId: string, source?: string): string | null {
   if (source?.startsWith('video:')) {
     const file = source.slice(6);
     if (file && !file.includes('/') && !file.includes('..')) {
       return `/videos/${encodeURIComponent(file)}`;
     }
   }
-  const file = (cameraVideos as Record<string, string>)[cameraId] || '210321.mp4';
-  return `/videos/${encodeURIComponent(file)}`;
+  // Camera không có video demo nào (không có trong camera-videos.json, chưa gắn "video:...") -> không dựng ô demo
+  const file = (cameraVideos as Record<string, string>)[cameraId];
+  return file ? `/videos/${encodeURIComponent(file)}` : null;
 }
 
 // --- Sub-components ---
@@ -468,7 +469,7 @@ export default function CamerasPage() {
           date: new Date().toLocaleDateString(),
           time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           timestamp: now,
-          clipUrl: videoForCamera(cam.id, cam.rtspUrl),   // video vi phạm ĐÚNG của camera này (chỉ trả 1 lần)
+          clipUrl: videoForCamera(cam.id, cam.rtspUrl) ?? undefined,   // video vi phạm ĐÚNG của camera này (chỉ trả 1 lần)
           description: `AI phát hiện ${v.label} tại khu vực ${cam.name}.`
         };
 
@@ -485,14 +486,16 @@ export default function CamerasPage() {
 
   // Danh sách camera online (thật + demo) + phát hiện AI hiện tại — dùng chung cho
   // lưới xem trực tiếp bên dưới VÀ bảng tổng quan tuân thủ PPE cuối trang.
-  const demoTiles = mockCameras.filter(c => c.status === CameraStatus.ONLINE && existingDemoIds.has(c.id)).slice(0, 6).map(cam => {
+  const demoTiles = mockCameras.filter(c => c.status === CameraStatus.ONLINE && existingDemoIds.has(c.id)).slice(0, 6).flatMap(cam => {
     const detections = getDetectionsForCamera(cam.id);
     // Ô demo lấy thông tin hiển thị từ mock-cameras.ts (file TĨNH), nhưng nguồn
     // video phải lấy từ DB — đó mới là chỗ ghi video anh chọn qua Cài đặt. Thiếu
     // dòng này thì đổi video xong ô vẫn chiếu video cũ, trong khi AI đã phân tích
     // video mới -> khung nhận diện nằm lệch hẳn khỏi hình.
     const fromDb = allCameras?.find(c => c.id === cam.id);
-    return { id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl: videoForCamera(cam.id, fromDb?.rtspUrl) };
+    const videoUrl = videoForCamera(cam.id, fromDb?.rtspUrl);
+    if (!videoUrl) return [];
+    return [{ id: cam.id, cam, isDemo: true as const, detections, hasViolation: detections.some(d => d.isViolation), videoUrl }];
   });
   const realTiles = (realCameras ?? []).filter(c => c.status === CameraStatus.ONLINE).map(cam => {
     const parsed = parseCameraSource(cam.rtspUrl);
@@ -552,7 +555,7 @@ export default function CamerasPage() {
             </div>
             <h1 className="text-4xl font-black text-[var(--text-primary)] tracking-tighter">TRUNG TÂM GIÁM SÁT AI</h1>
           </div>
-          <p className="text-[var(--text-muted)] text-sm max-w-xl">Hệ thống giám sát thông minh thời gian thực xử lý 16 luồng trực tiếp với phân tích AI hành vi.</p>
+          <p className="text-[var(--text-muted)] text-sm max-w-xl">Hệ thống giám sát thông minh thời gian thực xử lý {onlineCameraTiles.length} luồng trực tiếp với phân tích AI hành vi.</p>
         </div>
         <div className="w-full lg:w-80">
           <LiveLog lastEvent={lastEvent} />
@@ -561,7 +564,7 @@ export default function CamerasPage() {
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { label: 'Luồng hoạt động', value: '16', icon: Wifi, color: 'success' },
+          { label: 'Luồng hoạt động', value: String(onlineCameraTiles.length), icon: Wifi, color: 'success' },
           { label: 'Bộ xử lý AI', value: '4/4', icon: Cpu, color: 'primary' },
           { label: 'Độ trễ', value: '8ms', icon: Activity, color: 'info' },
           { label: 'Tiêu chuẩn Mũ', value: 'Xanh (CRC)', icon: ShieldCheck, color: 'success' },

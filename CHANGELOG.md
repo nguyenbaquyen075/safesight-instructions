@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thay đổi
+- **Chỉ còn 2 video demo** (`IMG_2744 2.MOV` cho cam-007, `IMG_2745 2.MOV` cho cam-008): xoá `public/videos/210321.mp4` và `test1.mp4`, `src/data/camera-videos.json` chỉ còn hai camera đó. Trang `/cameras` không còn video mặc định `210321.mp4`: camera demo không có video thì không dựng ô; số "Luồng hoạt động" và câu mô tả trên đầu trang lấy theo số luồng đang hiện thay cho số 16 viết cứng. Bỏ `videoUrl` chết trong `mock-cameras.ts`, thumbnail `AlertTimeline` và dữ liệu mẫu `mock-violations.ts` trỏ sang video còn lại. `training/generate_dataset.py` vẫn đọc `test1.mp4` để tạo dữ liệu huấn luyện — muốn chạy lại phải khôi phục file này từ lịch sử git.
+
 ### Sửa
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
