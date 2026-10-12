@@ -177,11 +177,19 @@ export default function ViolationsPage() {
                {violation.clipUrl ? (
                  <video 
                    src={violation.clipUrl} 
+                   poster={violation.snapshotUrl}
                    className="w-full h-full object-cover opacity-60 group-hover:scale-110 transition-transform duration-1000"
                    muted
                    loop
                    onMouseOver={e => (e.target as HTMLVideoElement).play()}
                    onMouseOut={e => (e.target as HTMLVideoElement).pause()}
+                 />
+               ) : violation.snapshotUrl ? (
+                 // eslint-disable-next-line @next/next/no-img-element
+                 <img
+                   src={violation.snapshotUrl}
+                   alt="Ảnh bằng chứng"
+                   className="w-full h-full object-cover opacity-80 group-hover:scale-110 transition-transform duration-1000"
                  />
                ) : (
                  <div className="w-full h-full bg-gradient-to-br from-zinc-900 to-black flex items-center justify-center">
