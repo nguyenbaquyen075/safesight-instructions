@@ -48,11 +48,16 @@ function exportViolationsCsv(rows: Violation[]) {
   URL.revokeObjectURL(url);
 }
 
+// Chỉ dựng một phần danh sách mỗi lần: API trả về TOÀN BỘ vi phạm (dev.db thật ~3.700 dòng) và trang tự
+// tải lại mỗi 15s; dựng hết ~3.700 thẻ cùng lúc (~250.000 phần tử) làm trang đứng hình ~20s mỗi lần tải.
+const PAGE_SIZE = 24;
+
 export default function ViolationsPage() {
   const mounted = useMounted();
   type SeverityFilter = 'TẤT CẢ' | 'NGHIÊM TRỌNG' | 'CAO';
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
   const [selectedViolation, setSelectedViolation] = useState<Violation | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { data: violations = [] } = useViolations();
   const { data: kpis } = useDashboardKPIs();
   const deleteViolation = useDeleteViolation();
@@ -119,7 +124,7 @@ export default function ViolationsPage() {
              {['ALL', Severity.CRITICAL, Severity.HIGH].map(s => (
                <button
                  key={s}
-                 onClick={() => setFilter(getFilterLabel(s) as SeverityFilter)}
+                 onClick={() => { setFilter(getFilterLabel(s) as SeverityFilter); setVisibleCount(PAGE_SIZE); }}
                  className={cn(
                    "px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all whitespace-nowrap",
                    (filter === getFilterLabel(s)) ? "bg-[var(--primary)] text-white shadow-lg" : "text-[var(--text-muted)] hover:text-white"
@@ -165,12 +170,12 @@ export default function ViolationsPage() {
 
       {/* Content Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {allViolations.map((violation, idx) => (
+        {allViolations.slice(0, visibleCount).map((violation, idx) => (
           <div 
             key={violation.id}
             onClick={() => setSelectedViolation(violation)}
             className="group bg-[var(--surface)] border border-[var(--border)] rounded-[2.5rem] overflow-hidden hover:border-[var(--primary)]/30 transition-all duration-500 hover:shadow-2xl animate-fade-up cursor-pointer"
-            style={{ animationDelay: `${idx * 100}ms` }}
+            style={{ animationDelay: `${(idx % PAGE_SIZE) * 100}ms` }}
           >
             {/* Media Preview */}
             <div className="relative aspect-video bg-black overflow-hidden">
@@ -302,6 +307,18 @@ export default function ViolationsPage() {
           </div>
         ))}
       </div>
+
+      {allViolations.length > visibleCount && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <p className="text-xs text-[var(--text-muted)]">Đang hiện {Math.min(visibleCount, allViolations.length)} / {allViolations.length} vi phạm</p>
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="px-6 py-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-black uppercase tracking-widest text-[var(--text-primary)] hover:border-[var(--primary)]/40 transition-all"
+          >
+            Hiện thêm {Math.min(PAGE_SIZE, allViolations.length - visibleCount)}
+          </button>
+        </div>
+      )}
     </div>
   );
 }

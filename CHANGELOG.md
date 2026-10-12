@@ -5,6 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Sửa
+- **Trang `/violations` và `/alerts` hết lag/treo**: trước đây dựng mọi vi phạm cùng lúc — API trả toàn bộ (dev.db thật ~3.700 dòng, 2 MB) nên `/violations` có ~249.000 phần tử, thẻ đầu tiên hiện sau ~22 giây, luồng chính bận ~20 giây khi tải và thêm ~13 giây mỗi lần tự tải lại 15 giây; `/alerts` ~180.000 phần tử, bận gần 15 giây trong mỗi 15 giây nhàn rỗi. Giờ `/violations` dựng 24 thẻ đầu và `/alerts` 20 thông báo đầu, nút "Hiện thêm" mỗi lần thêm một trang, đặt lại khi đổi bộ lọc hoặc tìm kiếm: ~1.200–1.900 phần tử, hiện sau ~0,3 giây, chu kỳ tải lại 15 giây chỉ bận vài chục ms. Thống kê, xuất CSV và "Đánh dấu tất cả đã đọc" vẫn tính trên toàn bộ danh sách.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
 - Video demo `210321.mp4` (cam-001/cam-005), `IMG_2744 2.MOV` (cam-007), `IMG_2745 2.MOV` (cam-008) chuyển mã từ HEVC/H.265 4K sang **H.264 720p**: Chrome/Linux không giải mã HEVC nên ô video đen trong khi engine (OpenCV) vẫn đọc được và đẩy khung nhận diện — nhìn như "không có video mà model vẫn bắt". File nhỏ hơn nhiều lần, engine không đổi.

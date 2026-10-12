@@ -27,12 +27,17 @@ import type { Violation } from '@/types/models';
 
 type SeverityFilter = 'TẤT CẢ' | 'NGHIÊM TRỌNG' | 'CAO' | 'TRUNG BÌNH' | 'THẤP';
 
+// Chỉ dựng một phần danh sách mỗi lần: dev.db thật ~3.700 vi phạm nên dựng hết là ~180.000 phần tử và
+// trình duyệt gần như treo liên tục (mỗi lần tự tải lại 15s lại dựng lại toàn bộ).
+const PAGE_SIZE = 20;
+
 export default function AlertsPage() {
   const [filter, setFilter] = useState<SeverityFilter>('TẤT CẢ');
   const [search, setSearch] = useState('');
   const mounted = useMounted();
   const readIds = useReadAlertIds();
   const [selectedAlert, setSelectedAlert] = useState<Violation | null>(null);
+  const [visibleCount, setVisibleCount] = useState(PAGE_SIZE);
   const { data: allAlerts = [] } = useViolations();
 
   if (!mounted) return null;
@@ -114,7 +119,7 @@ export default function AlertsPage() {
             type="text" 
             placeholder="Tìm kiếm theo công trình hoặc camera..." 
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => { setSearch(e.target.value); setVisibleCount(PAGE_SIZE); }}
             className="w-full pl-11 pr-4 py-2.5 bg-[var(--background-secondary)] border border-[var(--border)] rounded-2xl text-sm focus:border-[var(--primary)] outline-none transition-all"
           />
         </div>
@@ -123,7 +128,7 @@ export default function AlertsPage() {
           {['TẤT CẢ', 'NGHIÊM TRỌNG', 'CAO', 'TRUNG BÌNH', 'THẤP'].map(s => (
             <button
               key={s}
-              onClick={() => setFilter(s as SeverityFilter)}
+              onClick={() => { setFilter(s as SeverityFilter); setVisibleCount(PAGE_SIZE); }}
               className={cn(
                 "px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest border transition-all whitespace-nowrap",
                 filter === s 
@@ -139,11 +144,11 @@ export default function AlertsPage() {
 
       {/* Alerts Feed */}
       <div className="space-y-4">
-        {filteredAlerts.map((alert, idx) => (
+        {filteredAlerts.slice(0, visibleCount).map((alert, idx) => (
           <div 
             key={alert.id}
             className="group relative bg-[var(--surface)] border border-[var(--border)] p-6 rounded-[2.5rem] hover:border-[var(--primary)]/30 transition-all duration-300 hover:shadow-xl animate-fade-up"
-            style={{ animationDelay: `${idx * 50}ms` }}
+            style={{ animationDelay: `${(idx % PAGE_SIZE) * 50}ms` }}
           >
             <div className="flex flex-col lg:flex-row gap-6 items-start">
               {/* Severity Indicator */}
@@ -221,6 +226,18 @@ export default function AlertsPage() {
           </div>
         ))}
       </div>
+
+      {filteredAlerts.length > visibleCount && (
+        <div className="flex flex-col items-center gap-2 pt-2">
+          <p className="text-xs text-[var(--text-muted)]">Đang hiện {Math.min(visibleCount, filteredAlerts.length)} / {filteredAlerts.length} thông báo</p>
+          <button
+            onClick={() => setVisibleCount(c => c + PAGE_SIZE)}
+            className="px-6 py-3 rounded-xl bg-[var(--surface)] border border-[var(--border)] text-xs font-black uppercase tracking-widest text-[var(--text-primary)] hover:border-[var(--primary)]/40 transition-all"
+          >
+            Hiện thêm {Math.min(PAGE_SIZE, filteredAlerts.length - visibleCount)}
+          </button>
+        </div>
+      )}
     </div>
   );
 }
