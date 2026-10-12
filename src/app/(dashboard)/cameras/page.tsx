@@ -15,10 +15,13 @@ import {
   Terminal,
   Cpu,
   ShieldCheck,
-  Radio
+  Radio,
+  Volume2,
+  VolumeX
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useYolo, Detection } from '@/hooks/useYolo';
+import { useAutoSpeaker } from '@/hooks/useAutoSpeaker';
 import { useMounted } from '@/hooks/use-mounted';
 import { mockCameras } from '@/data/mock-cameras';
 import type { Camera } from '@/types/models';
@@ -28,6 +31,17 @@ import { MicButton } from '@/components/cameras/MicButton';
 import { WebcamPreview } from '@/components/cameras/WebcamPreview';
 import { useCameras } from '@/hooks/use-cameras';
 import { parseCameraSource } from '@/lib/camera-source';
+
+// Tên món bảo hộ khi đọc to (khoá khớp `missingPpe` do ppe_tracker.py gửi)
+const SPOKEN_PPE: Record<string, string> = {
+  helmet: 'mũ bảo hộ',
+  vest: 'áo phản quang',
+  gloves: 'găng tay',
+  boots: 'giày bảo hộ',
+};
+
+const joinVietnamese = (items: string[]) =>
+  items.length > 1 ? `${items.slice(0, -1).join(', ')} và ${items[items.length - 1]}` : items[0];
 import { DEMO_CAMERA_IDS } from '@/lib/camera-shape';
 import { SubjectAgentPanel } from '@/components/agent/SubjectAgentPanel';
 
@@ -407,6 +421,22 @@ export default function CamerasPage() {
   const { isConnected, lastEvent, getDetectionsForCamera, getVideoPosForCamera } = useYolo();
   const { data: allCameras, isLoading: camerasLoading } = useCameras({ includeDemo: true });
   const realCameras = allCameras?.filter(c => !DEMO_CAMERA_IDS.has(c.id));
+  // Loa tự động: đọc to các lỗi hệ thống đang bắt được theo vòng (camera cách nhau 2s, nghỉ 10s giữa 2 vòng), dạng "Tại <camera>, thiếu <món>. Yêu cầu khắc phục ngay."
+  const [autoSpeak, setAutoSpeak] = React.useState(false);
+  const { error: speakError, speak } = useAutoSpeaker(autoSpeak, () =>
+    (allCameras ?? []).flatMap(cam => {
+      const missing = new Set<string>();
+      let violating = false;
+      getDetectionsForCamera(cam.id).forEach(d => {
+        if (d.type !== 'person' || !d.isViolation) return;
+        violating = true;
+        d.missingPpe?.forEach(m => missing.add(m));
+      });
+      if (!violating) return [];
+      const items = [...missing].map(m => SPOKEN_PPE[m] ?? m);
+      return [{ key: cam.id, text: `Tại ${cam.name}, ${items.length ? `thiếu ${joinVietnamese(items)}` : 'vi phạm an toàn'}. Yêu cầu khắc phục ngay.` }];
+    })
+  );
   // Camera demo đã bị xoá (qua Cài đặt > Giám sát) sẽ mất khỏi đây -> không hiện
   // trên lưới nữa. Trong lúc đang tải, coi như còn đủ để khỏi nhấp nháy mất rồi hiện lại.
   const existingDemoIds = camerasLoading
@@ -610,6 +640,28 @@ export default function CamerasPage() {
                 <span className="text-xs text-[var(--text-muted)]">
                   Hiển thị {visibleCameras.length} / {onlineCameraTiles.length} luồng
                 </span>
+              )}
+              <button
+                onClick={() => {
+                  const next = !autoSpeak;
+                  setAutoSpeak(next);
+                  // Đọc ngay trong lúc bấm: mở quyền phát âm và cho người dùng nghe được loa đã bật
+                  if (next) speak('Loa tự động đã bật.');
+                  else window.speechSynthesis?.cancel();
+                }}
+                aria-pressed={autoSpeak}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-2 rounded-xl border text-xs font-black uppercase tracking-widest transition-all",
+                  autoSpeak
+                    ? "bg-[var(--success)] border-[var(--success)] text-white"
+                    : "bg-[var(--surface)] border-[var(--border)] text-[var(--text-muted)] hover:text-[var(--text-primary)]"
+                )}
+              >
+                {autoSpeak ? <Volume2 className="w-3.5 h-3.5" /> : <VolumeX className="w-3.5 h-3.5" />}
+                {autoSpeak ? 'Loa tự động: Bật' : 'Loa tự động: Tắt'}
+              </button>
+              {autoSpeak && speakError && (
+                <span className="text-xs text-[var(--danger)] max-w-xs">{speakError}</span>
               )}
               <div className="flex items-center gap-1 p-1 rounded-xl bg-[var(--surface)] border border-[var(--border)]">
                 <button
