@@ -4,6 +4,9 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 
 ## [Unreleased]
 
+### Thay đổi
+- Video demo cam-007 (`public/videos/IMG_2744 2.MOV`) cắt còn **31,4 giây** (trước 38,4): bỏ đoạn công nhân thứ hai đi vào khung ở cuối. Cắt không chuyển mã (H.264 720x1280 giữ nguyên, 942 khung đầu giống hệt từng điểm ảnh). Đoạn đó làm model găng `ppe_gang.pt` nhầm cổ tay áo rằn ri của người tay trần thành găng nên khung GĂNG xanh sai; cắt chỉ gỡ cảnh gây ra trên bản demo, model chưa được sửa.
+
 ### Sửa
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
