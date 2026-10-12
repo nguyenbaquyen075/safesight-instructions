@@ -163,7 +163,7 @@ POST /api/observations  ->  upsert ObservationStat(cameraId, minute, persons, pe
 
 **Găng/giày bắt buộc với cái giá đo được:** `required_ppe=('helmet','vest','gloves','boots')` được truyền từ `yolo_inference.py` (mặc định trong `PPEViolationTracker.__init__` vẫn là mũ + áo). Báo oan đo bằng `eval_ppe_decision.py`: mũ 4.7%, áo 3.1%, găng 8.7%, giày 6.3%. Để kéo găng/giày về ≤ 1% cần train lại (xem [08](08-train-model-them-ppe.md)). Cơ chế chống báo oan: cửa sổ bằng chứng `EVIDENCE_WINDOW=2.5s`, thời gian quan sát `THOI_GIAN_QUAN_SAT=3s` trước khi kết luận thiếu găng/giày, giữ khung `HOLD_SECONDS=2.5s`, và **thấy đồ thắng lớp phủ định**.
 
-**Kiến trúc nhiều model trong một tracker:** người/mũ/áo từ model chính; găng/giày từ model phụ chuyên lớp (`parts_models`), chạy mỗi `PPE_MOI_N_KHUNG=3` khung; `yolov8n-pose.pt` chạy mọi khung để đặt khung tại cổ tay/cổ chân và vùng đầu. Thiếu model phụ hay pose thì lùi về model chính, không dừng hệ thống.
+**Kiến trúc nhiều model trong một tracker:** người/mũ/áo từ model chính; găng/giày từ model phụ chuyên lớp (`parts_models`), chạy mỗi `PPE_MOI_N_KHUNG=3` khung; khung vẽ GIÀY neo vào điểm khớp cổ chân của model tư thế rồi căn theo `CHAN_MAU`/`CHAN_XUONG` (và độ lệch riêng học từ ô giày của model phụ) để ôm đúng chiếc giày, hai khung chồng nhau trên một chân thì bỏ bớt; `yolov8n-pose.pt` chạy mọi khung để đặt khung tại cổ tay/cổ chân và vùng đầu. Thiếu model phụ hay pose thì lùi về model chính, không dừng hệ thống.
 
 Ảnh minh hoạ vi phạm mẫu: `no_helmet.png`, `no_vest.png` (thư mục gốc repo).
 
