@@ -25,6 +25,7 @@ import {
   useViolationActions,
 } from '@/hooks/use-violations';
 import { useUsers } from '@/hooks/use-users';
+import { useLockBodyScroll } from '@/hooks/use-lock-body-scroll';
 import { useAnnounceCamera } from '@/hooks/use-cameras';
 import { DEFAULT_DUE_MS, type CorrectiveActionDTO } from '@/lib/corrective-action-shape';
 import { AgentReviewCard } from '@/components/agent/AgentReviewCard';
@@ -57,6 +58,7 @@ function ActionChip({ action }: { action: CorrectiveActionDTO }) {
 }
 
 export function ViolationDetailModal({ violation, onClose }: { violation: ViolationLike, onClose: () => void }) {
+  useLockBodyScroll();
   const [showAssign, setShowAssign] = useState(false);
   // clip_*.mp4 bị dọn (clear_snapshots) trong khi Violation.clipUrl còn giữ đường dẫn cũ
   // -> video 404 lúc phát; rơi về ảnh chốt thay vì ô video đen.
@@ -193,7 +195,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
 
         {/* Content Side — cột này cuộn riêng: màn hình thấp thì các nút ở đáy vẫn bấm được
             (min-h-0 để flex item chịu co lại, nếu không overflow-y-auto không có tác dụng). */}
-        <div className="w-full lg:w-96 min-h-0 overflow-y-auto p-10 flex flex-col justify-between border-l border-white/5">
+        <div className="w-full lg:w-96 min-h-0 overflow-y-auto overscroll-contain p-10 flex flex-col justify-between border-l border-white/5">
            <div className="space-y-8">
               <div className="flex justify-between items-start">
                  <div>
@@ -343,7 +345,7 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
         </div>
 
         {showAssign && (
-          <div className="absolute inset-0 z-10 bg-[var(--surface)] rounded-[3rem] p-8 sm:p-10 overflow-y-auto animate-in fade-in duration-300">
+          <div className="absolute inset-0 z-10 bg-[var(--surface)] rounded-[3rem] p-8 sm:p-10 overflow-y-auto overscroll-contain animate-in fade-in duration-300">
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-11 h-11 rounded-2xl bg-red-500/15 text-red-500 flex items-center justify-center">
@@ -359,15 +361,16 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
               </button>
             </div>
 
-            <div className="grid sm:grid-cols-2 gap-5">
-              <div className="sm:col-span-2 space-y-2">
+            {/* Trái: ảnh/clip vi phạm đầy đủ (không cắt); phải: thông tin giao việc. Màn hình hẹp xếp dọc. */}
+            <div className="grid lg:grid-cols-2 gap-8 items-stretch">
+              <div className="flex flex-col space-y-2">
                 <span className="text-[10px] font-black text-white/40 uppercase tracking-widest">Ảnh bằng chứng</span>
-                <div className="relative rounded-2xl overflow-hidden border border-white/10 h-40 bg-black">
+                <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-black h-72 lg:h-[min(62vh,560px)]">
                   {violation.snapshotUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element -- ảnh do AI engine ghi lúc chạy, không qua next/image
-                    <img src={violation.snapshotUrl} alt="Ảnh bằng chứng của vi phạm được giao xử lý" className="w-full h-full object-cover" />
+                    <img src={violation.snapshotUrl} alt="Ảnh bằng chứng của vi phạm được giao xử lý" className="w-full h-full object-contain" />
                   ) : violation.clipUrl ? (
-                    <video src={violation.clipUrl} muted playsInline preload="metadata" className="w-full h-full object-cover" />
+                    <video src={violation.clipUrl} muted playsInline preload="metadata" className="w-full h-full object-contain" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center text-white/20"><ShieldAlert className="w-10 h-10" /></div>
                   )}
@@ -375,63 +378,67 @@ export function ViolationDetailModal({ violation, onClose }: { violation: Violat
                 </div>
               </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="assignee-name" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Người xử lý</label>
-                {/* datalist: gợi ý người trong hệ thống nhưng vẫn cho gõ tên tổ đội / thầu phụ chưa có tài khoản. */}
-                <input
-                  id="assignee-name"
-                  list="assignee-options"
-                  value={assigneeName}
-                  onChange={(e) => setAssigneeName(e.target.value)}
-                  maxLength={80}
-                  placeholder="Chọn hoặc nhập tên..."
-                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all"
-                />
-                <datalist id="assignee-options">
-                  {users.map(u => <option key={u.id} value={u.name} />)}
-                </datalist>
-              </div>
+              <div className="flex flex-col gap-5">
+                <div className="grid sm:grid-cols-2 gap-5">
+                <div className="space-y-1.5">
+                  <label htmlFor="assignee-name" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Người xử lý</label>
+                  {/* datalist: gợi ý người trong hệ thống nhưng vẫn cho gõ tên tổ đội / thầu phụ chưa có tài khoản. */}
+                  <input
+                    id="assignee-name"
+                    list="assignee-options"
+                    value={assigneeName}
+                    onChange={(e) => setAssigneeName(e.target.value)}
+                    maxLength={80}
+                    placeholder="Chọn hoặc nhập tên..."
+                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all"
+                  />
+                  <datalist id="assignee-options">
+                    {users.map(u => <option key={u.id} value={u.name} />)}
+                  </datalist>
+                </div>
 
-              <div className="space-y-1.5">
-                <label htmlFor="assignee-due" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Hạn xử lý</label>
-                <input
-                  id="assignee-due"
-                  type="datetime-local"
-                  value={dueAt}
-                  min={toDateTimeLocal(new Date())}
-                  onChange={(e) => setDueAt(e.target.value)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all"
-                />
-              </div>
+                <div className="space-y-1.5">
+                  <label htmlFor="assignee-due" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Hạn xử lý</label>
+                  <input
+                    id="assignee-due"
+                    type="datetime-local"
+                    value={dueAt}
+                    min={toDateTimeLocal(new Date())}
+                    onChange={(e) => setDueAt(e.target.value)}
+                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all"
+                  />
+                </div>
 
-              <div className="sm:col-span-2 space-y-1.5">
-                <label htmlFor="assignee-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Việc cần làm</label>
-                <textarea
-                  id="assignee-description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  maxLength={500}
-                  placeholder="Ví dụ: phát mũ bảo hộ cho tổ 2 và nhắc lại quy định trước ca sáng"
-                  className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all resize-y"
-                />
-              </div>
+                <div className="sm:col-span-2 space-y-1.5">
+                  <label htmlFor="assignee-description" className="text-[10px] font-black text-white/40 uppercase tracking-widest">Việc cần làm</label>
+                  <textarea
+                    id="assignee-description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    rows={3}
+                    maxLength={500}
+                    placeholder="Ví dụ: phát mũ bảo hộ cho tổ 2 và nhắc lại quy định trước ca sáng"
+                    className="w-full px-3 py-2.5 rounded-xl bg-[var(--background-secondary)] border border-white/10 text-sm text-white outline-none focus:border-[var(--primary)] transition-all resize-y"
+                  />
+                </div>
 
-              <div className="sm:col-span-2 p-3 rounded-xl bg-[var(--background-secondary)] border border-white/5 text-xs text-white/60 flex flex-wrap gap-x-6 gap-y-1">
-                <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{violation.siteName} • {violation.cameraName}</span>
-                <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{violation.date || new Date(violation.detectedAt).toLocaleDateString()} {violation.time || ''}</span>
-              </div>
-            </div>
+                <div className="sm:col-span-2 p-3 rounded-xl bg-[var(--background-secondary)] border border-white/5 text-xs text-white/60 flex flex-wrap gap-x-6 gap-y-1">
+                  <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{violation.siteName} • {violation.cameraName}</span>
+                  <span className="flex items-center gap-1"><Calendar className="w-3 h-3" />{violation.date || new Date(violation.detectedAt).toLocaleDateString()} {violation.time || ''}</span>
+                </div>
+                </div>
 
-            <div className="flex gap-3 mt-8">
-              <button onClick={() => setShowAssign(false)} className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 font-bold text-sm hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]">Quay lại</button>
-              <button
-                onClick={submitAssignment}
-                disabled={createAction.isPending || assigneeName.trim().length < 2 || description.trim().length < 5}
-                className="flex-[2] py-3.5 rounded-2xl bg-red-500 text-white font-black text-sm uppercase tracking-widest hover:bg-red-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
-              >
-                <ClipboardCheck className="w-4 h-4" /> {createAction.isPending ? 'Đang giao...' : 'Giao việc'}
-              </button>
+              <div className="flex gap-3 mt-auto pt-2">
+                <button onClick={() => setShowAssign(false)} className="flex-1 py-3.5 rounded-2xl border border-white/10 text-white/60 font-bold text-sm hover:bg-white/5 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]">Quay lại</button>
+                <button
+                  onClick={submitAssignment}
+                  disabled={createAction.isPending || assigneeName.trim().length < 2 || description.trim().length < 5}
+                  className="flex-[2] py-3.5 rounded-2xl bg-red-500 text-white font-black text-sm uppercase tracking-widest hover:bg-red-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--primary)]"
+                >
+                  <ClipboardCheck className="w-4 h-4" /> {createAction.isPending ? 'Đang giao...' : 'Giao việc'}
+                </button>
+              </div>
+              </div>
             </div>
           </div>
         )}

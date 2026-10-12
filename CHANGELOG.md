@@ -5,6 +5,8 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Sửa
+- **Biểu mẫu "Giao việc khắc phục": ảnh vi phạm bên trái, thông tin bên phải**: trước đây ảnh bằng chứng là một dải ngang `h-40` với `object-cover` nên ảnh dọc 1080x1920 bị cắt thành một dải méo. Giờ ảnh/clip hiện đầy đủ (`object-contain`, cao `min(62vh, 560px)`) ở cột trái; cột phải gồm người xử lý, hạn, việc cần làm, thông tin vi phạm và nút "Quay lại / Giao việc" nằm ngang đáy ảnh; màn hình hẹp xếp dọc.
+- **Cuộn trong cửa sổ chi tiết vi phạm không làm trang nền chạy theo**: cuộn chuột trong cửa sổ (hoặc trên vùng nền tối) làm cú cuộn "tràn" sang trang phía sau. Thêm hook `useLockBodyScroll` (khoá cuộn `html`/`body` lúc mở, bù bề rộng thanh cuộn, trả lại và giữ nguyên vị trí cuộn khi đóng) và `overscroll-contain` cho cột nội dung và biểu mẫu.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
 - Video demo `210321.mp4` (cam-001/cam-005), `IMG_2744 2.MOV` (cam-007), `IMG_2745 2.MOV` (cam-008) chuyển mã từ HEVC/H.265 4K sang **H.264 720p**: Chrome/Linux không giải mã HEVC nên ô video đen trong khi engine (OpenCV) vẫn đọc được và đẩy khung nhận diện — nhìn như "không có video mà model vẫn bắt". File nhỏ hơn nhiều lần, engine không đổi.
