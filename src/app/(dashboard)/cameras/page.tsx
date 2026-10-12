@@ -246,7 +246,7 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Cam
   // --- Thống kê nhanh của khung hình hiện tại ---
   const persons = detections.filter(d => d.type === 'person');
   const violators = persons.filter(d => d.isViolation);
-  const missingCounts = { helmet: 0, gloves: 0, boots: 0 };
+  const missingCounts = { helmet: 0, vest: 0, gloves: 0, boots: 0 };
   persons.forEach(p => {
     p.missingPpe?.forEach(m => {
       if (m in missingCounts) missingCounts[m as keyof typeof missingCounts]++;
@@ -338,7 +338,7 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Cam
             <div className="p-3 rounded-2xl bg-white/[0.04] border border-white/10">
               <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest">Thiếu đồ bảo hộ</p>
               <p className="text-[11px] font-bold text-white/70 leading-tight mt-0.5">
-                Mũ {missingCounts.helmet} · Găng {missingCounts.gloves} · Giày {missingCounts.boots}
+                Mũ {missingCounts.helmet} · Áo {missingCounts.vest} · Găng {missingCounts.gloves} · Giày {missingCounts.boots}
               </p>
             </div>
           </div>
@@ -505,7 +505,7 @@ export default function CamerasPage() {
 
   const framePersons = onlineCameraTiles.flatMap(t => t.detections).filter(d => d.type === 'person');
   const frameViolators = framePersons.filter(d => d.isViolation);
-  const missingPpeCounts: Record<string, number> = { helmet: 0, gloves: 0, boots: 0 };
+  const missingPpeCounts: Record<string, number> = { helmet: 0, vest: 0, gloves: 0, boots: 0 };
   framePersons.forEach(p => {
     p.missingPpe?.forEach(m => {
       if (m in missingPpeCounts) missingPpeCounts[m]++;
@@ -749,9 +749,10 @@ export default function CamerasPage() {
           ))}
         </div>
 
-        <div className="grid sm:grid-cols-3 gap-3">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
           {[
             { key: 'helmet', label: 'Thiếu mũ bảo hộ', value: missingPpeCounts.helmet },
+            { key: 'vest', label: 'Thiếu áo phản quang', value: missingPpeCounts.vest },
             { key: 'gloves', label: 'Thiếu găng tay', value: missingPpeCounts.gloves },
             { key: 'boots', label: 'Thiếu giày bảo hộ', value: missingPpeCounts.boots },
           ].map(item => (
