@@ -5,6 +5,7 @@ import * as React from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Volume2, Wifi, WifiOff, ChevronDown, MapPin, Building2, Power, ListChecks } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { speakVietnamese } from '@/lib/speak';
 import { mockCameras } from '@/data/mock-cameras';
 import { CameraStatus } from '@/types/enums';
 import { CameraMonitoringCard } from '@/components/settings/CameraMonitoringCard';
@@ -20,6 +21,12 @@ export default function SiteSpeakerPage() {
   const [lastPlayedAt, setLastPlayedAt] = React.useState<number | null>(null);
   const [playError, setPlayError] = React.useState<string | null>(null);
   const [activated, setActivated] = React.useState(false);
+  // Tự đọc vi phạm do engine chốt. Dùng ref để bật/tắt không làm socket kết nối lại.
+  const [autoRead, setAutoRead] = React.useState(true);
+  const autoReadRef = React.useRef(true);
+  React.useEffect(() => {
+    autoReadRef.current = autoRead;
+  }, [autoRead]);
 
   const onlineCameras = mockCameras.filter((c) => c.status === CameraStatus.ONLINE);
   const selectedCamera = onlineCameras.find((c) => c.id === cameraId);
@@ -36,8 +43,18 @@ export default function SiteSpeakerPage() {
     socket.on('connect', () => {
       setIsConnected(true);
       socket.emit('subscribe-camera', cameraId);
+      socket.emit('subscribe-speaker', cameraId);
     });
     socket.on('disconnect', () => setIsConnected(false));
+
+    // Giọng đọc do trình duyệt tạo từ câu chữ server gửi tới — không cần file âm thanh hay khoá API.
+    socket.on('announce', (data: { cameraId: string; text: string }) => {
+      if (data.cameraId !== cameraId || !autoReadRef.current) return;
+      const err = speakVietnamese(data.text);
+      setPlayError(err);
+      if (err) return;
+      setLastPlayedAt(Date.now());
+    });
 
     socket.on('voice-broadcast', (data: { cameraId: string; audio: ArrayBuffer; mimeType: string }) => {
       if (data.cameraId !== cameraId) return;
@@ -64,6 +81,8 @@ export default function SiteSpeakerPage() {
 
   const activate = () => {
     new Audio(SILENT_AUDIO_SRC).play().catch(() => {});
+    // Mở khoá cả giọng đọc: trình duyệt chỉ cho speechSynthesis nói sau một thao tác bấm.
+    window.speechSynthesis?.speak(new SpeechSynthesisUtterance(''));
     setActivated(true);
   };
 
@@ -197,6 +216,16 @@ export default function SiteSpeakerPage() {
               )}
             </div>
           </div>
+          <label className="flex items-center gap-3 p-4 rounded-2xl bg-[var(--surface)] border border-[var(--border)] cursor-pointer">
+            <input
+              type="checkbox"
+              checked={autoRead}
+              onChange={(e) => setAutoRead(e.target.checked)}
+              className="w-4 h-4 accent-[var(--primary)]"
+            />
+            <span className="text-sm font-bold text-[var(--text-primary)]">Tự động đọc vi phạm bằng giọng nói</span>
+            <span className="text-xs text-[var(--text-muted)]">Nói rõ chỗ nào, vi phạm gì mỗi khi AI chốt vi phạm.</span>
+          </label>
         </div>
       )}
     </div>

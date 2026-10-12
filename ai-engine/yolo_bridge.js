@@ -32,6 +32,26 @@ app.post('/detections', (req, res) => {
   res.sendStatus(200);
 });
 
+// Loa công trường tự đọc vi phạm: server Next gọi vào đây khi engine chốt vi phạm. Chỉ phát
+// cho trang loa (room speaker-<id>), mỗi camera tối thiểu ANNOUNCE_COOLDOWN_MS mới đọc lại
+// để nhiều người vi phạm cùng lúc không đọc chồng. Không có loa nào nghe thì bỏ qua và
+// KHÔNG tính vào thời gian chờ.
+const ANNOUNCE_COOLDOWN_MS = Number(process.env.ANNOUNCE_COOLDOWN_MS) || 30000;
+const lastAnnounceAt = {};
+app.post('/announce', (req, res) => {
+  const { cameraId, text } = req.body || {};
+  if (typeof cameraId !== 'string' || !cameraId || typeof text !== 'string' || !text.trim() || text.length > 300) {
+    return res.sendStatus(400);
+  }
+  const room = `speaker-${cameraId}`;
+  if (!io.sockets.adapter.rooms.get(room)?.size) return res.status(202).json({ skipped: 'no-speaker' });
+  const now = Date.now();
+  if (now - (lastAnnounceAt[cameraId] || 0) < ANNOUNCE_COOLDOWN_MS) return res.status(429).json({ throttled: true });
+  lastAnnounceAt[cameraId] = now;
+  io.to(room).emit('announce', { cameraId, text });
+  res.sendStatus(200);
+});
+
 // Sức khoẻ cho agent/direct/health.ts: camera nào còn gửi detection, bao nhiêu client đang xem
 app.get('/health', (_req, res) => {
   res.json({ ok: true, lastDetectionAt, clients: io.engine.clientsCount, uptimeSec: Math.round((Date.now() - startedAt) / 1000) });
@@ -42,6 +62,12 @@ io.on('connection', (socket) => {
 
   socket.on('subscribe-camera', (cameraId) => {
     socket.join(`camera-${cameraId}`);
+  });
+
+  // Trang "Loa công trường" vào room riêng để /announce biết có loa đang nghe hay không
+  // (room camera-<id> còn gồm cả tab chỉ xem camera).
+  socket.on('subscribe-speaker', (cameraId) => {
+    socket.join(`speaker-${cameraId}`);
   });
 
   socket.on('subscribe-all', () => {

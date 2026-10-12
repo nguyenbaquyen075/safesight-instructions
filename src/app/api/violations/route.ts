@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { notifyViolation } from '@/lib/alert-notifier';
 import { enqueueAgentTask, pokeAgent } from '@/lib/agent-bridge';
+import { getViolationTypeLabel } from '@/lib/utils';
 import type { Violation } from '@/types/models';
 
 async function getRealViolations(): Promise<Violation[]> {
@@ -121,6 +122,19 @@ export async function POST(request: NextRequest) {
   // KHÔNG await — yolo_inference.py đang chặn frame loop chờ response này.
   // Nếu chuyển sang serverless (Vercel functions) phải đổi sang waitUntil/queue.
   notifyViolation(violation, camera).catch((err) => console.error('[telegram] notify failed', err));
+
+  // Loa công trường tự đọc "ở đâu, vi phạm gì". Bridge lo chuyện có loa nghe hay không và
+  // thời gian chờ giữa các lần đọc; lỗi ở đây chỉ ghi log, không được làm hỏng việc lưu vi phạm.
+  const bridgeUrl = process.env.YOLO_BRIDGE_URL?.trim() || 'http://127.0.0.1:4001';
+  fetch(`${bridgeUrl}/announce`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      cameraId,
+      text: `Tại ${camera.name}, ${getViolationTypeLabel(type).toLowerCase()}. Yêu cầu khắc phục ngay.`,
+    }),
+    signal: AbortSignal.timeout(2000),
+  }).catch((err) => console.error('[speaker] announce failed', err));
 
   // Agent review vi phạm này (lane nghiên cứu). Row là thông điệp; poke chỉ đánh thức sớm.
   enqueueAgentTask({ kind: 'violation.review', subjectType: 'violation', subjectId: violation.id, reason: `Vi phạm mới ${type} tại ${camera.name} (lần ${occurrenceCount ?? 1})`, priority: 300 })
