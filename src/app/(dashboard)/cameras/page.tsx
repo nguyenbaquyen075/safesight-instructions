@@ -67,7 +67,10 @@ function videoForCamera(cameraId: string, source?: string): string {
 // trôi khỏi hình. 0.5 = chậm một nửa, khung dễ theo mắt hơn.
 const TOC_DO_PHAT = 0.75;
 
-function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detections: Detection[]; aiPos?: number }) {
+// fit='cover' (ô trên lưới): video phủ kín ô, phần thừa bị cắt. fit='contain' (cửa sổ phóng to): video nằm TRỌN
+// trong khung, không cắt, có dải đen thừa — dùng min thay cho max trong kích thước khối video/khung.
+function DemoVideoWithBoxes({ src, detections, aiPos, fit = 'cover' }: { src: string; detections: Detection[]; aiPos?: number; fit?: 'cover' | 'contain' }) {
+  const pick = fit === 'contain' ? 'min' : 'max';
   const [ratio, setRatio] = React.useState<number | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
@@ -97,7 +100,7 @@ function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detection
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
         style={
           ratio
-            ? { width: `max(100cqw, 100cqh * ${ratio})`, height: `max(100cqh, 100cqw / ${ratio})` }
+            ? { width: `${pick}(100cqw, 100cqh * ${ratio})`, height: `${pick}(100cqh, 100cqw / ${ratio})` }
             : { width: '100%', height: '100%' }
         }
       >
@@ -206,7 +209,7 @@ interface StoredAiAlert {
 }
 
 // --- NEW: Camera Expansion Modal ---
-function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Camera, detections: Detection[], onClose: () => void, videoUrl: string }) {
+function LiveEventModal({ camera, detections, onClose, videoUrl, aiPos }: { camera: Camera, detections: Detection[], onClose: () => void, videoUrl: string, aiPos?: number }) {
   const [selectedKey, setSelectedKey] = React.useState<string | null>(null);
   // Lịch sử vi phạm ĐÃ GHI NHẬN của camera này (đọc từ feed thật, tự cập nhật khi có bản ghi mới)
   const [history, setHistory] = React.useState<StoredAiAlert[]>([]);
@@ -266,7 +269,8 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Cam
 
         {/* ==== Cột trái: video + tiêu đề/mô tả bên dưới ==== */}
         <div className="flex-1 flex flex-col bg-[#0b1220] rounded-[2rem] overflow-hidden border border-white/10 shadow-2xl">
-          <div className="relative aspect-video bg-black">
+          {/* Khung video có chiều cao riêng (không ép 16:9): video dọc 9:16 hiện TRỌN người, không bị kéo giãn */}
+          <div className="relative bg-black h-[min(62vh,640px)]">
             <div className="absolute top-0 left-0 right-0 p-5 flex justify-between items-center z-50 bg-gradient-to-b from-black/80 to-transparent">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-[var(--primary)] flex items-center justify-center text-white shadow-glow-primary">
@@ -285,17 +289,9 @@ function LiveEventModal({ camera, detections, onClose, videoUrl }: { camera: Cam
               </button>
             </div>
 
-            <video
-              src={videoUrl}
-              autoPlay muted loop playsInline
-              className="w-full h-full object-fill opacity-90"
-            />
-
-            <div className="absolute inset-0 pointer-events-none">
-              {detections.map(d => (
-                <AIDetectionBox key={d.id} detection={d} />
-              ))}
-            </div>
+            {/* Cùng thành phần với ô trên lưới: đồng bộ vị trí video với AI, khung nằm đúng vật, chỉ khác là
+                vừa khít (contain) thay vì phủ kín (cover) nên thấy đủ toàn cảnh */}
+            <DemoVideoWithBoxes src={videoUrl} detections={detections} aiPos={aiPos} fit="contain" />
 
             <div className="absolute bottom-4 left-4 px-4 py-3 rounded-2xl bg-black/50 backdrop-blur-md border border-white/10 flex items-center gap-6 z-50">
               <div className="flex flex-col">
@@ -544,6 +540,7 @@ export default function CamerasPage() {
           detections={getDetectionsForCamera(selectedCamera.cam.id)}
           onClose={() => setSelectedCamera(null)}
           videoUrl={selectedCamera.videoUrl}
+          aiPos={getVideoPosForCamera(selectedCamera.cam.id)}
         />
       )}
 

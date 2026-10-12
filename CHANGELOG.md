@@ -5,6 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Sửa
+- **Cửa sổ phóng to camera (`/cameras`) hiện đủ toàn cảnh như ô trên lưới**: trước đây cửa sổ này có một cách vẽ riêng — khung 16:9 cố định, `object-fill` kéo giãn video dọc 9:16 gấp ~3 lần chiều ngang, không đồng bộ vị trí video với AI (video chạy 1x còn AI phân tích theo `videoPos` nên khung lệch hình) và vẽ cả khung người. Giờ dùng lại `DemoVideoWithBoxes` của ô trên lưới với `fit="contain"` (video nằm TRỌN trong khung, không cắt, không méo, khung nhận diện cùng khối nên khớp vật), khung video cao `min(62vh, 640px)` thay cho 16:9 để video dọc hiện đủ người.
 - **Khung nhận diện trên `/cameras` khớp đúng hình video**: khối chứa video và lớp khung giờ có đúng tỉ lệ video và phủ kín ô (container query units `cqw`/`cqh`), thay cho khối luôn bằng ô. Trước đây video dọc 9:16 trong ô 357x456 bị `object-cover` cắt ~180px trên/dưới trong khi lớp khung vẫn tính % theo cả ô, nên khung ở phần dưới hình (bàn chân) hiện cao hơn giày thật ~45px và khung ở phần trên thấp hơn người. Video ngang không đổi.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
