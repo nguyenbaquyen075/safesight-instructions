@@ -130,6 +130,11 @@ export default function DashboardPage() {
   const { data: violations = [], isLoading: alertsLoading } = useViolations();
   const sites = useRealSitesFromCameras(violations);
   const sitesLoading = alertsLoading;
+  // Ảnh minh hoạ mỗi công trường = ảnh bằng chứng mới nhất của công trường đó (danh sách đã sắp mới -> cũ)
+  const siteImages: Record<string, string> = {};
+  for (const v of violations) {
+    if (v.snapshotUrl && v.siteId && !siteImages[v.siteId]) siteImages[v.siteId] = v.snapshotUrl;
+  }
 
   // Bọc mỗi vi phạm thật thành 1 "Alert" để tái dùng AlertTimeline có sẵn (không có bảng Alert
   // riêng cho luồng thật này — mỗi vi phạm THẬT đã tự thân là 1 cảnh báo trong hệ thống).
@@ -254,7 +259,7 @@ export default function DashboardPage() {
               Xem tất cả <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="relative z-10 min-h-[300px]">
+          <div className="relative z-10 min-h-[440px]">
             {alertsLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map(i => (
@@ -268,7 +273,7 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <AlertTimeline alerts={alerts?.slice(0, 5) ?? []} />
+              <AlertTimeline alerts={alerts?.slice(0, 8) ?? []} />
             )}
           </div>
         </div>
@@ -292,7 +297,7 @@ export default function DashboardPage() {
               Xem tất cả <ArrowRight className="w-3 h-3" />
             </Link>
           </div>
-          <div className="relative z-10 min-h-[300px]">
+          <div className="relative z-10 min-h-[440px]">
             {sitesLoading ? (
                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[1, 2, 3, 4].map(i => (
@@ -300,7 +305,7 @@ export default function DashboardPage() {
                   ))}
                </div>
             ) : (
-              <SiteStatusGrid sites={sites} />
+              <SiteStatusGrid sites={sites} images={siteImages} />
             )}
           </div>
         </div>

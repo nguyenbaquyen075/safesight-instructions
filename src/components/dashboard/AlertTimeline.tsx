@@ -9,6 +9,7 @@ import { CheckCircle2, ShieldAlert } from 'lucide-react';
 import { cn, getSeverityColor, getViolationTypeLabel } from '@/lib/utils';
 import type { Alert } from '@/types/models';
 import { AlertStatus } from '@/types/enums';
+import { FallbackImage } from '@/components/dashboard/FallbackImage';
 
 interface AlertTimelineProps {
   alerts: Alert[];
@@ -18,7 +19,7 @@ export function AlertTimeline({ alerts }: AlertTimelineProps) {
   const router = useRouter();
   if (alerts.length === 0) {
     return (
-      <div className="h-[300px] flex flex-col items-center justify-center text-center">
+      <div className="h-[440px] flex flex-col items-center justify-center text-center">
         <ShieldAlert className="w-8 h-8 text-[var(--text-muted)] mb-2" />
         <p className="text-sm text-[var(--text-secondary)]">Không có thông báo gần đây</p>
       </div>
@@ -26,7 +27,7 @@ export function AlertTimeline({ alerts }: AlertTimelineProps) {
   }
 
   return (
-    <div className="h-[300px] overflow-y-auto pr-2 relative">
+    <div className="h-[440px] overflow-y-auto pr-2 relative">
       <div className="absolute left-3 top-2 bottom-2 w-px bg-[var(--border)]" />
       
       <div className="space-y-4">
@@ -68,23 +69,21 @@ export function AlertTimeline({ alerts }: AlertTimelineProps) {
                   </span>
                 </div>
 
-                <div className="flex items-start gap-3 p-3 rounded-lg bg-[var(--background)] border border-[var(--border)]">
-                  {/* Thumbnail — khung hình sống từ video đang giám sát (khớp hiện tại) */}
-                  <div className="relative w-16 h-12 rounded-md overflow-hidden bg-[var(--surface-elevated)] flex-shrink-0 border border-[var(--border)]">
-                    <video
-                      src="/videos/test1.mp4"
-                      autoPlay
-                      muted
-                      loop
-                      playsInline
-                      className="object-cover w-full h-full"
+                <div className="flex items-start gap-4 p-4 rounded-xl bg-[var(--background)] border border-[var(--border)]">
+                  {/* Ảnh minh hoạ: ảnh bằng chứng của vi phạm (ảnh dự phòng nếu ảnh đã bị xoá) */}
+                  <div className="relative w-28 h-24 rounded-lg overflow-hidden bg-[var(--surface-elevated)] flex-shrink-0 border border-[var(--border)]">
+                    <FallbackImage
+                      src={violation.snapshotUrl}
+                      fallbackSrc="/images/site-placeholder.jpg"
+                      alt="Ảnh minh hoạ vi phạm"
+                      className="object-cover object-top w-full h-full"
                     />
-                    <div className="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-md" />
+                    <div className="absolute inset-0 ring-1 ring-inset ring-black/10 rounded-lg" />
                   </div>
 
                   {/* Details */}
                   <div className="flex-1 min-w-0 flex flex-col justify-center">
-                    <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                    <p className="text-base font-semibold text-[var(--text-primary)] truncate">
                       {getViolationTypeLabel(violation.type)}
                     </p>
                     <p className="text-xs text-[var(--text-secondary)] truncate">

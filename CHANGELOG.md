@@ -5,6 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Sửa
+- **Trang tổng quan: ảnh minh hoạ cho "Thông báo gần đây" và "Trạng thái công trường"**: thông báo chỉ có ô ảnh nhỏ 64x48 (video mẫu cố định, khung 300px, 5 dòng) và công trường không có ảnh. Giờ mỗi thông báo hiện ảnh bằng chứng của vi phạm (112x96), khung cao 440px, hiện 8 thông báo; mỗi công trường có ảnh minh hoạ ở đầu thẻ (ảnh bằng chứng mới nhất của công trường đó). Ảnh bằng chứng bị engine xoá khi tắt nên lỗi tải thì chuyển sang ảnh minh hoạ chung `public/images/site-placeholder.jpg` (lấy từ `landing-page/assets/site-preview.jpg`) qua `FallbackImage`.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
 - Video demo `210321.mp4` (cam-001/cam-005), `IMG_2744 2.MOV` (cam-007), `IMG_2745 2.MOV` (cam-008) chuyển mã từ HEVC/H.265 4K sang **H.264 720p**: Chrome/Linux không giải mã HEVC nên ô video đen trong khi engine (OpenCV) vẫn đọc được và đẩy khung nhận diện — nhìn như "không có video mà model vẫn bắt". File nhỏ hơn nhiều lần, engine không đổi.
