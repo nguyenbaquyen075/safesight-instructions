@@ -68,7 +68,7 @@ function videoForCamera(cameraId: string, source?: string): string {
 const TOC_DO_PHAT = 0.75;
 
 function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detections: Detection[]; aiPos?: number }) {
-  const [, setRatio] = React.useState<number | null>(null);
+  const [ratio, setRatio] = React.useState<number | null>(null);
   const videoRef = React.useRef<HTMLVideoElement>(null);
 
   // TUA video theo vị trí AI đang phân tích. Không có bước này thì hai bên chỉ
@@ -87,13 +87,19 @@ function DemoVideoWithBoxes({ src, detections, aiPos }: { src: string; detection
     // diện nằm CÙNG khung con nên bị cắt y hệt -> vẫn khớp đúng người.
     // Phủ kín ô (chiều cao do ô quyết định), giữ đúng tỉ lệ, phần thừa bị CẮT —
     // không méo, không viền đen. Khung nhận diện nằm cùng khối nên cắt y hệt.
-    <div className="absolute inset-0 overflow-hidden bg-black">
+    <div className="absolute inset-0 overflow-hidden bg-black" style={{ containerType: 'size' }}>
       <div
-        className="relative w-full h-full"
-        // PHỦ KÍN ô mà KHÔNG méo: giữ đúng tỉ lệ video rồi phóng to tới khi cạnh
-        // ngắn chạm mép ô, phần thừa bị cắt (overflow-hidden ở thẻ cha).
-        // Video dọc 9:16 trong ô ngang -> tràn trên/dưới, không còn viền đen.
-        // Khung nhận diện nằm CÙNG khối này nên bị cắt y hệt, vẫn khớp người.
+        // Khối con có ĐÚNG tỉ lệ video và phủ kín ô (cqw/cqh = % rộng/cao của ô): video không bị
+        // méo, phần thừa bị cắt ở thẻ cha. Khung nhận diện nằm TRONG khối này nên % của chúng là
+        // % của khung hình video — không phải % của ô. Trước đây khối con luôn bằng ô, còn video
+        // object-cover bị cắt trên/dưới (~180px với video dọc 9:16 trong ô 357x456) nên khung bị
+        // kéo lệch: phần dưới hình (bàn chân) hiện CAO hơn giày thật khoảng 45px.
+        className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
+        style={
+          ratio
+            ? { width: `max(100cqw, 100cqh * ${ratio})`, height: `max(100cqh, 100cqw / ${ratio})` }
+            : { width: '100%', height: '100%' }
+        }
       >
         <video
           ref={videoRef}

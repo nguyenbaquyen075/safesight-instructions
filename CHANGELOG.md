@@ -5,6 +5,7 @@ Mọi thay đổi đáng chú ý của dự án được ghi tại đây. Địn
 ## [Unreleased]
 
 ### Sửa
+- **Khung nhận diện trên `/cameras` khớp đúng hình video**: khối chứa video và lớp khung giờ có đúng tỉ lệ video và phủ kín ô (container query units `cqw`/`cqh`), thay cho khối luôn bằng ô. Trước đây video dọc 9:16 trong ô 357x456 bị `object-cover` cắt ~180px trên/dưới trong khi lớp khung vẫn tính % theo cả ô, nên khung ở phần dưới hình (bàn chân) hiện cao hơn giày thật ~45px và khung ở phần trên thấp hơn người. Video ngang không đổi.
 - Modal camera/vi phạm/công trường, tab Agent: ô chat đứng **trước** nhật ký; nhật ký gói trong mục "Nhật ký agent" gập được (20 sự kiện gần nhất, hộp cuộn riêng) kèm liên kết sang trang Agent — trước đây phải cuộn qua toàn bộ log mới thấy ô hỏi.
 - `/agent`: dòng thời gian tải theo trang 50 sự kiện với nút "Tải thêm" (trần 500 theo API) trong hộp cuộn 60vh thay vì tải cứng 150 dòng và kéo dài trang vô tận.
 - Video demo `210321.mp4` (cam-001/cam-005), `IMG_2744 2.MOV` (cam-007), `IMG_2745 2.MOV` (cam-008) chuyển mã từ HEVC/H.265 4K sang **H.264 720p**: Chrome/Linux không giải mã HEVC nên ô video đen trong khi engine (OpenCV) vẫn đọc được và đẩy khung nhận diện — nhìn như "không có video mà model vẫn bắt". File nhỏ hơn nhiều lần, engine không đổi.
